@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.5 — 2026-10-12
+
+Follow-up on the same day as 0.1.4 (Asia/Shanghai).
+
+### Changed
+- **Toolchain:** box/dev **rustc/cargo 1.99.0** (latest stable); workspace + `src-tauri` `rust-version` **1.99.0** (was 1.91).
+- **Wasmtime 43 → 49.0.2** (needs Rust ≥1.96; now allowed). Engine still **lazy** on first WASM extension load.
+- Synced `package-lock.json` so CI `npm ci` works (cloud-build on `v0.1.4` failed on lock drift).
+- Cheap `dead_code` allows on unused TextMate/storage helpers; `cargo fix` unused imports.
+
+### Build / release
+- Local: `npm run build` + `cargo build --release` (relaxed profile OK for testing).
+- Tag **v0.1.5**; unsigned multi-OS via `cloud-build.yml`.
+
 ## 0.1.4 — 2026-10-12
 
 LAB-707 / Grok Bot box pass on `chocolatedesue/sidex` (Asia/Shanghai).

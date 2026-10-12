@@ -1,6 +1,6 @@
 # SideX — Markdown WYSIWYG (所见即所得) + VS Code parity notes
 
-Date: 2026-10-12 (Asia/Shanghai). Merged to **`main`**; app version **0.1.4**.
+Date: 2026-10-12 (Asia/Shanghai). Merged to **`main`**; app version **0.1.5**.
 Box checkout: `/workspace/sidex` (fork `chocolatedesue/sidex`).
 Original feature branch: `feature/markdown-wysiwyg-vscode-parity`.
 
@@ -75,8 +75,8 @@ Gitignored runtime assets (populated by `npm run setup:full` / setup script):
 - `npm run setup` / `setup:full` — builtins + VS Code **1.141** `markdown-editor-out`.
 - `npm run build` — **green**. `postbuild` copies `extensions/` into `dist/extensions/` including `markdown-editor-out/editor.js`.
 - Dev static: `GET /extensions/markdown-language-features/markdown-editor-out/editor.js` → 200 via vite middleware.
-- Toolchain: **rustc/cargo 1.91.0** via rustup (`PATH` must include `~/.cargo/bin`). `cargo check` / release binary OK; Tauri GUI needs display.
-- Push / release: `gh` as **chocolatedesue**; shipped on `main` and tag **v0.1.4**.
+- Toolchain: **rustc/cargo 1.99.0** (latest stable) via rustup (`PATH` must include `~/.cargo/bin`). `cargo check` / release binary OK; Tauri GUI needs display.
+- Push / release: `gh` as **chocolatedesue**; shipped on `main` and tag **v0.1.5**.
 
 ## Remaining gaps vs VS Code Markdown Editor
 
@@ -93,4 +93,4 @@ SideX built-in AI agent / `sidexChat` — not touched.
 
 ## 2026-10-12 dep/perf + release follow-up
 
-See CROSS_VALIDATION_REPORT.md "Dependency + performance pass" and "Release 0.1.4". rustc 1.91; Wasmtime lazy; npm/cargo patch bumps; EmbedPDF + marketplace install; tag `v0.1.4`.
+See CROSS_VALIDATION_REPORT.md "Dependency + performance pass" and "Release 0.1.4". rustc 1.99; Wasmtime 49 lazy; npm/cargo patch bumps; EmbedPDF + marketplace install; tag `v0.1.5`.

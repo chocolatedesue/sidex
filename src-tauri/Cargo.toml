@@ -1,12 +1,12 @@
 [package]
 name = "sidex"
-version = "0.1.4"
+version = "0.1.5"
 description = "SideX - A fast, open-source code editor"
 authors = ["Siden Technologies Inc"]
 license = "MIT"
 repository = "https://github.com/sidenai/sidex"
 edition = "2021"
-rust-version = "1.91.0"
+rust-version = "1.99.0"
 
 [[bin]]
 name = "SideX"
@@ -89,13 +89,13 @@ open = "5"
 url = "2"
 
 # WASM extension runtime
-wasmtime = { version = "43", default-features = false, features = [
+wasmtime = { version = "49", default-features = false, features = [
   "runtime",
   "component-model",
   "cranelift",
   "async",
 ] }
-wasmtime-wasi = "43"
+wasmtime-wasi = "49"
 toml = "0.8"
 anyhow = "1"
 sidex-db = { path = "../crates/sidex-db" }

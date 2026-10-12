@@ -214,6 +214,7 @@ pub fn syntax_tokenize(language: String, source: String) -> Result<Vec<SyntaxTok
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct TextMateLineTokens {
     pub line: u32,
     pub tokens: Vec<TextMateToken>,
@@ -221,6 +222,7 @@ pub struct TextMateLineTokens {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct TextMateToken {
     pub start: u32,
     pub end: u32,
@@ -229,6 +231,7 @@ pub struct TextMateToken {
 
 #[allow(clippy::needless_pass_by_value)]
 #[tauri::command]
+#[allow(dead_code)]
 pub fn textmate_tokenize_lines(
     grammar_json: String,
     source: String,

@@ -23,7 +23,6 @@ use commands::window::restore_and_show;
 use std::sync::Arc;
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::Listener;
 use tauri::Manager;
 
 #[cfg(target_os = "macos")]

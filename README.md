@@ -27,7 +27,7 @@
 
 SideX is a port of Visual Studio Code that replaces Electron with [Tauri](https://tauri.app/) — a Rust backend and OS's native webview. The same TypeScript workbench, the same editor, terminal, and Git integration, running without a bundled browser.
 
-> **Early release (0.1.4).** Core editing, terminal, Markdown WYSIWYG, EmbedPDF, and marketplace install are in place. The extension host (full activate / non-PDF custom editors) and debugger are still in progress. See [What's Working](#whats-working).
+> **Early release (0.1.5).** Core editing, terminal, Markdown WYSIWYG, EmbedPDF, and marketplace install are in place. The extension host (full activate / non-PDF custom editors) and debugger are still in progress. See [What's Working](#whats-working).
 
 ---
 
@@ -127,7 +127,7 @@ npm run build         # Vite workbench → dist/ (includes EmbedPDF + markdown-e
 npx tauri build       # packages desktop app; runs `npm run build` via beforeBuildCommand
 ```
 
-Requires **Rust 1.91+** (`src-tauri` / workspace `rust-version`). `npm run build` raises Vite's Node heap to 12 GB internally. If you still OOM, set `NODE_OPTIONS="--max-old-space-size=16384"`.
+Requires **Rust 1.99+** (latest stable at release; `rust-version` 1.99.0) (`src-tauri` / workspace `rust-version`). `npm run build` raises Vite's Node heap to 12 GB internally. If you still OOM, set `NODE_OPTIONS="--max-old-space-size=16384"`.
 
 First desktop build takes several minutes (Rust). Unsigned multi-OS binaries without signing secrets: see [docs/CLOUD-BUILD.md](./docs/CLOUD-BUILD.md) (`cloud-build.yml`). Changelog: [CHANGELOG.md](./CHANGELOG.md). Cross-check notes: [CROSS_VALIDATION_REPORT.md](./CROSS_VALIDATION_REPORT.md).
 

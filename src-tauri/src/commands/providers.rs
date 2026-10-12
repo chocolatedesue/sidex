@@ -21,7 +21,6 @@
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 

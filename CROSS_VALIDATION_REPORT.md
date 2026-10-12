@@ -3,8 +3,8 @@
 **Date:** 2026-10-12 (Asia/Shanghai, UTC+8) — release prep **0.1.4**  
 **Repo:** `chocolatedesue/sidex`  
 **Box checkout:** `/workspace/sidex` (Grok Bot built-in machine)  
-**Version:** app `0.1.4` (`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml`)  
-**Tip:** `git log -1 --oneline` on `origin/main`; tag `v0.1.4` + GitHub Release; see `CHANGELOG.md`.
+**Version:** app `0.1.5` (`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml`)  
+**Tip:** `git log -1 --oneline` on `origin/main`; tag `v0.1.5` + GitHub Release; see `CHANGELOG.md`.
 
 Sources: Multica LAB-707 (ccds lab) prior agent work + this pass (marketplace, EmbedPDF EditorPane, audit/optimize, build+interactive smoke). **No Multica issue comment** (user dismissed widget).
 
@@ -146,7 +146,7 @@ MD WYSIWYG / EmbedPDF / marketplace install path **not intentionally changed** b
 
 ## Remaining hard limits (honest)
 
-1. Box has **rustc 1.91.0** (rustup); `cargo check` / release binary build OK. Full signed `tauri build` + GUI E2E still prefer **cloud-build** / desktop with display (`docs/CLOUD-BUILD.md`).
+1. Box has **rustc 1.99.0** (latest stable via rustup); `cargo check` / release binary build OK. Full signed `tauri build` + GUI E2E still prefer **cloud-build** / desktop with display (`docs/CLOUD-BUILD.md`).
 2. Non-PDF extension **customEditors** need webview resolve bridge (host stores providers; pane path incomplete).
 3. Formatting CI may still fail on pre-existing AI-crate prettier/rustfmt noise.
 4. MD Diff Editor WYSIWYG path not ported.
@@ -167,9 +167,14 @@ MD WYSIWYG / EmbedPDF / marketplace install path **not intentionally changed** b
 
 ---
 
+## Release 0.1.5
+
+- Toolchain **rustc 1.99.0**; wasmtime **49.0.2**; `package-lock.json` synced for `npm ci`.
+- Docs/CHANGELOG updated; local `npm run build` + `cargo build --release` → `release-artifacts/`.
+- Tag **v0.1.5** → GitHub Release; `cloud-build.yml` on the tag for Win/macOS/Linux unsigned binaries.
+- Prior tag `v0.1.4` remains (cloud-build failed there on lock drift).
+
 ## Release 0.1.4
 
-- Version bump in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`.
-- Docs: README, this report, `DEV_NOTES_MD_WYSIWYG.md`, new `CHANGELOG.md`.
-- Local: `npm run build` + `cargo build --release` (and/or web `dist` zip) under `release-artifacts/`.
-- Tag `v0.1.4` → GitHub Release; `cloud-build.yml` also runs on the tag for Linux/Windows/macOS unsigned binaries.
+- Version bump + docs/CHANGELOG; local linux tarball + web dist on GitHub Release.
+- Cloud-build for `v0.1.4` **failed** (`npm ci` lock out of sync) — fixed in 0.1.5.

@@ -107,6 +107,7 @@ impl LocalServer {
     }
 
     /// WebSocket origin the workbench should connect to.
+    #[allow(dead_code)]
     pub fn ws_url(&self) -> String {
         format!("ws://127.0.0.1:{}", self.port())
     }
