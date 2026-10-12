@@ -6,7 +6,7 @@ Two clouds can build this tree. Neither needs a local toolchain.
 |---|---|---|
 | GitHub Actions — `build.yml` (upstream) | `cargo check` on Linux / macOS / Windows | push to `main`, PR (paths-filtered) |
 | GitHub Actions — `release.yml` (upstream) | the real release: `tauri build` × 6 targets, signing, Cloudflare R2 + updater manifest | tag `v*` or manual dispatch |
-| GitHub Actions — `cloud-build.yml` (added here) | unsigned Linux + Windows release binaries as **workflow artifacts** | manual dispatch, or tag `v*` |
+| GitHub Actions — `cloud-build.yml` (added here) | unsigned Linux + Windows release binaries and an unsigned macOS `SideX.app` (arm64 + x64), as **workflow artifacts** | manual dispatch, or tag `v*` |
 | CNB — `.cnb.yml` (added here) | `check` on push/PR; `linux-x86_64` release tarball published to the `dist/linux-x86_64` branch | push to `main`, PR |
 
 ## Getting a binary without any secrets
@@ -20,7 +20,17 @@ to R2 (`siden-assets`), so on a mirror without those secrets it will fail.
    to a GitHub Release.
 
 Artifacts land under the run’s **Artifacts** section: `sidex-linux-x86_64`
-(`.tar.gz`) and `sidex-windows-x86_64` (`.zip`).
+(`.tar.gz`), `sidex-windows-x86_64` (`.zip`), and `sidex-macos-arm64` /
+`sidex-macos-x64` (zipped `SideX.app`).
+
+The macOS bundle is **unsigned** (no Apple certificate in this mirror), so
+Gatekeeper will refuse it on first open. Download, unzip, then either
+right-click → *Open*, or clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine SideX.app
+open SideX.app
+```
 
 The tarball/zip contains the release binary (the workbench frontend is embedded
 in it), `dist/` (the built frontend assets), the `extension-host/` and
@@ -77,9 +87,9 @@ Node 20+ comes from NodeSource; the CNB job points cargo at the aliyun mirror
 
 ## Notes / possible follow-ups
 
-- macOS is not built in `.cnb.yml` (CNB has no cloud macOS nodes) and is not in
-  `cloud-build.yml` (it would need the Apple signing material to be useful).
-  Upstream’s `release.yml` covers it.
+- macOS is not built in `.cnb.yml` — CNB has no cloud macOS nodes — so it goes
+  through GitHub Actions (`cloud-build.yml`, unsigned). Upstream's `release.yml`
+  builds the signed DMGs when the Apple secrets are present.
 - `cargo build --release` produces the raw binary rather than a `.deb`/AppImage;
   `tauri build` (the CLI is already a dev dependency) would emit installers —
   that is what upstream’s `release.yml` does, given the secrets.

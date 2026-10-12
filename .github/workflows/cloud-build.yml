@@ -1,6 +1,6 @@
 name: Cloud build (no signing secrets)
 
-# Downloadable Linux and Windows binaries without any release secrets.
+# Downloadable Linux, Windows and macOS builds without any release secrets.
 #
 # The upstream `release.yml` is the real release pipeline: it runs `tauri build`
 # for six targets, signs them (Apple certificate, Azure Trusted Signing) and
@@ -8,6 +8,10 @@ name: Cloud build (no signing secrets)
 # secrets this mirror does not have. This workflow is the "just give me a
 # binary" path: it builds release binaries and attaches them as workflow
 # artifacts, nothing else.
+#
+# Linux and Windows come out as the raw release binary plus its resources;
+# macOS goes through `tauri build` so it produces a real SideX.app (unsigned —
+# see docs/CLOUD-BUILD.md for how to open it past Gatekeeper).
 #
 # Trigger it from the Actions tab ("Run workflow") or by pushing a tag; tags
 # additionally attach the files to a GitHub Release.
@@ -117,10 +121,65 @@ jobs:
           name: sidex-windows-x86_64
           path: sidex-*.zip
 
+  macos:
+    name: macos-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            target: aarch64-apple-darwin
+          - arch: x64
+            target: x86_64-apple-darwin
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # `tauri build` runs `npm run build` itself (beforeBuildCommand) and then
+      # bundles SideX.app, so only the dependencies are needed here.
+      - name: Frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          key: macos-${{ matrix.target }}
+
+      - name: Build the app bundle
+        # No signing identity and no updater key here, so the bundle is
+        # unsigned; `--bundles app` skips the dmg (all it would need is
+        # create-dmg and a mounted image).
+        run: npx tauri build --target ${{ matrix.target }} --bundles app
+
+      - name: Package
+        run: |
+          set -e
+          VERSION=$(node -p "require('./package.json').version")
+          NAME="sidex-${VERSION}-macos-${{ matrix.arch }}"
+          APP="src-tauri/target/${{ matrix.target }}/release/bundle/macos/SideX.app"
+          test -d "$APP" || { echo "no app bundle at $APP"; exit 1; }
+          # ditto keeps the bundle's symlinks and resource forks intact.
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "${NAME}.zip"
+          ls -lh "${NAME}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidex-macos-${{ matrix.arch }}
+          path: sidex-*.zip
+
   release:
     name: attach to release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux-x86_64, windows-x86_64]
+    needs: [linux-x86_64, windows-x86_64, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
