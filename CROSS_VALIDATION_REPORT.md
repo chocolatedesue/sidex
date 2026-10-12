@@ -4,7 +4,7 @@
 **Repo:** `chocolatedesue/sidex`  
 **Box checkout:** `/workspace/sidex` (Grok Bot built-in machine)  
 **Merge HEAD:** `de752693bfde907345e15425283abe6ef3f65de4` (feature/markdown-wysiwyg-vscode-parity → main)  
-**Follow-up commits:** KeyChord `7a6bff62faed081c3e5896075cc3fe725f8643b9`; report tip `a308ed66b7cd940aef7eafef2ffffa4ab09221cb`  
+**Follow-up commits on main:** KeyChord `7a6bff62faed081c3e5896075cc3fe725f8643b9`; report docs commits after that (see `git log`). Tip = `origin/main`.
 **Remote:** `origin/main` includes both (pushed).
 
 Sources: Multica LAB-707 (ccds lab) user asks + agent deliveries, `DEV_NOTES_MD_WYSIWYG.md`, VS Code 1.141 `markdown-editor-out`, local `npm run build`, GitHub Actions.
@@ -19,7 +19,7 @@ Sources: Multica LAB-707 (ccds lab) user asks + agent deliveries, `DEV_NOTES_MD_
 | 2 | Align VS Code feel / icons / plugins | **PARTIAL** | Codicon `markdown` / `openPreview` / `edit` on editor title. Open VSX fallback in `marketplace.rs`. Extension host WIP limits plugin activation. |
 | 3 | Markdown 所见即所得 = VS Code latest WYSIWYG | **PASS** | `viewType: vscode.markdown.editor`; loads VS Code **1.141** `markdown-editor-out/editor.js` (~598KB). Not a toy renderer. |
 | 4 | Cross-validate vs VS Code behavior | **PARTIAL** | Protocol/commands/assets verified; GUI E2E not on headless box. **Ctrl+K V** chord fixed (was wrong non-chord binding). |
-| 5 | Pushed and merged into **main** | **PASS** | Merge `de75269` on `origin/main`; follow-ups `7a6bff6` + report tip on `origin/main`. |
+| 5 | Pushed and merged into **main** | **PASS** | Merge `de75269` on `origin/main`; KeyChord `7a6bff6` + report docs on `origin/main`. |
 
 ---
 
@@ -85,7 +85,7 @@ Asset base: `${origin}/extensions/markdown-language-features/markdown-editor-out
 | Commit | Change |
 |--------|--------|
 | `7a6bff62faed081c3e5896075cc3fe725f8643b9` | `KeyChord(Ctrl/Cmd+K, V)` for `markdown.showPreviewToSide`. |
-| `a308ed66b7cd940aef7eafef2ffffa4ab09221cb` | Full LAB-707 `CROSS_VALIDATION_REPORT.md` tables. |
+| later docs commits on main | Full LAB-707 `CROSS_VALIDATION_REPORT.md` (this file). |
 
 ---
 
