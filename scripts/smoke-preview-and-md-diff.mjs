@@ -30,7 +30,9 @@ const bridgeSrc = read('src/vs/workbench/contrib/extensions/browser/tauriExtensi
 step('bridge.nonPdfRegistered', bridgeSrc.includes('[webview bridge]') && bridgeSrc.includes('_openExtensionCustomEditor'));
 step('bridge.noLongerDeferred', !bridgeSrc.includes('deferred (non-PDF webview bridge pending)'));
 step('bridge.resolveRequest', bridgeSrc.includes("'resolveCustomEditor'") || bridgeSrc.includes('"resolveCustomEditor"') || bridgeSrc.includes('resolveCustomEditor'));
-step('bridge.pdfEmbedKept', bridgeSrc.includes('PdfPreviewEditorInput') && bridgeSrc.includes('via EmbedPDF'));
+step('bridge.openWithSkipsBuiltins', bridgeSrc.includes('BUILTIN_OPEN_WITH_VIEW_TYPES') && bridgeSrc.includes('Open With: skip'));
+step('bridge.openWithNoFakePdfRemap', !bridgeSrc.includes('via EmbedPDF'));
+step('bridge.pdfBuiltinOnly', bridgeSrc.includes('use built-in PDF Preview'));
 
 const contribSrc = read('src/vs/workbench/contrib/markdown/browser/markdown.contribution.ts');
 step('md.createDiffEditorInput', contribSrc.includes('createDiffEditorInput'));
@@ -43,6 +45,16 @@ step('md.diff.standalone', diffSrc.includes('createStandaloneEditorInput'));
 
 const edSrc = read('src/vs/workbench/contrib/markdown/browser/markdownEditor.ts');
 step('md.standaloneApi', edSrc.includes('createStandaloneEditorInput'));
+
+
+const previewSrc = read('src/vs/workbench/contrib/markdown/browser/markdownPreview.ts');
+step('md.preview.viewType.vscode', previewSrc.includes("MARKDOWN_PREVIEW_VIEW_TYPE = 'vscode.markdown.preview.editor'"));
+
+const pdfContrib = read('src/vs/workbench/contrib/pdfPreview/browser/pdfPreview.contribution.ts');
+step('pdf.openWith.label', pdfContrib.includes("'PDF Preview'") && pdfContrib.includes('EmbedPDF'));
+step('pdf.openWith.default', pdfContrib.includes('RegisteredEditorPriority.default'));
+
+step('md.editor.viewType.vscode', edSrc.includes("MARKDOWN_EDITOR_VIEW_TYPE = 'vscode.markdown.editor'") || edSrc.includes('vscode.markdown.editor'));
 
 // Live resolveCustomEditor against host.cjs (no IPC process.send → module.exports branch)
 try {

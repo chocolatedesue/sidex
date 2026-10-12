@@ -56,8 +56,8 @@ RAM savings are most tested on macOS, WKWebView is shared with Safari. On Window
 - Extension marketplace — [Open VSX](https://open-vsx.org/) + siden gallery search/install (VSIX download + unpack)
 - File watching, file search, full-text search, Rust-backed search index
 - SQLite storage, document management (autosave, undo/redo, encoding)
-- **Markdown:** text editor, side preview (`Ctrl+K` then `V`), and **Markdown Editor** WYSIWYG via VS Code **1.141** `markdown-editor-out` (`Markdown: Open Markdown Editor` / Reopen With)
-- **PDF:** built-in **EmbedPDF** EditorPane (`@embedpdf/snippet`) for `.pdf` / Reopen With
+- **Markdown:** text editor, side preview (`Ctrl+K` then `V`), **Markdown Preview**, and **Markdown Editor** WYSIWYG via VS Code **1.141** `markdown-editor-out` (Open With / Reopen With / `Markdown: Open Markdown Editor`)
+- **PDF:** built-in **PDF Preview** (EmbedPDF / `@embedpdf/snippet`) default for `.pdf` / Open With
 - Built-in AI agent — optional; **off by default** (`sidex.chat.enabled`). When enabled: chat, inline diffs, shell commands, multi-file edits; bring your own model provider, no account needed (see [AI Agent](#ai-agent))
 
 ---

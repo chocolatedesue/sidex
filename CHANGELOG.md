@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (post-0.1.5) — Open With ↔ VS Code UX
+
+### Fixed
+- **Open With / Reopen With hope = actual:** picker no longer double-lists workbench Markdown hosts from `markdown-language-features` contributes, and no longer shows fake marketplace PDF entries labeled "(via EmbedPDF)" that always opened EmbedPDF. Built-in options only where they work.
+- **VS Code-shaped choices:** `.md` → Text Editor (default) + **Markdown Preview** (`vscode.markdown.preview.editor`) + **Markdown Editor** (`vscode.markdown.editor`, Diff via `createDiffEditorInput`); `.pdf` → Text Editor + **PDF Preview** (EmbedPDF, default). Marketplace non-PDF preview `customEditors` still appear and resolve via the webview bridge.
+
+### Changed
+- Markdown Preview viewType aligned to VS Code id `vscode.markdown.preview.editor` (was `sidex.markdown.preview`).
+- PDF Open With label shortened to **PDF Preview** (detail: EmbedPDF).
+
 ## Unreleased (post-0.1.5) — Preview plugins + Markdown Diff WYSIWYG
 
 ### Fixed

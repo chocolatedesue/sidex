@@ -123,9 +123,10 @@ class MarkdownPreviewAutoReopen extends Disposable implements IWorkbenchContribu
 registerWorkbenchContribution2(MarkdownPreviewAutoReopen.ID, MarkdownPreviewAutoReopen, WorkbenchPhase.BlockStartup);
 
 /**
- * Register the preview as a first-class editor so a user can change what opens
- * a markdown file: "Reopen Editor With…" lists it next to the text editor, and
- * `workbench.editorAssociations` can point `*.md` at it.
+ * Register the preview as a first-class editor so Open With / Reopen With match
+ * VS Code: Text Editor (default) + Markdown Preview + Markdown Editor, each
+ * option opens the real host (viewType `vscode.markdown.preview.editor`).
+ * `workbench.editorAssociations` can point `*.md` at any of them.
  *
  * `RegisteredEditorPriority.option` is deliberate: the resolver only picks a
  * registered editor when the user asked for one (association or picker), so
@@ -141,10 +142,11 @@ class MarkdownPreviewEditorContribution extends Disposable implements IWorkbench
 		super();
 		this._register(
 			editorResolverService.registerEditor(
-				'*.{md,markdown,mdx}',
+				'*.{md,markdown,mdx,mdtxt,mdtext}',
 				{
 					id: MARKDOWN_PREVIEW_VIEW_TYPE,
 					label: localize('markdownPreviewEditor', 'Markdown Preview'),
+					detail: localize('markdownPreviewEditorDetail', 'Built-in'),
 					priority: RegisteredEditorPriority.option
 				},
 				{},
@@ -192,6 +194,7 @@ class MarkdownWysiwygEditorContribution extends Disposable implements IWorkbench
 				{
 					id: MARKDOWN_EDITOR_VIEW_TYPE,
 					label: localize('markdownWysiwygEditor', 'Markdown Editor'),
+					detail: localize('markdownWysiwygEditorDetail', 'Built-in'),
 					priority: RegisteredEditorPriority.option
 				},
 				{},

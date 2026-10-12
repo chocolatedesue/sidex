@@ -106,3 +106,10 @@ SideX built-in AI agent / `sidexChat` — not touched.
 ## 2026-10-12 dep/perf + release follow-up
 
 See CROSS_VALIDATION_REPORT.md "Dependency + performance pass" and "Release 0.1.4". rustc 1.99; Wasmtime 49 lazy; npm/cargo patch bumps; EmbedPDF + marketplace install; tag `v0.1.5`.
+
+
+## 2026-10-13 — Open With / Reopen With ↔ VS Code UX
+
+- Skip re-registering `vscode.markdown.editor` / `vscode.markdown.preview.editor` / PDF remaps from ext-host contributes (picker had duplicates or "(via EmbedPDF)" stubs).
+- Preview viewType → `vscode.markdown.preview.editor`; PDF label → **PDF Preview**.
+- Working marketplace preview plugins still register once and open via resolveCustomEditor bridge.

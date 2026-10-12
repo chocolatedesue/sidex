@@ -91,7 +91,6 @@ import {
 	IEditorResolverService,
 	RegisteredEditorPriority,
 } from '../../../services/editor/common/editorResolverService.js';
-import { PdfPreviewEditorInput } from '../../pdfPreview/browser/pdfPreviewEditorInput.js';
 import { basename } from '../../../../base/common/resources.js';
 import { generateUuid } from '../../../../base/common/uuid.js';
 
@@ -3116,6 +3115,19 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		return { edits } as WorkspaceEdit & Rejection;
 	}
 
+	/**
+	 * ViewTypes already hosted by the workbench (Open With / Reopen With).
+	 * Skip re-registering them from extension contributes so the picker matches
+	 * VS Code: one Text Editor, one Markdown Preview, one Markdown Editor, one
+	 * PDF Preview — each option actually opens that host (no dead duplicates).
+	 */
+	private static readonly BUILTIN_OPEN_WITH_VIEW_TYPES = new Set<string>([
+		'vscode.markdown.editor',
+		'vscode.markdown.preview.editor',
+		'sidex.markdown.preview', // legacy id (pre-VS Code parity)
+		'sidex.pdf.preview',
+	]);
+
 	private _registerExtensionCustomEditor(ce: {
 		viewType: string;
 		displayName: string;
@@ -3130,6 +3142,20 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		const pdfSelectors = selectors.filter(s => s.toLowerCase().includes('.pdf'));
 		const isPdfView = ce.viewType.toLowerCase().includes('pdf') || pdfSelectors.length > 0;
 
+		// Align Open With with what actually runs (VS Code UX): never double-list
+		// workbench Markdown / PDF hosts, and never advertise fake PDF remaps.
+		if (TauriExtensionHostContribution.BUILTIN_OPEN_WITH_VIEW_TYPES.has(ce.viewType)) {
+			this.logService.info(`[ExtHost] Open With: skip ${ce.viewType} (built-in host already registered)`);
+			return;
+		}
+		if (isPdfView) {
+			// Built-in `sidex.pdf.preview` ("PDF Preview") is the only PDF option.
+			// Marketplace PDF customEditors used to list remapped stubs that always
+			// opened EmbedPDF — hope ≠ actual. Hide them from the picker.
+			this.logService.info(`[ExtHost] Open With: skip PDF ${ce.viewType} → use built-in PDF Preview`);
+			return;
+		}
+
 		this._customEditorDisposables.get(key)?.dispose();
 		this._customEditorDisposables.delete(key);
 
@@ -3142,27 +3168,6 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 					: priorityRaw === 'builtin' ? RegisteredEditorPriority.builtin
 						: RegisteredEditorPriority.option;
 
-		// PDF associations still prefer built-in EmbedPDF (no extension host needed).
-		if (isPdfView) {
-			const glob = pdfSelectors[0] || '*.pdf';
-			const disposable = this.editorResolverService.registerEditor(
-				glob,
-				{
-					id: ce.viewType,
-					label: `${label} (via EmbedPDF)`,
-					priority: RegisteredEditorPriority.option,
-				},
-				{},
-				{
-					createEditorInput: ({ resource }) => ({ editor: new PdfPreviewEditorInput(resource) }),
-				}
-			);
-			this._customEditorDisposables.set(key, disposable);
-			this._register(disposable);
-			this.logService.info(`[ExtHost] Registered custom editor association ${ce.viewType} → ${glob} (${label})`);
-			return;
-		}
-
 		// Common preview / custom-editor plugins: register each selector and resolve
 		// via the Node extension host webview bridge (resolveCustomEditor).
 		const disposables: IDisposable[] = [];
@@ -3173,6 +3178,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 					id: ce.viewType,
 					label,
 					priority,
+					detail: ce.extensionId || undefined,
 				},
 				{
 					singlePerResource: true,

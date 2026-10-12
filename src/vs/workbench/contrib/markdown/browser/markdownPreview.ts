@@ -27,7 +27,7 @@ import { INotificationService } from '../../../../platform/notification/common/n
 import { renderMarkdownDocument, DEFAULT_MARKDOWN_STYLES } from './markdownDocumentRenderer.js';
 import { katexStylesheetUri, MarkedKatexSupport } from './markedKatexSupport.js';
 
-export const MARKDOWN_PREVIEW_VIEW_TYPE = 'sidex.markdown.preview';
+export const MARKDOWN_PREVIEW_VIEW_TYPE = 'vscode.markdown.preview.editor';
 
 const PREVIEW_OPEN_FILES_KEY = 'markdown.preview.openFiles';
 const PREVIEW_SECURITY_KEY = 'markdown.preview.security';
