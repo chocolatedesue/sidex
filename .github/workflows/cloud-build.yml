@@ -43,11 +43,11 @@ jobs:
     name: linux-x86_64
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -97,7 +97,7 @@ jobs:
           ( cd dist-pkg && tar czf "../${NAME}.tar.gz" "${NAME}" )
           ls -lh "${NAME}.tar.gz"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sidex-linux-x86_64
           path: sidex-*.tar.gz
@@ -106,11 +106,11 @@ jobs:
     name: windows-x86_64
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -147,7 +147,7 @@ jobs:
           Compress-Archive -Path "dist-pkg/$name" -DestinationPath "$name.zip"
           Get-ChildItem "$name.zip" | Select-Object Name, Length
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sidex-windows-x86_64
           path: sidex-*.zip
@@ -165,11 +165,11 @@ jobs:
             target: aarch64-apple-darwin
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -208,11 +208,16 @@ jobs:
             find . -maxdepth 6 -type d -name 'SideX.app' | head
             exit 1
           fi
+          # No Apple certificate here, but an ad-hoc signature at least gives the
+          # bundle a stable identity: users then only need to clear the download
+          # quarantine, instead of hitting "damaged" on first launch.
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --verbose=1 "$APP" || true
           # ditto keeps the bundle's symlinks and resource forks intact.
           ditto -c -k --sequesterRsrc --keepParent "$APP" "${NAME}.zip"
           ls -lh "${NAME}.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sidex-macos-${{ matrix.arch }}
           path: sidex-*.zip
@@ -225,7 +230,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
