@@ -190,6 +190,38 @@ export class MarkdownPreviewManager extends Disposable {
 		}
 	}
 
+	/**
+	 * Create (and show) the preview for `resource` and hand back its editor
+	 * input. This is what the editor resolver calls, so a file type can be
+	 * pointed at the preview through `workbench.editorAssociations` or
+	 * "Reopen Editor With…".
+	 *
+	 * Like the command path, the preview is a single instance: it follows the
+	 * resource it was last asked for rather than opening one tab per file.
+	 */
+	createPreviewInput(resource: URI): EditorInput | undefined {
+		this._currentResource = resource;
+		this._locked = false;
+		return this._createOrUpdateWebview(resource, false, false);
+	}
+
+	/**
+	 * Same, but makes sure the file's text model exists first. Creating the
+	 * webview before the model is loaded leaves it blank: rendering is driven
+	 * by the model, and there is nothing to re-render it from until an editor
+	 * opens. The editor resolver goes through here.
+	 */
+	async createPreviewInputWhenReady(resource: URI): Promise<EditorInput | undefined> {
+		if (!this._textFileService.files.get(resource)) {
+			try {
+				await this._textFileService.files.resolve(resource);
+			} catch (err) {
+				this._logService.warn('[Markdown Preview] Could not load', resource.toString(), err);
+			}
+		}
+		return this.createPreviewInput(resource);
+	}
+
 	hasActivePreview(): boolean {
 		return this._webviewInput !== undefined && !this._webviewInput.isDisposed();
 	}
@@ -289,7 +321,7 @@ export class MarkdownPreviewManager extends Disposable {
 
 	//#region --- webview lifecycle ---
 
-	private _createOrUpdateWebview(resource: URI, side?: boolean, preserveFocus = true): void {
+	private _createOrUpdateWebview(resource: URI, side?: boolean, preserveFocus = true): WebviewInput | undefined {
 		const title = `Preview: ${resource.path.split('/').pop() || resource.path}`;
 		const parentDir = URI.joinPath(resource, '..');
 
@@ -313,7 +345,7 @@ export class MarkdownPreviewManager extends Disposable {
 			});
 			if (!input) {
 				this._logService.warn('[Markdown Preview] Could not open the preview editor');
-				return;
+				return undefined;
 			}
 			this._webviewInput = input;
 
@@ -340,6 +372,8 @@ export class MarkdownPreviewManager extends Disposable {
 		this._listenToContentChanges();
 		this._listenToEditorScroll();
 		this._updateLockState();
+
+		return this._webviewInput;
 	}
 
 	private _rememberOpenPreview(resource: URI): void {

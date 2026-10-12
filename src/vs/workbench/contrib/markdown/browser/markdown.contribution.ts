@@ -24,7 +24,11 @@ import {
 	WorkbenchPhase,
 	registerWorkbenchContribution2
 } from '../../../common/contributions.js';
-import { MarkdownPreviewManager } from './markdownPreview.js';
+import { MARKDOWN_PREVIEW_VIEW_TYPE, MarkdownPreviewManager } from './markdownPreview.js';
+import {
+	IEditorResolverService,
+	RegisteredEditorPriority
+} from '../../../services/editor/common/editorResolverService.js';
 
 let _previewManager: MarkdownPreviewManager | undefined;
 
@@ -89,6 +93,55 @@ class MarkdownPreviewAutoReopen extends Disposable implements IWorkbenchContribu
 }
 
 registerWorkbenchContribution2(MarkdownPreviewAutoReopen.ID, MarkdownPreviewAutoReopen, WorkbenchPhase.BlockStartup);
+
+/**
+ * Register the preview as a first-class editor so a user can change what opens
+ * a markdown file: "Reopen Editor With…" lists it next to the text editor, and
+ * `workbench.editorAssociations` can point `*.md` at it.
+ *
+ * `RegisteredEditorPriority.option` is deliberate: the resolver only picks a
+ * registered editor when the user asked for one (association or picker), so
+ * markdown keeps opening in the text editor until someone chooses otherwise.
+ */
+class MarkdownPreviewEditorContribution extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.markdownPreviewEditor';
+
+	constructor(
+		@IEditorResolverService editorResolverService: IEditorResolverService,
+		@IInstantiationService private readonly _instantiationService: IInstantiationService
+	) {
+		super();
+		this._register(
+			editorResolverService.registerEditor(
+				'*.{md,markdown,mdx}',
+				{
+					id: MARKDOWN_PREVIEW_VIEW_TYPE,
+					label: localize('markdownPreviewEditor', 'Markdown Preview'),
+					priority: RegisteredEditorPriority.option
+				},
+				{},
+				{
+					createEditorInput: async ({ resource }) => {
+						if (!_previewManager) {
+							_previewManager = this._instantiationService.createInstance(MarkdownPreviewManager);
+						}
+						const editor = await _previewManager.createPreviewInputWhenReady(resource);
+						if (!editor) {
+							throw new Error(`Markdown Preview could not open ${resource.toString()}`);
+						}
+						return { editor };
+					}
+				}
+			)
+		);
+	}
+}
+
+registerWorkbenchContribution2(
+	MarkdownPreviewEditorContribution.ID,
+	MarkdownPreviewEditorContribution,
+	WorkbenchPhase.BlockStartup
+);
 
 CommandsRegistry.registerCommand('markdown.showPreview', accessor => {
 	getOrCreateManager(accessor).showPreview();
