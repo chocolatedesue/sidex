@@ -1,7 +1,8 @@
 # SideX — Markdown WYSIWYG (所见即所得) + VS Code parity notes
 
-Date: 2026-10-12 (Asia/Shanghai). Branch: `feature/markdown-wysiwyg-vscode-parity`.
+Date: 2026-10-12 (Asia/Shanghai). Merged to **`main`**; app version **0.1.4**.
 Box checkout: `/workspace/sidex` (fork `chocolatedesue/sidex`).
+Original feature branch: `feature/markdown-wysiwyg-vscode-parity`.
 
 ## What this is
 
@@ -65,16 +66,17 @@ Gitignored runtime assets (populated by `npm run setup:full` / setup script):
 
 - Install path: Rust `sidex-extensions` marketplace client → default `https://marketplace.siden.ai/api` (Open-VSX-compatible).
 - This change: if that worker errors on search, **retry once against `https://open-vsx.org/api`** so Markdown-related extensions remain discoverable.
-- Hard limit (unchanged): **extension host is WIP**. Installing a VSIX/Open VSX extension that needs Node `vscode` API (including stock `markdown-language-features` itself) will not fully activate. Language basics / themes / many web-capable pieces can still load via the web worker host; custom editors from extensions need the restored `customEditor` contribution + LocalProcess host (stubbed today).
+- Install-by-id resolves siden/Open VSX download then `install_extension_from_url` (web can search via HTTP fallback).
+- Hard limit: **extension host activate** for Node `vscode` API extensions is still incomplete on a full LocalProcess host. Themes / language basics / many web-capable pieces can load; non-PDF extension **customEditors** still need `resolveCustomEditor`. PDF uses built-in EmbedPDF instead of extension custom editors.
 
 ## Build status (box)
 
 - `npm install` — OK (Node 20 on box; tas-client wants ≥22 — warning only).
-- `npm run setup` — wrote 4 builtin descriptors (markdown-basics / language-features / math / mermaid).
-- `npm run build` — **green** (~30s). `postbuild` copied `extensions/` into `dist/extensions/` including `markdown-editor-out/editor.js`.
-- Dev static: `GET /extensions/markdown-language-features/markdown-editor-out/editor.js` → 200 (~584 KB) via vite middleware.
-- `cargo check -p sidex-extensions` — blocked on box rustc 1.85 (crate wants 1.91); marketplace diff is small/`log::warn` only.
-- Push — **blocked**: no `gh` / HTTPS credentials on the box (`could not read Username for https://github.com`). Commit is local on `feature/markdown-wysiwyg-vscode-parity` (`40708cf`).
+- `npm run setup` / `setup:full` — builtins + VS Code **1.141** `markdown-editor-out`.
+- `npm run build` — **green**. `postbuild` copies `extensions/` into `dist/extensions/` including `markdown-editor-out/editor.js`.
+- Dev static: `GET /extensions/markdown-language-features/markdown-editor-out/editor.js` → 200 via vite middleware.
+- Toolchain: **rustc/cargo 1.91.0** via rustup (`PATH` must include `~/.cargo/bin`). `cargo check` / release binary OK; Tauri GUI needs display.
+- Push / release: `gh` as **chocolatedesue**; shipped on `main` and tag **v0.1.4**.
 
 ## Remaining gaps vs VS Code Markdown Editor
 
@@ -89,6 +91,6 @@ Gitignored runtime assets (populated by `npm run setup:full` / setup script):
 SideX built-in AI agent / `sidexChat` — not touched.
 
 
-## 2026-10-12 dep/perf follow-up
+## 2026-10-12 dep/perf + release follow-up
 
-See CROSS_VALIDATION_REPORT.md "Dependency + performance pass". rustc 1.91 via rustup; Wasmtime lazy; npm patch bumps; cargo update within wasmtime 43.
+See CROSS_VALIDATION_REPORT.md "Dependency + performance pass" and "Release 0.1.4". rustc 1.91; Wasmtime lazy; npm/cargo patch bumps; EmbedPDF + marketplace install; tag `v0.1.4`.

@@ -1,9 +1,10 @@
 # SideX Cross-Validation Report (LAB-707 操作腻子)
 
-**Date:** 2026-10-12 (Asia/Shanghai, UTC+8) — updated same day with dep/perf pass  
+**Date:** 2026-10-12 (Asia/Shanghai, UTC+8) — release prep **0.1.4**  
 **Repo:** `chocolatedesue/sidex`  
 **Box checkout:** `/workspace/sidex` (Grok Bot built-in machine)  
-**Tip:** see `git log -1 --oneline` on `origin/main` after this push.
+**Version:** app `0.1.4` (`package.json` / `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml`)  
+**Tip:** `git log -1 --oneline` on `origin/main`; tag `v0.1.4` + GitHub Release; see `CHANGELOG.md`.
 
 Sources: Multica LAB-707 (ccds lab) prior agent work + this pass (marketplace, EmbedPDF EditorPane, audit/optimize, build+interactive smoke). **No Multica issue comment** (user dismissed widget).
 
@@ -16,7 +17,7 @@ Sources: Multica LAB-707 (ccds lab) prior agent work + this pass (marketplace, E
 | 1 | Developed on Grok Bot box | **PASS** | Local `/workspace/sidex`; no Cursor CloudAgent for this pass |
 | 2 | Feel / icons / **插件系统** | **PARTIAL→improved** | Codicon MD titles; Open VSX + siden gallery; install-by-id fixed; customEditors from ext host → Reopen With (PDF via EmbedPDF). Full custom-editor webview resolve still incomplete for non-PDF |
 | 3 | MD 所见即所得 = VS Code latest | **PASS** | VS Code **1.141** `markdown-editor-out`; KeyChord `Ctrl+K V` |
-| 4 | Cross-validate + interactive | **PASS** (web) / **PARTIAL** (native GUI) | Playwright: marketplace API, EmbedPDF mount, vite preview workbench + Extensions view. No Tauri GUI on box (rustc 1.85 &lt; 1.91) |
+| 4 | Cross-validate + interactive | **PASS** (web) / **PARTIAL** (native GUI) | Playwright: marketplace API, EmbedPDF mount, vite preview workbench + Extensions view. Box rustc **1.91** via rustup; `cargo check`/`cargo build --release` feasible; no display → no Tauri GUI E2E |
 | 5 | Push **main** | **PASS** (this tip) | Commits on `origin/main` |
 
 ---
@@ -25,7 +26,7 @@ Sources: Multica LAB-707 (ccds lab) prior agent work + this pass (marketplace, E
 
 | # | Item | Prior | This pass | Result |
 |---|------|-------|-----------|--------|
-| 1 | CLI folder/file/goto/single-instance/sidex:// | Implemented in `cli.rs` | Reviewed; still blocked from `cargo test` on box rustc | **PARTIAL** (code OK) |
+| 1 | CLI folder/file/goto/single-instance/sidex:// | Implemented in `cli.rs` | Reviewed; `cargo check` OK on rustc 1.91 | **PASS** (code) / GUI E2E pending |
 | 2 | MD WYSIWYG + preview | Ported + KeyChord fix | Retained; lifecycle/`retainContextWhenHidden`/`createEditorInputWhenReady` re-checked | **PASS** |
 | 3 | Web 自测 | Prior win-webtest | `vite preview` + Playwright interactive (palette, Extensions view, marketplace fetch from page) | **PASS** |
 | 4 | AI default OFF / no sidex-server at boot | `sidex.chat.enabled` false; `server::register` only | Re-verified | **PASS** |
@@ -145,11 +146,12 @@ MD WYSIWYG / EmbedPDF / marketplace install path **not intentionally changed** b
 
 ## Remaining hard limits (honest)
 
-1. Box **rustc was 1.85**; this pass installed **rustup 1.91.0** — `cargo check` works. Full `tauri build` / GUI E2E still prefers cloud-build artifacts (no display on box).
+1. Box has **rustc 1.91.0** (rustup); `cargo check` / release binary build OK. Full signed `tauri build` + GUI E2E still prefer **cloud-build** / desktop with display (`docs/CLOUD-BUILD.md`).
 2. Non-PDF extension **customEditors** need webview resolve bridge (host stores providers; pane path incomplete).
 3. Formatting CI may still fail on pre-existing AI-crate prettier/rustfmt noise.
 4. MD Diff Editor WYSIWYG path not ported.
 5. EmbedPDF chunk ~1.1 MB (lazy-loaded on first PDF).
+6. Upstream `release.yml` needs Apple/Azure/R2 secrets — this fork uses `cloud-build.yml` + `gh release` for unsigned artifacts.
 
 ---
 
@@ -161,3 +163,13 @@ MD WYSIWYG / EmbedPDF / marketplace install path **not intentionally changed** b
 4. Reopen Editor With… → Preview / Markdown Editor / EmbedPDF / Text.  
 5. Extensions view → search (siden/Open VSX) → Install → restart or hot-load on desktop.  
 6. AI panel stays off until `sidex.chat.enabled`.
+
+
+---
+
+## Release 0.1.4
+
+- Version bump in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`.
+- Docs: README, this report, `DEV_NOTES_MD_WYSIWYG.md`, new `CHANGELOG.md`.
+- Local: `npm run build` + `cargo build --release` (and/or web `dist` zip) under `release-artifacts/`.
+- Tag `v0.1.4` → GitHub Release; `cloud-build.yml` also runs on the tag for Linux/Windows/macOS unsigned binaries.

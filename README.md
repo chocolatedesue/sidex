@@ -27,7 +27,7 @@
 
 SideX is a port of Visual Studio Code that replaces Electron with [Tauri](https://tauri.app/) — a Rust backend and OS's native webview. The same TypeScript workbench, the same editor, terminal, and Git integration, running without a bundled browser.
 
-> **Early release.** Core editing and the terminal are solid. The extension host and debugger are still in progress. See [What's Working](#whats-working) for the full picture.
+> **Early release (0.1.4).** Core editing, terminal, Markdown WYSIWYG, EmbedPDF, and marketplace install are in place. The extension host (full activate / non-PDF custom editors) and debugger are still in progress. See [What's Working](#whats-working).
 
 ---
 
@@ -53,10 +53,12 @@ RAM savings are most tested on macOS, WKWebView is shared with Safari. On Window
 - Git — status, diff, log, stage, commit, branch, push/pull/fetch, stash, reset
 - Themes — multiple built-in themes from the VSCode catalogue
 - Native OS menus (macOS, Windows, Linux)
-- Extension installation from [Open VSX](https://open-vsx.org/)
+- Extension marketplace — [Open VSX](https://open-vsx.org/) + siden gallery search/install (VSIX download + unpack)
 - File watching, file search, full-text search, Rust-backed search index
 - SQLite storage, document management (autosave, undo/redo, encoding)
-- Built-in AI agent — chat, inline diffs, shell commands, multi-file edits; bring your own model provider, no account needed (see [AI Agent](#ai-agent))
+- **Markdown:** text editor, side preview (`Ctrl+K` then `V`), and **Markdown Editor** WYSIWYG via VS Code **1.141** `markdown-editor-out` (`Markdown: Open Markdown Editor` / Reopen With)
+- **PDF:** built-in **EmbedPDF** EditorPane (`@embedpdf/snippet`) for `.pdf` / Reopen With
+- Built-in AI agent — optional; **off by default** (`sidex.chat.enabled`). When enabled: chat, inline diffs, shell commands, multi-file edits; bring your own model provider, no account needed (see [AI Agent](#ai-agent))
 
 ---
 
@@ -66,7 +68,7 @@ SideX has a built-in coding agent, and it needs no SideX account of any kind —
 
 ### How it starts
 
-On launch, the app spawns its own agent server (`sidexai/sidex-server`, written in Go) as a child process bound to `127.0.0.1` on a random free port. It's supervised from [`src-tauri/src/server.rs`](./src-tauri/src/server.rs) and stopped when the app exits. If the server binary isn't built, the rest of the editor still works — the chat panel just reports itself as disconnected.
+AI is **off by default** (`sidex.chat.enabled` = false). When you turn it on, the app spawns its own agent server (`sidexai/sidex-server`, written in Go) as a child process bound to `127.0.0.1` on a random free port. It's supervised from [`src-tauri/src/server.rs`](./src-tauri/src/server.rs) and stopped when the app exits. If the server binary isn't built, the rest of the editor still works — the chat panel just reports itself as disconnected.
 
 ### Bring your own model
 
@@ -107,24 +109,37 @@ The app looks for a binary at that path automatically when running from a source
 ### Run in Development
 
 ```bash
-git clone https://github.com/Sidenai/sidex.git
+git clone https://github.com/chocolatedesue/sidex.git   # or upstream Sidenai/sidex
 cd sidex
 npm install
-npm run tauri dev
+npm run setup:full    # pulls VS Code 1.141 markdown-editor-out + builtins
+npm run tauri dev     # desktop (needs Rust 1.91+)
+# or frontend-only:
+npm run setup && npm run dev
 ```
 
 ### Build from Source
 
 ```bash
 npm install
-npx tauri build
+npm run setup:full
+npm run build         # Vite workbench → dist/ (includes EmbedPDF + markdown-editor-out)
+npx tauri build       # packages desktop app; runs `npm run build` via beforeBuildCommand
 ```
 
-`npx tauri build` runs the frontend build for you (`npm run build`), which already raises Vite's Node heap limit to 12 GB internally — no `NODE_OPTIONS` needed on a normal machine. If you still hit an out-of-memory error, raise it further yourself with `NODE_OPTIONS="--max-old-space-size=16384"` before the command.
+Requires **Rust 1.91+** (`src-tauri` / workspace `rust-version`). `npm run build` raises Vite's Node heap to 12 GB internally. If you still OOM, set `NODE_OPTIONS="--max-old-space-size=16384"`.
 
-First build takes 5–10 minutes (Rust compile time). Pre-built binaries are not distributed yet.
+First desktop build takes several minutes (Rust). Unsigned multi-OS binaries without signing secrets: see [docs/CLOUD-BUILD.md](./docs/CLOUD-BUILD.md) (`cloud-build.yml`). Changelog: [CHANGELOG.md](./CHANGELOG.md). Cross-check notes: [CROSS_VALIDATION_REPORT.md](./CROSS_VALIDATION_REPORT.md).
 
-Everything above runs standalone, with no account and no setup. Want the chat panel connected too? See [AI Agent](#ai-agent) above — building the agent server is a separate, optional step.
+Workbench-only smoke (no Tauri GUI):
+
+```bash
+npx vite preview --host 127.0.0.1 --port 4173
+node scripts/smoke-marketplace-pdf.mjs
+node scripts/smoke-interactive-web.mjs
+```
+
+Everything above runs standalone, with no account and no setup. AI stays off until you enable it — see [AI Agent](#ai-agent). Agent server build is optional.
 
 ---
 
@@ -179,8 +194,10 @@ sidex/
 | File watching | notify crate (FSEvents on macOS) |
 | Search | dashmap + rayon + regex (parallel, Rust) |
 | Storage | SQLite via rusqlite |
-| Extensions | Open VSX registry |
-| Agent server | Go, own process on loopback ([`sidexai/sidex-server`](./sidexai/sidex-server)) |
+| Extensions | Open VSX + siden marketplace (search / install VSIX) |
+| Markdown WYSIWYG | VS Code 1.141 `markdown-editor-out` webview |
+| PDF | EmbedPDF (`@embedpdf/snippet`) EditorPane |
+| Agent server | Go, own process on loopback ([`sidexai/sidex-server`](./sidexai/sidex-server)); off unless `sidex.chat.enabled` |
 
 For a deeper dive, see [ARCHITECTURE.md](./ARCHITECTURE.md)
 

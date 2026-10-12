@@ -16,7 +16,7 @@ to R2 (`siden-assets`), so on a mirror without those secrets it will fail.
 `cloud-build.yml` is the no-secrets path:
 
 1. Actions tab → **Cloud build (no signing secrets)** → *Run workflow*, or
-2. `git tag v0.1.3 && git push origin v0.1.3` — the tag also attaches the files
+2. `git tag v0.1.4 && git push origin v0.1.4` — the tag also attaches the files
    to a GitHub Release.
 
 Artifacts land under the run’s **Artifacts** section: `sidex-linux-x86_64`
