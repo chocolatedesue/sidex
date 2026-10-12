@@ -3,6 +3,50 @@ import * as path from 'path';
 import { nlsPlugin } from './scripts/vite-plugin-nls';
 import { sidexFsBridge } from './scripts/vite-plugin-sidex-fs-bridge';
 
+
+function serveExtensions() {
+  // Serves VS Code built-in extension assets (esp. markdown-editor-out) at
+  // /extensions/... so Markdown Editor webviews can load the upstream bundle.
+  return {
+    name: 'sidex-serve-extensions',
+    configureServer(server: import('vite').ViteDevServer) {
+      const extRoot = path.resolve(__dirname, 'extensions');
+      server.middlewares.use((req, res, next) => {
+        const raw = req.url ?? '';
+        if (!raw.startsWith('/extensions/')) {
+          next();
+          return;
+        }
+        void import('node:fs').then(fs => {
+          try {
+            const rel = decodeURIComponent(raw.slice('/extensions'.length).split('?')[0]);
+            const fsPath = path.resolve(extRoot, '.' + rel);
+            if (!fsPath.startsWith(extRoot + path.sep) || !fs.existsSync(fsPath) || fs.statSync(fsPath).isDirectory()) {
+              next();
+              return;
+            }
+            if (fsPath.endsWith('.js')) {
+              res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+            } else if (fsPath.endsWith('.css')) {
+              res.setHeader('Content-Type', 'text/css; charset=utf-8');
+            } else if (fsPath.endsWith('.woff2')) {
+              res.setHeader('Content-Type', 'font/woff2');
+            } else if (fsPath.endsWith('.woff')) {
+              res.setHeader('Content-Type', 'font/woff');
+            } else if (fsPath.endsWith('.ttf')) {
+              res.setHeader('Content-Type', 'font/ttf');
+            }
+            res.setHeader('Cache-Control', 'public, max-age=60');
+            fs.createReadStream(fsPath).pipe(res);
+          } catch {
+            next();
+          }
+        });
+      });
+    },
+  };
+}
+
 function quietMissingSourceMaps() {
   const skip = [/\/vscode-textmate\/.*\.js\.map$/];
   return {
@@ -25,10 +69,11 @@ export default defineConfig({
   clearScreen: false,
   assetsInclude: ['**/*.wasm', '**/*.json', '**/*.tmLanguage.json'],
   publicDir: 'public',
-  plugins: [nlsPlugin(), quietMissingSourceMaps(), sidexFsBridge()],
+  plugins: [nlsPlugin(), quietMissingSourceMaps(), serveExtensions(), sidexFsBridge()],
   server: {
     port: 1420,
     strictPort: true,
+    fs: { allow: [path.resolve(__dirname), path.resolve(__dirname, 'extensions')] },
     watch: {
       ignored: ['**/src-tauri/**'],
     },

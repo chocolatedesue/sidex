@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VSCODE_VERSION="1.115.0"
+VSCODE_VERSION="1.141.0"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXTENSIONS_DIR="$REPO_ROOT/extensions"
 
@@ -25,8 +25,37 @@ prune_excluded_extensions() {
   fi
 }
 
+
+# Markdown WYSIWYG (VS Code Markdown Editor) needs the prebuilt
+# markdown-editor-out webview from a VS Code ≥ 1.135 install. Source
+# tarballs from GitHub do not include it — only product builds do. If the
+# catalog came from a local editor that is too old, pull just the four
+# markdown-related builtins from the matching VS Code linux package.
+ensure_markdown_editor_assets() {
+  local editor_js="$EXTENSIONS_DIR/markdown-language-features/markdown-editor-out/editor.js"
+  if [[ -f "$editor_js" ]]; then
+    echo "Markdown Editor webview present ($(du -sh "$EXTENSIONS_DIR/markdown-language-features/markdown-editor-out" | cut -f1))."
+    return 0
+  fi
+  echo "Markdown Editor webview missing — fetching from VS Code ${VSCODE_VERSION}…"
+  local tmp
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' RETURN
+  curl -L --progress-bar     "https://update.code.visualstudio.com/${VSCODE_VERSION}/linux-x64/stable"     -o "$tmp/code.tar.gz"
+  tar -xzf "$tmp/code.tar.gz" -C "$tmp"     --wildcards 'VSCode-linux-x64/resources/app/extensions/markdown-*'     --wildcards 'VSCode-linux-x64/resources/app/extensions/mermaid-markdown-features'     2>/dev/null || tar -xzf "$tmp/code.tar.gz" -C "$tmp"     "VSCode-linux-x64/resources/app/extensions/markdown-language-features"     "VSCode-linux-x64/resources/app/extensions/markdown-basics"     "VSCode-linux-x64/resources/app/extensions/markdown-math"     "VSCode-linux-x64/resources/app/extensions/mermaid-markdown-features"
+  local src="$tmp/VSCode-linux-x64/resources/app/extensions"
+  for name in markdown-language-features markdown-basics markdown-math mermaid-markdown-features; do
+    if [[ -d "$src/$name" ]]; then
+      rm -rf "$EXTENSIONS_DIR/$name"
+      cp -a "$src/$name" "$EXTENSIONS_DIR/"
+      echo "Installed $name from VS Code ${VSCODE_VERSION}."
+    fi
+  done
+}
+
 if [[ -d "$EXTENSIONS_DIR" && "$(ls -A "$EXTENSIONS_DIR" 2>/dev/null | wc -l)" -gt 10 ]]; then
   prune_excluded_extensions
+  ensure_markdown_editor_assets
   echo "extensions/ already populated ($(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') entries) — skipping."
   exit 0
 fi
@@ -48,6 +77,7 @@ for candidate in "${VSCODE_CANDIDATES[@]}"; do
     echo "Copying built-in extensions..."
     cp -r "$candidate"/. "$EXTENSIONS_DIR/"
     prune_excluded_extensions
+    ensure_markdown_editor_assets
     echo "Copied $(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') extensions."
     exit 0
   fi
@@ -66,5 +96,6 @@ echo "Extracting extensions..."
 tar -xzf "$TMP_DIR/vscode.tar.gz" -C "$TMP_DIR" "vscode-${VSCODE_VERSION}/extensions"
 cp -r "$TMP_DIR/vscode-${VSCODE_VERSION}/extensions/." "$EXTENSIONS_DIR/"
 prune_excluded_extensions
+ensure_markdown_editor_assets
 
 echo "Done — $(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') extensions installed."

@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 /// users who want to point at a self-hosted proxy or at
 /// `https://open-vsx.org/api` directly).
 const DEFAULT_BASE_URL: &str = "https://marketplace.siden.ai/api";
+/// Direct Open VSX API used when the SideX marketplace worker is unreachable.
+const OPEN_VSX_FALLBACK_URL: &str = "https://open-vsx.org/api";
 const DEFAULT_PAGE_SIZE: u32 = 20;
 const CACHE_TTL_SECS: u64 = 300;
 
@@ -350,10 +352,24 @@ impl MarketplaceClient {
         if let Some(ref etag) = cached_etag {
             request = request.header(reqwest::header::IF_NONE_MATCH, etag);
         }
-        let response = request
-            .send()
-            .await
-            .context("marketplace search request failed")?;
+        let response = match request.send().await {
+            Ok(resp) => resp,
+            Err(err) if self.base_url == DEFAULT_BASE_URL => {
+                // SideX worker down — retry once against public Open VSX so
+                // Markdown-related and other extensions remain installable.
+                let fallback_url = url.replacen(DEFAULT_BASE_URL, OPEN_VSX_FALLBACK_URL, 1);
+                log::warn!(
+                    error = %err,
+                    "marketplace search failed; falling back to Open VSX"
+                );
+                self.http
+                    .get(&fallback_url)
+                    .send()
+                    .await
+                    .context("marketplace search request failed (Open VSX fallback)")?
+            }
+            Err(err) => return Err(err).context("marketplace search request failed"),
+        };
 
         // 304 Not Modified: our cached body is still fresh. Bump the
         // fetched_at timestamp so we don't re-validate on every call
