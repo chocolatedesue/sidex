@@ -3,11 +3,12 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { importAMDNodeModule, resolveAmdNodeModulePath } from '../../../../amdX.js';
 import * as domSanitize from '../../../../base/browser/domSanitize.js';
 import { MarkdownSanitizerConfig } from '../../../../base/browser/markdownRenderer.js';
 import { CodeWindow } from '../../../../base/browser/window.js';
 import { Lazy } from '../../../../base/common/lazy.js';
+import { AppResourcePath, FileAccess } from '../../../../base/common/network.js';
+import { URI } from '../../../../base/common/uri.js';
 import type * as marked from '../../../../base/common/marked/marked.js';
 import { katexContainerLatexAttributeName, MarkedKatexExtension } from '../common/markedKatexExtension.js';
 
@@ -127,7 +128,12 @@ export class MarkedKatexSupport {
 
 	private static _katex?: typeof import('katex');
 	private static _katexPromise = new Lazy(async () => {
-		this._katex = await importAMDNodeModule<typeof import('katex')>('katex', 'dist/katex.min.js');
+		// Bundled with the workbench rather than fetched from `<app>/node_modules`:
+		// that folder cannot ship inside a packaged app (Tauri's bundler refuses a
+		// frontendDist with a top-level `node_modules`), and Vite splits this into
+		// its own chunk anyway, so math costs nothing until something renders.
+		const katexModule = (await import('katex')) as typeof import('katex') & { default?: typeof import('katex') };
+		this._katex = katexModule.default ?? katexModule;
 		return this._katex;
 	});
 
@@ -159,10 +165,29 @@ export class MarkedKatexSupport {
 			const katexStyle = document.createElement('link');
 			katexStyle.classList.add('katex');
 			katexStyle.rel = 'stylesheet';
-			katexStyle.href = resolveAmdNodeModulePath('katex', 'dist/katex.min.css');
+			katexStyle.href = katexStylesheetHref();
 			doc.head.appendChild(katexStyle);
 		}
 	}
+}
+
+/**
+ * Where the KaTeX stylesheet lives, as an app-relative URL.
+ *
+ * The dev server serves it straight out of `node_modules`; a build copies it to
+ * `<app>/katex` (see `scripts/postbuild.js`). It deliberately avoids
+ * `resolveAmdNodeModulePath`, whose `<app>/node_modules` path is exactly what
+ * Tauri refuses to bundle — only this one stylesheet is needed at runtime now
+ * that the renderer itself is bundled.
+ */
+export function katexStylesheetHref(): string {
+	const base = import.meta.env.DEV ? 'vs/../../node_modules/katex/dist' : 'vs/../../katex';
+	return FileAccess.asBrowserUri(`${base}/katex.min.css` as AppResourcePath).toString(true);
+}
+
+/** {@link katexStylesheetHref} as a URI (webviews need one for `asWebviewUri`). */
+export function katexStylesheetUri(): URI {
+	return URI.parse(katexStylesheetHref());
 }
 
 const trustedMathMlTags = Object.freeze([

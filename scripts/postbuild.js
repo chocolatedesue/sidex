@@ -5,50 +5,51 @@ const DIST_DIR = 'dist';
 const ASSETS_DIR = path.join(DIST_DIR, 'assets');
 
 function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} kB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} kB`;
+	return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function getFileSizes(dir, extension) {
-  if (!fs.existsSync(dir)) return { total: 0, files: [] };
+	if (!fs.existsSync(dir)) return { total: 0, files: [] };
 
-  const files = fs.readdirSync(dir)
-    .filter(f => f.endsWith(extension))
-    .map(f => ({
-      name: f,
-      size: fs.statSync(path.join(dir, f)).size
-    }))
-    .sort((a, b) => b.size - a.size);
+	const files = fs
+		.readdirSync(dir)
+		.filter(f => f.endsWith(extension))
+		.map(f => ({
+			name: f,
+			size: fs.statSync(path.join(dir, f)).size
+		}))
+		.sort((a, b) => b.size - a.size);
 
-  return {
-    total: files.reduce((sum, f) => sum + f.size, 0),
-    files
-  };
+	return {
+		total: files.reduce((sum, f) => sum + f.size, 0),
+		files
+	};
 }
 
 // Copy extensions
 if (fs.existsSync('extensions')) {
-  fs.cpSync('extensions', path.join(DIST_DIR, 'extensions'), { recursive: true, force: true });
+	fs.cpSync('extensions', path.join(DIST_DIR, 'extensions'), { recursive: true, force: true });
 }
 if (fs.existsSync('extensions-meta.json')) {
-  fs.copyFileSync('extensions-meta.json', path.join(DIST_DIR, 'extensions-meta.json'));
+	fs.copyFileSync('extensions-meta.json', path.join(DIST_DIR, 'extensions-meta.json'));
 }
 console.log('Post-build: copied extensions\n');
 
-// KaTeX is loaded the way VS Code loads AMD node modules: the workbench asks
-// for `vs/../../node_modules/katex/dist/...`, which resolves to
-// `<root>/node_modules/katex/dist/...`. Vite serves that from the project in
-// dev, but a production build has no `node_modules`, so the markdown preview
-// lost its math. Copy the runtime files (js, css and the fonts the css pulls
-// in) next to the built app.
+// The markdown preview renders KaTeX itself (it is bundled), but the
+// stylesheet and the fonts it pulls in are fetched at runtime. Vite serves
+// those from the project in dev; a build has to copy them next to the app.
+// Deliberately NOT into `dist/node_modules`: Tauri's bundler refuses to bundle
+// a frontendDist that contains a top-level `node_modules` folder, which is what
+// broke the macOS `.app` build.
 const KATEX_SRC = path.join('node_modules', 'katex', 'dist');
-const KATEX_DEST = path.join(DIST_DIR, 'node_modules', 'katex', 'dist');
+const KATEX_DEST = path.join(DIST_DIR, 'katex');
 if (fs.existsSync(KATEX_SRC)) {
-  fs.cpSync(KATEX_SRC, KATEX_DEST, { recursive: true, force: true });
-  console.log(`Post-build: copied katex runtime to ${KATEX_DEST}\n`);
+	fs.cpSync(KATEX_SRC, KATEX_DEST, { recursive: true, force: true });
+	console.log(`Post-build: copied the katex stylesheet + fonts to ${KATEX_DEST}\n`);
 } else {
-  console.warn('Post-build: node_modules/katex not found — markdown math will not render in this build\n');
+	console.warn('Post-build: node_modules/katex not found — markdown math will not render in this build\n');
 }
 
 // Calculate bundle sizes
@@ -71,6 +72,6 @@ console.log('══════════════════════�
 // Show top 5 largest JS files
 console.log('\nTop 5 largest JS chunks:');
 js.files.slice(0, 5).forEach((f, i) => {
-  console.log(`  ${i + 1}. ${f.name.padEnd(50)} ${formatSize(f.size).padStart(10)}`);
+	console.log(`  ${i + 1}. ${f.name.padEnd(50)} ${formatSize(f.size).padStart(10)}`);
 });
 console.log('');

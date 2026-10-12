@@ -23,8 +23,7 @@ import { ICodeEditorService } from '../../../../editor/browser/services/codeEdit
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { renderMarkdownDocument, DEFAULT_MARKDOWN_STYLES } from './markdownDocumentRenderer.js';
-import { MarkedKatexSupport } from './markedKatexSupport.js';
-import { resolveAmdNodeModulePath } from '../../../../amdX.js';
+import { katexStylesheetUri, MarkedKatexSupport } from './markedKatexSupport.js';
 
 export const MARKDOWN_PREVIEW_VIEW_TYPE = 'sidex.markdown.preview';
 
@@ -583,9 +582,7 @@ export class MarkdownPreviewManager extends Disposable {
 		const withImages = rewriteImageSrcs(body, baseDir);
 		const settings = this._getPreviewSettings();
 		const katexStyles = katexExtension
-			? `<link rel="stylesheet" href="${asWebviewUri(
-					URI.parse(resolveAmdNodeModulePath('katex', 'dist/katex.min.css'))
-				).toString(true)}">`
+			? `<link rel="stylesheet" href="${asWebviewUri(katexStylesheetUri()).toString(true)}">`
 			: '';
 
 		// Theme colours are injected by the webview host as live `--vscode-*`
