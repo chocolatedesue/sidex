@@ -87,3 +87,8 @@ Gitignored runtime assets (populated by `npm run setup:full` / setup script):
 ## Out of scope
 
 SideX built-in AI agent / `sidexChat` — not touched.
+
+
+## 2026-10-12 dep/perf follow-up
+
+See CROSS_VALIDATION_REPORT.md "Dependency + performance pass". rustc 1.91 via rustup; Wasmtime lazy; npm patch bumps; cargo update within wasmtime 43.

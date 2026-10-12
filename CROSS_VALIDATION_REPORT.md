@@ -1,6 +1,6 @@
 # SideX Cross-Validation Report (LAB-707 操作腻子)
 
-**Date:** 2026-10-12 (Asia/Shanghai, UTC+8)  
+**Date:** 2026-10-12 (Asia/Shanghai, UTC+8) — updated same day with dep/perf pass  
 **Repo:** `chocolatedesue/sidex`  
 **Box checkout:** `/workspace/sidex` (Grok Bot built-in machine)  
 **Tip:** see `git log -1 --oneline` on `origin/main` after this push.
@@ -84,9 +84,68 @@ AI remains default-off (`sidex.chat.enabled` default `false`).
 
 ---
 
+
+---
+
+## Dependency + performance pass (same day, follow-up)
+
+**Toolchain:** box `rustc`/`cargo` upgraded via rustup **1.85.1 → 1.91.0** (matches `workspace.package.rust-version`). `cargo check --manifest-path src-tauri/Cargo.toml` now **PASS** (after installing webkit/gtk pkg-config deps).  
+
+**Kept non-breaking (no major jumps):** `monaco-editor` 0.52.x, `@xterm/xterm` 5.5.x, `katex` 0.16.x, `typescript` ~5.6, `vite` 6.x, `@embedpdf/snippet` 2.15.1, `wasmtime` 43.x.  
+
+### npm (installed)
+
+| Package | Before | After |
+|---------|--------|-------|
+| vite | 6.4.2 | **6.4.4** |
+| typescript-eslint | 8.58.2 | **8.71.1** (dropped redundant `@typescript-eslint/{eslint-plugin,parser}` — flat config uses meta package) |
+| eslint | 9.39.4 | **9.39.5** |
+| prettier | 3.8.3 | **3.9.10** |
+| playwright | 1.62.1 | **1.64.0** |
+| @microsoft/1ds-core-js / post-js | 4.3.11 | **4.4.5** |
+| @tauri-apps/plugin-dialog | 2.7.0 | **2.8.2** |
+| @tauri-apps/plugin-shell | 2.3.5 | **2.5.0** |
+| @vscode/tree-sitter-wasm | 0.3.0 | **0.3.1** |
+| @webgpu/types | 0.1.69 | **0.1.74** |
+| @embedpdf/snippet | 2.15.1 | 2.15.1 (latest) |
+| monaco / xterm / katex / typescript | unchanged majors | unchanged |
+
+### Cargo (Cargo.lock `cargo update`, same majors)
+
+| Crate | Before | After |
+|-------|--------|-------|
+| wasmtime / wasmtime-wasi | 43.0.1 | **43.0.2** (49.x available but needs Rust 1.96 — skipped) |
+| tauri | 2.12.3 | 2.12.3 |
+| tokio | (workspace 1.x) | **1.53.2** in lock |
+| serde | 1.x | **1.0.229** |
+| reqwest | 0.12.x (+0.13 transitive) | 0.12.28 / 0.13.5 |
+
+### Performance / startup
+
+1. **Wasmtime lazy:** `WasmExtensionRuntime::new()` is now cheap; `Engine`+`Linker` built on **first** `load_extension` (was eager at Tauri `.manage`, paying cold-start cost even with zero WASM extensions).
+2. **macOS PATH:** skip login-shell probe when PATH already has Homebrew/`/usr/local/bin`; timeout **3s → 1.5s**.
+3. **PDF memory:** EmbedPDF open path does **one** `ArrayBuffer` slice into the Blob URL (removed double-copy).
+4. **AI:** still default-off (`sidex.chat.enabled` false); unchanged.
+5. **Compile fix:** `sidex-extensions` marketplace fallback used tracing-style `log::warn!(error = %err, …)` → fixed to `log` crate format (unblocked `cargo check`).
+
+### Re-validation
+
+```
+rustc 1.91.0 / cargo 1.91.0
+cargo check --manifest-path src-tauri/Cargo.toml   # PASS (warnings only)
+cargo test -p sidex-extensions --lib               # 101 passed
+cargo test -p sidex-text --lib                     # 295 passed
+npm run build                                      # PASS; EmbedPDF + pdfium.wasm in dist
+smoke-marketplace-pdf.mjs                          # 7/7
+smoke-interactive-web.mjs                          # 5/5
+```
+
+MD WYSIWYG / EmbedPDF / marketplace install path **not intentionally changed** beyond PDF buffer copy + marketplace log fix.
+
+
 ## Remaining hard limits (honest)
 
-1. Box **rustc 1.85** vs crate **1.91** — cannot `cargo`/Tauri-build here; desktop ext-host E2E needs Windows/mac cloud-build artifact.
+1. Box **rustc was 1.85**; this pass installed **rustup 1.91.0** — `cargo check` works. Full `tauri build` / GUI E2E still prefers cloud-build artifacts (no display on box).
 2. Non-PDF extension **customEditors** need webview resolve bridge (host stores providers; pane path incomplete).
 3. Formatting CI may still fail on pre-existing AI-crate prettier/rustfmt noise.
 4. MD Diff Editor WYSIWYG path not ported.

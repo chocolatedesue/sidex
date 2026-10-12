@@ -2046,38 +2046,48 @@ pub struct WasmExtensionRuntime {
     inner: Mutex<WasmRuntimeState>,
 }
 
+/// Engine + linker are heavy (Wasmtime codegen). Keep them unset until the first
+/// WASM extension actually loads so cold start does not pay for an unused runtime.
 struct WasmRuntimeState {
-    engine: Engine,
-    linker: Linker<WasmHostState>,
+    engine: Option<Engine>,
+    linker: Option<Linker<WasmHostState>>,
     extensions: HashMap<String, LoadedWasmExtension>,
     shared_documents: HashMap<String, DocumentData>,
     shared_workspace_folders: Vec<String>,
 }
 
-impl WasmExtensionRuntime {
-    pub fn new() -> Result<Self> {
+impl WasmRuntimeState {
+    fn ensure_engine(&mut self) -> Result<(), String> {
+        if self.engine.is_some() && self.linker.is_some() {
+            return Ok(());
+        }
         let mut config = Config::new();
         config.wasm_component_model(true);
-
-        let engine =
-            Engine::new(&config).map_err(|e| anyhow::anyhow!("create wasmtime engine: {e}"))?;
+        let engine = Engine::new(&config).map_err(|e| format!("create wasmtime engine: {e}"))?;
         let mut linker: Linker<WasmHostState> = Linker::new(&engine);
-
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker)
-            .map_err(|e| anyhow::anyhow!("add WASI to linker: {e}"))?;
-
+            .map_err(|e| format!("add WASI to linker: {e}"))?;
         SidexExtension::add_to_linker::<_, wasmtime::component::HasSelf<_>>(&mut linker, |x| x)
-            .map_err(|e| anyhow::anyhow!("add WIT bindings to linker: {e}"))?;
+            .map_err(|e| format!("add WIT bindings to linker: {e}"))?;
+        log::info!("wasmtime engine initialized (lazy, first WASM extension load)");
+        self.engine = Some(engine);
+        self.linker = Some(linker);
+        Ok(())
+    }
+}
 
-        Ok(Self {
+impl WasmExtensionRuntime {
+    /// Cheap: does not construct a Wasmtime `Engine` until `load_extension`.
+    pub fn new() -> Self {
+        Self {
             inner: Mutex::new(WasmRuntimeState {
-                engine,
-                linker,
+                engine: None,
+                linker: None,
                 extensions: HashMap::new(),
                 shared_documents: HashMap::new(),
                 shared_workspace_folders: Vec::new(),
             }),
-        })
+        }
     }
 
     pub fn load_extension(&self, manifest: &ExtensionManifest) -> Result<(), String> {
@@ -2094,11 +2104,14 @@ impl WasmExtensionRuntime {
         );
 
         let mut guard = self.inner.lock().map_err(|e| e.to_string())?;
+        guard.ensure_engine()?;
 
-        let component = Component::from_file(&guard.engine, &wasm_path)
+        // Clone Engine (Arc-backed) so we do not hold a borrow across later mut uses of `guard`.
+        let engine = guard.engine.as_ref().expect("engine after ensure").clone();
+        let component = Component::from_file(&engine, &wasm_path)
             .map_err(|e| format!("failed to load wasm component {}: {e}", wasm_path.display()))?;
 
-        let mut store = Store::new(&guard.engine, WasmHostState::new());
+        let mut store = Store::new(&engine, WasmHostState::new());
 
         {
             let host_state = store.data_mut();
@@ -2116,8 +2129,11 @@ impl WasmExtensionRuntime {
                 .clone_from(&guard.shared_workspace_folders);
         }
 
-        let bindings = SidexExtension::instantiate(&mut store, &component, &guard.linker)
-            .map_err(|e| format!("failed to instantiate {}: {e}", manifest.id))?;
+        let bindings = {
+            let linker = guard.linker.as_ref().expect("linker after ensure");
+            SidexExtension::instantiate(&mut store, &component, linker)
+                .map_err(|e| format!("failed to instantiate {}: {e}", manifest.id))?
+        };
 
         bindings
             .sidex_extension_extension_api()

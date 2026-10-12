@@ -177,8 +177,10 @@ export class PdfPreviewEditor extends EditorPane {
 				return;
 			}
 
-			const data = new Uint8Array(file.value.buffer.slice(0));
-			const ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+			// One ArrayBuffer copy into a Blob URL — avoid double-slice which
+			// briefly held two full PDF copies in JS heap.
+			const src = file.value.buffer;
+			const ab = src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength);
 			const blobUrl = URL.createObjectURL(new Blob([ab], { type: 'application/pdf' }));
 			if (cts.token.isCancellationRequested) {
 				URL.revokeObjectURL(blobUrl);

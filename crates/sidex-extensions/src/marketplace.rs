@@ -359,8 +359,7 @@ impl MarketplaceClient {
                 // Markdown-related and other extensions remain installable.
                 let fallback_url = url.replacen(DEFAULT_BASE_URL, OPEN_VSX_FALLBACK_URL, 1);
                 log::warn!(
-                    error = %err,
-                    "marketplace search failed; falling back to Open VSX"
+                    "marketplace search failed; falling back to Open VSX: {err}"
                 );
                 self.http
                     .get(&fallback_url)

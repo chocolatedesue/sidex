@@ -384,6 +384,16 @@ fn fix_macos_path() {
     use std::sync::mpsc;
     use std::time::Duration;
 
+    // Skip the login-shell round-trip when PATH already looks like a developer
+    // machine (Homebrew /usr/local). Saves up to the timeout on warm launches.
+    let current_path = std::env::var("PATH").unwrap_or_default();
+    if current_path.contains("/opt/homebrew")
+        || current_path.contains("/usr/local/bin")
+        || current_path.contains("/home/linuxbrew")
+    {
+        return;
+    }
+
     let shell = std::env::var("SHELL")
         .ok()
         .filter(|s| !s.is_empty())
@@ -410,7 +420,9 @@ fn fix_macos_path() {
         let _ = tx.send(child.wait_with_output());
     });
 
-    let output = match rx.recv_timeout(Duration::from_secs(3)) {
+    // Cap wait at 1.5s — previously 3s could dominate cold start when the
+    // interactive shell hung on nvm/rbenv init.
+    let output = match rx.recv_timeout(Duration::from_millis(1500)) {
         Ok(Ok(output)) => output,
         Ok(Err(e)) => {
             log::warn!("fix_macos_path: shell failed: {e}");
@@ -484,9 +496,8 @@ pub fn run() {
         .manage(Arc::new(SettingsStore::new()))
         .manage(Arc::new(sidex_extension_api::CommandRegistry::new()))
         .manage(Arc::new(RemoteManagerStore::new()))
-        .manage(Arc::new(
-            WasmExtensionRuntime::new().expect("failed to initialize WASM runtime"),
-        ))
+        // Wasmtime Engine is created lazily on first WASM extension load (startup win).
+        .manage(Arc::new(WasmExtensionRuntime::new()))
         .register_asynchronous_uri_scheme_protocol("sidex-asset", |_ctx, request, responder| {
             std::thread::spawn(move || {
                 let raw_path = request.uri().path();
