@@ -254,6 +254,7 @@ import './contrib/webviewView/browser/webviewView.contribution.js';
 
 // Image Preview
 import './contrib/imagePreview/browser/imagePreview.contribution.js';
+import './contrib/pdfPreview/browser/pdfPreview.contribution.js';
 
 // Extensions Management
 import './contrib/extensions/browser/extensions.contribution.js';

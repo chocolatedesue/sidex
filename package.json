@@ -41,6 +41,7 @@
     "@xterm/xterm": "^5.5.0",
     "katex": "^0.16.47",
     "monaco-editor": "^0.52.2",
+    "pdfjs-dist": "^4.10.38",
     "tas-client": "^0.3.2",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.2"
