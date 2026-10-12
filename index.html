@@ -10,7 +10,14 @@
 			globalThis._VSCODE_NLS_LANGUAGE = localStorage.getItem('vscode.nls.locale') || 'en';
 			globalThis._VSCODE_NLS_MESSAGES = [];
 
-			globalThis.__SIDEX_TAURI__ = true;
+			// Real Tauri shell vs plain browser (vite preview / web smoke).
+			// Hard-coding `true` made web builds pretend to be desktop: extension-host
+			// bootstrap then failed loudly and marketplace install tried Tauri invoke.
+			globalThis.__SIDEX_TAURI__ = !!(
+				globalThis.__TAURI_INTERNALS__ ||
+				globalThis.__TAURI__ ||
+				(typeof navigator !== 'undefined' && /Tauri/i.test(navigator.userAgent || ''))
+			);
 			try {
 				const ua = navigator.userAgent || '';
 				const plat = navigator.platform || '';

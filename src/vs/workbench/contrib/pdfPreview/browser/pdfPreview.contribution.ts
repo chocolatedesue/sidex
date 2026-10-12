@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------------------------
- *  SideX — registers the built-in PDF preview.
+ *  SideX — registers the built-in PDF preview (EmbedPDF / embed-pdf-viewer).
  *
  *  Registered with `RegisteredEditorPriority.default`, so a `.pdf` opens in it
  *  by default and "Reopen Editor With…" offers it next to the text editor.
- *  Nothing here depends on the extension host or on the `customEditors`
- *  contribution point, both of which SideX does not run: a marketplace PDF
- *  viewer cannot register itself, which is why the preview is built in.
+ *  Engine: @embedpdf/snippet (same stack as chocolatedesue/Modern-PDF-Preview).
+ *  Marketplace PDF custom editors still need the extension-host customEditor
+ *  bridge; this built-in covers the LAB-707 named path without that host.
  *--------------------------------------------------------------------------------------------*/
 
 import { localize } from '../../../../nls.js';
@@ -27,7 +27,7 @@ import { PdfPreviewEditor } from './pdfPreviewEditor.js';
 import { PdfPreviewEditorInput } from './pdfPreviewEditorInput.js';
 
 Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
-	EditorPaneDescriptor.create(PdfPreviewEditor, PdfPreviewEditor.ID, localize('pdfPreview', 'PDF Preview')),
+	EditorPaneDescriptor.create(PdfPreviewEditor, PdfPreviewEditor.ID, localize('pdfPreview', 'Modern PDF Preview')),
 	[new SyncDescriptor(PdfPreviewEditorInput)]
 );
 
@@ -41,9 +41,7 @@ class PdfPreviewContribution extends Disposable implements IWorkbenchContributio
 				'*.pdf',
 				{
 					id: PdfPreviewEditor.ID,
-					label: localize('pdfPreview.editor', 'Modern PDF Preview'),
-					// Default: PDFs are not text, so the preview should win over
-					// the text editor unless a user says otherwise.
+					label: localize('pdfPreview.editor', 'Modern PDF Preview (EmbedPDF)'),
 					priority: RegisteredEditorPriority.default
 				},
 				{},

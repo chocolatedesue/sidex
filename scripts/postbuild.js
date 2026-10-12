@@ -37,6 +37,28 @@ if (fs.existsSync('extensions-meta.json')) {
 }
 console.log('Post-build: copied extensions\n');
 
+// EmbedPDF (LAB-707) needs PDFium WASM next to the app. public/ copies on Vite
+// build, but keep an explicit fallback from node_modules for cloud/CI caches.
+const PDFIUM_CANDIDATES = [
+	path.join('public', 'pdfium.wasm'),
+	path.join('node_modules', '@embedpdf', 'snippet', 'dist', 'pdfium.wasm'),
+	path.join('node_modules', '@embedpdf', 'pdfium', 'dist', 'pdfium.wasm'),
+];
+const pdfiumDest = path.join(DIST_DIR, 'pdfium.wasm');
+let copiedPdfium = false;
+for (const src of PDFIUM_CANDIDATES) {
+	if (fs.existsSync(src)) {
+		fs.copyFileSync(src, pdfiumDest);
+		console.log(`Post-build: copied ${src} → ${pdfiumDest}\n`);
+		copiedPdfium = true;
+		break;
+	}
+}
+if (!copiedPdfium) {
+	console.warn('Post-build: pdfium.wasm not found — EmbedPDF PDF preview will fail\n');
+}
+
+
 // The markdown preview renders KaTeX itself (it is bundled), but the
 // stylesheet and the fonts it pulls in are fetched at runtime. Vite serves
 // those from the project in dev; a build has to copy them next to the app.

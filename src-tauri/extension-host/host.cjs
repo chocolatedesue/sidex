@@ -999,10 +999,50 @@ class ExtensionHost extends EventEmitter {
     const commands = [...this._commands.keys()];
     const webviewViewProviders = this._webviewViewProviders ? [...this._webviewViewProviders.keys()] : [];
     const customEditorProviders = this._customEditorProviders ? [...this._customEditorProviders.keys()] : [];
+    const customEditors = this._collectCustomEditorContributions();
     return {
       id,
-      result: { commands, webviewViewProviders, customEditorProviders },
+      result: { commands, webviewViewProviders, customEditorProviders, customEditors },
     };
+  }
+
+  _collectCustomEditorContributions() {
+    const out = [];
+    const seen = new Set();
+    for (const [extId, ext] of this._extensions || []) {
+      const list = ext?.manifest?.contributes?.customEditors;
+      if (!Array.isArray(list)) continue;
+      for (const ce of list) {
+        if (!ce?.viewType) continue;
+        const key = `${extId}::${ce.viewType}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const selectors = (ce.selector || []).map((s) => s.filenamePattern || s.filename || '*').filter(Boolean);
+        out.push({
+          extensionId: extId,
+          viewType: ce.viewType,
+          displayName: ce.displayName || ce.viewType,
+          priority: ce.priority || 'default',
+          selectors: selectors.length ? selectors : ['*'],
+          registered: !!(this._customEditorProviders && this._customEditorProviders.has(ce.viewType)),
+        });
+      }
+    }
+    // Providers registered without a contributes entry still show up for Reopen With.
+    if (this._customEditorProviders) {
+      for (const viewType of this._customEditorProviders.keys()) {
+        if ([...seen].some((k) => k.endsWith(`::${viewType}`))) continue;
+        out.push({
+          extensionId: '',
+          viewType,
+          displayName: viewType,
+          priority: 'option',
+          selectors: ['*'],
+          registered: true,
+        });
+      }
+    }
+    return out;
   }
 
   _handleResetPanels(id) {
@@ -3505,7 +3545,25 @@ function createVscodeShim() {
     registerCustomEditorProvider: (viewType, provider) => {
       if (!host._customEditorProviders) host._customEditorProviders = new Map();
       host._customEditorProviders.set(viewType, provider);
-      host.emit('event', { type: 'registerCustomEditorProvider', viewType });
+      let meta = { viewType, selectors: ['*'], displayName: viewType, priority: 'option', extensionId: '' };
+      try {
+        for (const [extId, ext] of host._extensions || []) {
+          const list = ext?.manifest?.contributes?.customEditors;
+          if (!Array.isArray(list)) continue;
+          const hit = list.find((c) => c.viewType === viewType);
+          if (hit) {
+            meta = {
+              viewType,
+              extensionId: extId,
+              displayName: hit.displayName || viewType,
+              priority: hit.priority || 'default',
+              selectors: (hit.selector || []).map((s) => s.filenamePattern || s.filename || '*').filter(Boolean) || ['*'],
+            };
+            break;
+          }
+        }
+      } catch {}
+      host.emit('event', { type: 'registerCustomEditorProvider', ...meta });
       return { dispose() { host._customEditorProviders?.delete(viewType); } };
     },
     registerUriHandler: (handler) => {

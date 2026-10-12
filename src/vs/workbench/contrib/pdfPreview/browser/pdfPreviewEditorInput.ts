@@ -1,11 +1,10 @@
 /*---------------------------------------------------------------------------------------------
  *  SideX — editor input for the built-in PDF preview.
  *
- *  A plain `EditorInput` (like `ImagePreviewEditorInput`): the pane renders the
- *  document itself, so there is no webview, no extension host and no custom
- *  editor contribution point involved. SideX ships the `customEditors`
- *  subsystem as a stub, which is why a marketplace PDF viewer can never
- *  register itself here.
+ *  A plain `EditorInput` (like `ImagePreviewEditorInput`): the pane hosts
+ *  EmbedPDF (@embedpdf/snippet / embed-pdf-viewer) directly — no webview and
+ *  no extension host required. Marketplace customEditors remain a separate
+ *  extension-host path (see tauriExtensionHost.contribution).
  *--------------------------------------------------------------------------------------------*/
 
 import { URI } from '../../../../base/common/uri.js';

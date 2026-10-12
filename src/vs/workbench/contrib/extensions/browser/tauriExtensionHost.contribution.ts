@@ -87,6 +87,12 @@ import { ExtensionIdentifier } from '../../../../platform/extensions/common/exte
 import { IWebviewService } from '../../webview/browser/webview.js';
 import { ICodeEditorService } from '../../../../editor/browser/services/codeEditorService.js';
 import type { ICodeEditor } from '../../../../editor/browser/editorBrowser.js';
+import {
+	IEditorResolverService,
+	RegisteredEditorPriority,
+} from '../../../services/editor/common/editorResolverService.js';
+import { PdfPreviewEditorInput } from '../../pdfPreview/browser/pdfPreviewEditorInput.js';
+
 
 
 
@@ -171,6 +177,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 	private _treeViews = new Map<string, TreeView>();
 	private _registeredCommands = new Map<string, IDisposable>();
 	private _webviewViewDisposables = new Map<string, IDisposable>();
+	private _customEditorDisposables = new Map<string, IDisposable>();
 
 	constructor(
 		@ILogService private readonly logService: ILogService,
@@ -198,6 +205,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		@IWebviewViewService private readonly webviewViewService: IWebviewViewService,
 		@IWebviewService private readonly webviewService: IWebviewService,
 		@ICodeEditorService private readonly codeEditorService: ICodeEditorService,
+		@IEditorResolverService private readonly editorResolverService: IEditorResolverService,
 	) {
 		super();
 		this._init();
@@ -874,6 +882,14 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 				break;
 			case 'registerCustomEditorProvider':
 				this.logService.info(`[ExtHost] registerCustomEditorProvider: ${msg.viewType}`);
+				this._registerExtensionCustomEditor({
+					viewType: msg.viewType,
+					displayName: msg.displayName || msg.viewType,
+					priority: msg.priority || 'option',
+					selectors: Array.isArray(msg.selectors) && msg.selectors.length ? msg.selectors : ['*'],
+					extensionId: msg.extensionId || '',
+					registered: true,
+				});
 				break;
 			case 'registerTaskProvider':
 				this.logService.info(`[ExtHost] registerTaskProvider: ${msg.taskType}`);
@@ -1198,6 +1214,14 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 			commands: string[];
 			webviewViewProviders: string[];
 			customEditorProviders: string[];
+			customEditors?: Array<{
+				extensionId: string;
+				viewType: string;
+				displayName: string;
+				priority: string;
+				selectors: string[];
+				registered: boolean;
+			}>;
 		}>('getExtensionState', {}, { timeoutMs: 5000, allowBeforeHandshake: true }).then(
 			(state) => {
 				if (!state) { return; }
@@ -1207,8 +1231,24 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 				for (const viewId of state.webviewViewProviders) {
 					this._onRegisterWebviewViewProvider(viewId);
 				}
+				for (const ce of state.customEditors || []) {
+					this._registerExtensionCustomEditor(ce);
+				}
+				// Fallback: providers without contributes metadata
+				for (const viewType of state.customEditorProviders || []) {
+					if (!(state.customEditors || []).some(c => c.viewType === viewType)) {
+						this._registerExtensionCustomEditor({
+							viewType,
+							displayName: viewType,
+							priority: 'option',
+							selectors: ['*'],
+							extensionId: '',
+							registered: true,
+						});
+					}
+				}
 				const kiloCmds = state.commands.filter(c => c.startsWith('kilo-code'));
-				this.logService.info(`[ExtHost] Synced state: ${state.commands.length} commands (${kiloCmds.length} kilo), ${state.webviewViewProviders.length} webview views`);
+				this.logService.info(`[ExtHost] Synced state: ${state.commands.length} commands (${kiloCmds.length} kilo), ${state.webviewViewProviders.length} webview views, ${(state.customEditors || []).length} custom editors`);
 				if (kiloCmds.length > 0) {
 					this.logService.info(`[ExtHost] Kilo commands: ${kiloCmds.join(', ')}`);
 				}
@@ -3073,6 +3113,49 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		}));
 		return { edits } as WorkspaceEdit & Rejection;
 	}
+
+	private _registerExtensionCustomEditor(ce: {
+		viewType: string;
+		displayName: string;
+		priority?: string;
+		selectors: string[];
+		extensionId?: string;
+		registered?: boolean;
+	}): void {
+		const key = ce.viewType;
+		const selectors = (ce.selectors && ce.selectors.length) ? ce.selectors : ['*'];
+		const label = ce.displayName || ce.viewType;
+		const pdfSelectors = selectors.filter(s => s.toLowerCase().includes('.pdf'));
+		const isPdfView = ce.viewType.toLowerCase().includes('pdf') || pdfSelectors.length > 0;
+
+		// Full custom-editor webview resolve is still incomplete. PDF associations
+		// reopen through built-in EmbedPDF so Reopen With stays useful (LAB-707).
+		if (!isPdfView) {
+			this.logService.info(`[ExtHost] custom editor ${ce.viewType} (${label}) selectors=${selectors.join(',')} — deferred (non-PDF webview bridge pending)`);
+			return;
+		}
+
+		this._customEditorDisposables.get(key)?.dispose();
+		this._customEditorDisposables.delete(key);
+
+		const glob = pdfSelectors[0] || '*.pdf';
+		const disposable = this.editorResolverService.registerEditor(
+			glob,
+			{
+				id: ce.viewType,
+				label: `${label} (via EmbedPDF)`,
+				priority: RegisteredEditorPriority.option,
+			},
+			{},
+			{
+				createEditorInput: ({ resource }) => ({ editor: new PdfPreviewEditorInput(resource) }),
+			}
+		);
+		this._customEditorDisposables.set(key, disposable);
+		this._register(disposable);
+		this.logService.info(`[ExtHost] Registered custom editor association ${ce.viewType} → ${glob} (${label})`);
+	}
+
 }
 
 registerWorkbenchContribution2(

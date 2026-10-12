@@ -165,7 +165,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['vscode-textmate', 'vscode-oniguruma'],
+    include: ['vscode-textmate', 'vscode-oniguruma', '@embedpdf/snippet'],
     exclude: ['@tauri-apps/api'],
   },
   worker: {

@@ -131,3 +131,6 @@ MEMORY.md
 /sidex-site/
 /deploy/
 .crossval-lab707/
+smoke-artifacts/
+public/pdfium.wasm
+test-fixtures/*.pdf

@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------------------------
- *  SideX Extension Host Bridge
- *  Connects to the Node.js extension host via WebSocket and registers
- *  Monaco language feature providers that forward to loaded extensions.
+ *  SideX Extension Host Bridge (SUPERSEDED — not imported by workbench).
+ *  Prefer `tauriExtensionHost.contribution.ts` (extension_platform_bootstrap).
+ *  Kept as reference for the lighter WS language-features path only.
  *--------------------------------------------------------------------------------------------*/
 
 import { invoke } from '@tauri-apps/api/core';
