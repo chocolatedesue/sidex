@@ -117,7 +117,7 @@ import {
 	registerWorkbenchContribution2,
 	WorkbenchPhase
 } from '../../../common/contributions.js';
-import { IDisposable } from '../../../../base/common/lifecycle.js';
+import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import {
 	Extensions as ConfigurationExtensions,
@@ -184,13 +184,15 @@ registerWorkbenchContribution2(
 	WorkbenchPhase.AfterRestored
 );
 
-class SidexStatusBarContribution implements IWorkbenchContribution {
+class SidexStatusBarContribution extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'sidex.statusbar';
 
 	constructor(
 		@IStatusbarService private readonly statusbarService: IStatusbarService,
 		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService
 	) {
+		super();
+
 		// Sidex panel toggle (far right)
 		const sidexEntry = statusbarService.addEntry(
 			{
@@ -239,9 +241,12 @@ class SidexStatusBarContribution implements IWorkbenchContribution {
 
 		// Listen for layout changes
 		(layoutService as any).onDidChangePartVisibility?.(() => update());
-		// Fallback: poll every 500ms (some layout changes don't fire events)
+		// Fallback: poll every 500ms (some layout changes don't fire events).
+		// Registered on the contribution so the workbench's own disposal stops
+		// it: assigning a `dispose` *object* here used to throw
+		// "this.dispose is not a function" on shutdown and leaked the timer.
 		const interval = setInterval(update, 500);
-		(this as unknown as { dispose?: IDisposable }).dispose = { dispose: () => clearInterval(interval) } as IDisposable;
+		this._register({ dispose: () => clearInterval(interval) });
 	}
 
 	private _sidexIcon(): string {

@@ -559,9 +559,15 @@ fn start(app: &AppHandle, server: &Arc<LocalServer>) {
     };
     server.with_proc(|p| p.port = port);
 
-    let provider_env = {
-        let store = app.state::<Arc<SecretsStore>>();
-        providers::server_env(&store)
+    // The secrets store is created best-effort during setup, so a failure
+    // there must not turn into a panic here (`state()` unwraps and takes the
+    // whole app down); start without provider credentials instead.
+    let provider_env = match app.try_state::<Arc<SecretsStore>>() {
+        Some(store) => providers::server_env(&store),
+        None => {
+            log::warn!("[sidex-server] no secrets store; starting without provider credentials");
+            BTreeMap::new()
+        }
     };
 
     let generation = server.bump_generation();

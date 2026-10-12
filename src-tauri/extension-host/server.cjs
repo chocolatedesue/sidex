@@ -266,9 +266,35 @@ class ExtensionHostManager {
 
 const hostManager = new ExtensionHostManager();
 
+// A WebSocket is not subject to CORS, so a page on any site can open one
+// against 127.0.0.1. Without an Origin check, a stray page could drive the
+// extension host (and through it the terminal / shell commands). Allow only the
+// app's own origins and native clients, which send no Origin at all.
+const ALLOWED_ORIGINS = [
+  /^tauri:\/\/localhost$/,
+  /^http:\/\/tauri\.localhost(:\d+)?$/,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+  /^https?:\/\/\[::1\](:\d+)?$/,
+];
+
+function isTrustedOrigin(origin) {
+  if (!origin) {
+    return true;
+  }
+  return ALLOWED_ORIGINS.some((allowed) => allowed.test(origin));
+}
+
 function handleUpgrade(req, socket) {
   const key = req.headers['sec-websocket-key'];
   if (!key) {
+    socket.destroy();
+    return;
+  }
+
+  const origin = req.headers['origin'];
+  if (!isTrustedOrigin(origin)) {
+    log(`rejecting websocket from untrusted origin: ${origin}`);
     socket.destroy();
     return;
   }
@@ -659,9 +685,11 @@ async function main() {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(
       JSON.stringify({
+        // Diagnostics only — deliberately no `connectionToken` here: this
+        // endpoint answers any local caller, and the token is handed to the
+        // workbench over the authenticated-by-origin websocket handshake.
         status: 'ok',
         pid: process.pid,
-        connectionToken: hostManager.connectionToken,
         sessionId: process.env.SIDEX_SESSION_ID || null,
         extensionCount: rustInitData ? (rustInitData.extensions || []).length : null,
       }),

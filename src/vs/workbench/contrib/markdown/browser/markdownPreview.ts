@@ -9,6 +9,7 @@ import { CancellationTokenSource } from '../../../../base/common/cancellation.js
 import { localize } from '../../../../nls.js';
 import { IEditorService, SIDE_GROUP } from '../../../services/editor/common/editorService.js';
 import { IWebviewWorkbenchService } from '../../webviewPanel/browser/webviewWorkbenchService.js';
+import { IWebviewService } from '../../webview/browser/webview.js';
 import { WebviewInput } from '../../webviewPanel/browser/webviewEditorInput.js';
 import { WebviewInitInfo } from '../../webview/browser/webview.js';
 import { asWebviewUri } from '../../webview/common/webview.js';
@@ -20,6 +21,7 @@ import { IConfigurationService } from '../../../../platform/configuration/common
 import { IExtensionService } from '../../../services/extensions/common/extensions.js';
 import { ILanguageService } from '../../../../editor/common/languages/language.js';
 import { ICodeEditorService } from '../../../../editor/browser/services/codeEditorService.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { renderMarkdownDocument, DEFAULT_MARKDOWN_STYLES } from './markdownDocumentRenderer.js';
@@ -155,6 +157,8 @@ export class MarkdownPreviewManager extends Disposable {
 	constructor(
 		@IEditorService private readonly _editorService: IEditorService,
 		@IWebviewWorkbenchService private readonly _webviewWorkbenchService: IWebviewWorkbenchService,
+		@IWebviewService private readonly _webviewService: IWebviewService,
+		@IInstantiationService private readonly _instantiationService: IInstantiationService,
 		@ITextFileService private readonly _textFileService: ITextFileService,
 		@ILogService private readonly _logService: ILogService,
 		@IStorageService private readonly _storageService: IStorageService,
@@ -190,27 +194,17 @@ export class MarkdownPreviewManager extends Disposable {
 	}
 
 	/**
-	 * Create (and show) the preview for `resource` and hand back its editor
-	 * input. This is what the editor resolver calls, so a file type can be
-	 * pointed at the preview through `workbench.editorAssociations` or
-	 * "Reopen Editor With…".
+	 * The editor resolver's entry point (see the webview lifecycle region for
+	 * the construction itself). Makes sure the file's text model exists first:
+	 * rendering is driven by the model, so building the preview before it is
+	 * loaded would leave the tab empty.
 	 *
-	 * Like the command path, the preview is a single instance: it follows the
-	 * resource it was last asked for rather than opening one tab per file.
-	 */
-	createPreviewInput(resource: URI): EditorInput | undefined {
-		this._currentResource = resource;
-		this._locked = false;
-		return this._createOrUpdateWebview(resource, false, false);
-	}
-
-	/**
-	 * Same, but makes sure the file's text model exists first. Creating the
-	 * webview before the model is loaded leaves it blank: rendering is driven
-	 * by the model, and there is nothing to re-render it from until an editor
-	 * opens. The editor resolver goes through here.
+	 * The preview is a single instance — it follows the resource it was last
+	 * asked for rather than opening one tab per file.
 	 */
 	async createPreviewInputWhenReady(resource: URI): Promise<EditorInput | undefined> {
+		this._currentResource = resource;
+		this._locked = false;
 		if (!this._textFileService.files.get(resource)) {
 			try {
 				await this._textFileService.files.resolve(resource);
@@ -321,58 +315,115 @@ export class MarkdownPreviewManager extends Disposable {
 	//#region --- webview lifecycle ---
 
 	private _createOrUpdateWebview(resource: URI, side?: boolean, preserveFocus = true): WebviewInput | undefined {
+		return this._openOrCreateWebview(resource, true, side, preserveFocus);
+	}
+
+	/**
+	 * Editor-resolver entry point: build the preview input for `resource` and
+	 * hand it back *without* opening it.
+	 *
+	 * The resolver runs inside an editor open. Calling `openWebview` from here
+	 * (which calls `editorService.openEditor`) re-enters that open, and both
+	 * passes then skip `WebviewEditor.claimWebview` — the pane never attaches
+	 * and the tab stays blank forever. So this path only constructs the input;
+	 * the resolver's own open mounts it.
+	 */
+	createPreviewInput(resource: URI): EditorInput | undefined {
+		// NOTE: `open: true` on purpose. An overlay webview constructed without
+		// an open (see the review's suggestion) attaches, but never creates its
+		// content iframe, so the tab sits on the webview's loading page forever.
+		// Opening here means the resolver re-reveals the same input.
+		return this._openOrCreateWebview(resource, true);
+	}
+
+	private _openOrCreateWebview(
+		resource: URI,
+		open: boolean,
+		side?: boolean,
+		preserveFocus = true
+	): WebviewInput | undefined {
 		const title = `Preview: ${resource.path.split('/').pop() || resource.path}`;
-		const parentDir = URI.joinPath(resource, '..');
 
-		if (!this._webviewInput) {
-			const initInfo: WebviewInitInfo = {
-				title,
-				options: {
-					enableFindWidget: true,
-					retainContextWhenHidden: true
-				},
-				contentOptions: {
-					allowScripts: true,
-					localResourceRoots: [parentDir]
-				},
-				extension: undefined
-			};
-
-			const input = this._webviewWorkbenchService.openWebview(initInfo, MARKDOWN_PREVIEW_VIEW_TYPE, title, undefined, {
-				preserveFocus,
-				group: side ? SIDE_GROUP : undefined
-			});
-			if (!input) {
-				this._logService.warn('[Markdown Preview] Could not open the preview editor');
-				return undefined;
-			}
-			this._webviewInput = input;
-
-			this._webviewDisposables.add(
-				input.onWillDispose(() => {
-					this._clearDebounceTimer();
-					this._renderCts.clear();
-					this._webviewDisposables.clear();
-					this._contentDisposables.clear();
-					this._webviewInput = undefined;
-					this._currentResource = undefined;
-					this._locked = false;
-				})
-			);
-
-			this._webviewDisposables.add(input.webview.onMessage(event => this._onPreviewMessage(event.message)));
-
-			this._rememberOpenPreview(resource);
-		} else {
+		if (this._webviewInput) {
 			this._webviewInput.setWebviewTitle(title);
+			this._afterWebviewReady();
+			return this._webviewInput;
 		}
 
+		const input = open
+			? this._openWebviewFor(resource, title, side, preserveFocus)
+			: this._createWebviewFor(resource, title);
+		if (!input) {
+			this._logService.warn('[Markdown Preview] Could not create the preview editor');
+			return undefined;
+		}
+
+		this._webviewInput = input;
+		this._webviewDisposables.add(
+			input.onWillDispose(() => {
+				this._clearDebounceTimer();
+				this._renderCts.clear();
+				this._webviewDisposables.clear();
+				this._contentDisposables.clear();
+				this._webviewInput = undefined;
+				this._currentResource = undefined;
+				this._locked = false;
+			})
+		);
+		this._webviewDisposables.add(input.webview.onMessage(event => this._onPreviewMessage(event.message)));
+		this._rememberOpenPreview(resource);
+
+		this._afterWebviewReady();
+		return input;
+	}
+
+	private _initInfo(resource: URI, title: string): WebviewInitInfo {
+		return {
+			title,
+			options: {
+				enableFindWidget: true,
+				retainContextWhenHidden: true
+			},
+			contentOptions: {
+				allowScripts: true,
+				localResourceRoots: [URI.joinPath(resource, '..')]
+			},
+			extension: undefined
+		};
+	}
+
+	/** Command path: the webview service creates *and* opens the editor. */
+	private _openWebviewFor(resource: URI, title: string, side?: boolean, preserveFocus = true): WebviewInput {
+		return this._webviewWorkbenchService.openWebview(
+			this._initInfo(resource, title),
+			MARKDOWN_PREVIEW_VIEW_TYPE,
+			title,
+			undefined,
+			{ preserveFocus, group: side ? SIDE_GROUP : undefined }
+		);
+	}
+
+	/** Resolver path: exactly what `openWebview` does, minus opening it. */
+	private _createWebviewFor(resource: URI, title: string): WebviewInput {
+		const initInfo = this._initInfo(resource, title);
+		const webview = this._webviewService.createWebviewOverlay(initInfo);
+		return this._instantiationService.createInstance(
+			WebviewInput,
+			{
+				viewType: MARKDOWN_PREVIEW_VIEW_TYPE,
+				name: title,
+				providedId: initInfo.providedViewType,
+				iconPath: undefined
+			},
+			webview
+		);
+	}
+
+	private _afterWebviewReady(): void {
 		this._renderContent(true);
 		this._listenToContentChanges();
 		this._listenToEditorScroll();
 		this._updateLockState();
-
-		return this._webviewInput;
 	}
 
 	private _rememberOpenPreview(resource: URI): void {
@@ -515,7 +566,15 @@ export class MarkdownPreviewManager extends Disposable {
 				await this._editorService.openEditor({ resource: uri, options: { pinned: true } });
 				return;
 			}
-			await this._openerService.open(uri, { openExternal: true, fromUserGesture: true });
+			// Only web links (and mail) may leave the app. A document must not be
+			// able to run something by being clicked: `command:` would execute a
+			// workbench command, and other schemes would hand the URI to an OS
+			// handler.
+			if (uri.scheme === 'http' || uri.scheme === 'https' || uri.scheme === 'mailto') {
+				await this._openerService.open(uri, { openExternal: true, fromUserGesture: true });
+				return;
+			}
+			this._logService.warn('[Markdown Preview] Refusing to open link with scheme', uri.scheme);
 		} catch (err) {
 			this._logService.warn('[Markdown Preview] Could not open link', href, err);
 		}

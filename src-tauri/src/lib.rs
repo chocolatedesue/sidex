@@ -581,12 +581,18 @@ pub fn run() {
             let db_path_str = db_path.to_string_lossy().to_string();
             let db = match StorageDb::new(&db_path_str) {
                 Ok(db) => db,
-                Err(e) => {
-                    log::error!("storage DB open failed ({e}); recreating {db_path_str}");
+                // Only a structurally broken file is worth rebuilding. Anything
+                // else - `SQLITE_BUSY`/`LOCKED` because another instance has it
+                // open, permissions, a full disk - must not delete the user's
+                // data: on Unix the `unlink` would succeed even while that other
+                // process is still using the file.
+                Err(e) if is_corrupt_database_error(&e) => {
+                    log::warn!("storage DB {db_path_str} is corrupt ({e}); rebuilding it");
                     let _ = std::fs::remove_file(&db_path);
                     StorageDb::new(&db_path_str)
-                        .map_err(|e| format!("failed to initialize storage database: {e}"))?
+                        .map_err(|e| format!("failed to rebuild storage database: {e}"))?
                 }
+                Err(e) => return Err(format!("failed to open storage database: {e}").into()),
             };
 
             restore_and_show(app, &db);
@@ -1101,4 +1107,16 @@ pub fn run() {
                 }
             }
         });
+}
+
+
+/// True when a storage-DB open failure means the file itself is unusable, as
+/// opposed to being locked or unreadable right now. Only the former justifies
+/// deleting it and starting over.
+fn is_corrupt_database_error(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("malformed")
+        || lower.contains("not a database")
+        || lower.contains("database corruption")
+        || lower.contains("file is encrypted")
 }

@@ -88,16 +88,32 @@ impl OpenRequest {
 /// Convert a filesystem path into a `file://` URI the webview understands.
 /// Relative paths are resolved against the process working directory first,
 /// which is what makes `sidex .` mean "the folder I am standing in".
+/// Schemes an incoming path/URI may use. Everything else is dropped rather
+/// than forwarded to the workbench as a resource.
+const TRUSTED_URI_SCHEMES: [&str; 6] = [
+    "file",
+    "vscode-file",
+    "vscode-remote",
+    "untitled",
+    "http",
+    "https",
+];
+
 fn path_to_uri(raw: &str, cwd: &Path) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
     }
-    // Already a URI (file:, vscode-remote:, ...) — pass it through.
+    // Already a URI - pass it through, but only for schemes that can name a
+    // resource. argv and deep links are attacker-reachable
+    // (`sidex://open?file=command:...`), and the workbench would act on an
+    // actionable URI such as `command:` or `javascript:` handed to it as a
+    // resource.
     if let Ok(parsed) = Url::parse(trimmed) {
-        if parsed.scheme().len() > 1 {
+        if TRUSTED_URI_SCHEMES.contains(&parsed.scheme()) {
             return Some(parsed.to_string());
         }
+        log::warn!("ignoring URI with untrusted scheme: {}", parsed.scheme());
     }
     let path = Path::new(trimmed);
     let absolute = if path.is_absolute() {
