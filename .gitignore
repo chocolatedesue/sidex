@@ -1,93 +1,90 @@
+
+!.env.example
+!.sidex/rules/
+!.sidex/skills/
+# /deploy    = maintainer deploy scripts and prod env
+# /sidex-web = marketing site + dashboard (Next.js)
 # =============================================================================
+# Library lock files should not be committed (Cargo best practice).
+# Local release packaging
+# Memory, bench results, and other generated state live in ~/.sidex/.
+# Only .sidex/rules/ and .sidex/skills/ are meant to be committed.
+# Private — not part of the public app repo.
 # SideX .gitignore
-# =============================================================================
-
-# ── Dependencies ─────────────────────────────────────────────────────────────
-node_modules/
-
+# The application lock (src-tauri/Cargo.lock) IS committed.
 # ── Build output ─────────────────────────────────────────────────────────────
-dist/
-out/
-build/
-*.tsbuildinfo
-
+# ── Cargo.lock for library crates ───────────────────────────────────────────
+# ── Cloudflare Wrangler (marketplace-proxy dev state) ────────────────────────
+# ── Dependencies ─────────────────────────────────────────────────────────────
+# ── Environment / Secrets ────────────────────────────────────────────────────
+# ── Extensions (auto-installed on first dev/build via npm run setup) ──────────
+# ── IDE / Editor ─────────────────────────────────────────────────────────────
+# ── Incomplete Rust WASM extensions (stubs, not yet LSP-backed) ──────────────
+# ── Local scratch / source reconstruction (never ship) ───────────────────────
+# ── Logs ─────────────────────────────────────────────────────────────────────
+# ── Misc ─────────────────────────────────────────────────────────────────────
+# ── OS files ─────────────────────────────────────────────────────────────────
 # ── Rust / Cargo ─────────────────────────────────────────────────────────────
-**/target/
-
+# ── Sidex ephemeral state (never commit) ─────────────────────────────────────
+# ── Tauri generated ──────────────────────────────────────────────────────────
+# ── Test / Coverage ──────────────────────────────────────────────────────────
 # ── WASM build artifacts (wasm-pack output) ──────────────────────────────────
 **/pkg/
-
-# ── Extensions (auto-installed on first dev/build via npm run setup) ──────────
-/extensions/
-
-# ── Cargo.lock for library crates ───────────────────────────────────────────
-# Library lock files should not be committed (Cargo best practice).
-# The application lock (src-tauri/Cargo.lock) IS committed.
-sidex-extension-sdk/Cargo.lock
-extensions-rust/Cargo.lock
-examples/**/Cargo.lock
-
-# ── Logs ─────────────────────────────────────────────────────────────────────
+**/target/
+*.lcov
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-logs/
-
-# ── OS files ─────────────────────────────────────────────────────────────────
-.DS_Store
-._*
-Thumbs.db
-Desktop.ini
-ehthumbs.db
-
-# ── IDE / Editor ─────────────────────────────────────────────────────────────
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+*.pem
+*.py[cod]
 *.sublime-project
 *.sublime-workspace
-
-# ── Environment / Secrets ────────────────────────────────────────────────────
+*.swo
+*.swp
+*.tgz
+*.tsbuildinfo
+*.vsix
+*~
+.DS_Store
+._*
+.cache/
+.crossval-lab707/
 .env
 .env.*
 .env.local
-!.env.example
-*.pem
-aws-credentials.json
-sidexai/aws-credentials.json
-
-# ── Tauri generated ──────────────────────────────────────────────────────────
-src-tauri/gen/
-
-# ── Test / Coverage ──────────────────────────────────────────────────────────
-coverage/
+.idea/
+.kilo/
 .nyc_output/
-*.lcov
-
-# ── Local scratch / source reconstruction (never ship) ───────────────────────
-__pycache__/
-*.py[cod]
+.parcel-cache/
+.sidex/*
+.turbo/
 .venv/
-venv/
-/scratchtmp/
-/recover_sources.py
-/recovered/
+.vscode/
+/deploy/
+/extensions/
+/marketing/
 /reconstruct/
 /reconstruct_sources.py
 /recover_*.py
-
-# ── Misc ─────────────────────────────────────────────────────────────────────
-*.tgz
-*.vsix
-.turbo/
-.cache/
-.parcel-cache/
-
-# ── Incomplete Rust WASM extensions (stubs, not yet LSP-backed) ──────────────
+/recover_sources.py
+/recovered/
+/scratchtmp/
+/sidex-site/
+/sidex-web/
+/website/
+Desktop.ini
+MEMORY.md
+Thumbs.db
+__pycache__/
+aws-credentials.json
+build/
+coverage/
+dist/
+ehthumbs.db
+examples/**/Cargo.lock
+extensions-meta.json
+extensions-rust/Cargo.lock
+extensions-rust/css-language-extension/css-builtin.json
+extensions-rust/css-language-extension/css-data.json
+extensions-rust/css-language-extension/src/css_data.rs
 extensions-rust/debug-auto-launch-extension/
 extensions-rust/debug-server-ready-extension/
 extensions-rust/emmet-extension/
@@ -103,34 +100,21 @@ extensions-rust/npm-extension/
 extensions-rust/php-language-extension/
 extensions-rust/references-view-extension/
 extensions-rust/terminal-suggest-extension/
-extensions-rust/css-language-extension/css-data.json
-extensions-rust/css-language-extension/css-builtin.json
-extensions-rust/css-language-extension/src/css_data.rs
-extensions-meta.json
-public/builtin-extensions.js
-
-# ── Cloudflare Wrangler (marketplace-proxy dev state) ────────────────────────
 infrastructure/marketplace-proxy/.wrangler/
 infrastructure/marketplace-proxy/node_modules/
-
-# ── Sidex ephemeral state (never commit) ─────────────────────────────────────
-# Memory, bench results, and other generated state live in ~/.sidex/.
-# Only .sidex/rules/ and .sidex/skills/ are meant to be committed.
-.sidex/*
-!.sidex/rules/
-!.sidex/skills/
-MEMORY.md
-.kilo/
-
-# Private — not part of the public app repo.
-# /sidex-web = marketing site + dashboard (Next.js)
-# /deploy    = maintainer deploy scripts and prod env
-/sidex-web/
-/website/
-/marketing/
-/sidex-site/
-/deploy/
-.crossval-lab707/
-smoke-artifacts/
+logs/
+node_modules/
+npm-debug.log*
+out/
+pnpm-debug.log*
+public/builtin-extensions.js
 public/pdfium.wasm
+release-artifacts/
+sidex-extension-sdk/Cargo.lock
+sidexai/aws-credentials.json
+smoke-artifacts/
+src-tauri/gen/
 test-fixtures/*.pdf
+venv/
+yarn-debug.log*
+yarn-error.log*
