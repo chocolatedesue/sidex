@@ -1022,7 +1022,7 @@ fn codex_credential_path() -> Option<PathBuf> {
 
 #[cfg(target_os = "macos")]
 fn keychain_lookup(service: &str) -> Option<String> {
-    let out = Command::new("security")
+    let out = std::process::Command::new("security")
         .args(["find-generic-password", "-s", service, "-w"])
         .output()
         .ok()?;
