@@ -178,3 +178,65 @@ MD WYSIWYG / EmbedPDF / marketplace install path **not intentionally changed** b
 
 - Version bump + docs/CHANGELOG; local linux tarball + web dist on GitHub Release.
 - Cloud-build for `v0.1.4` **failed** (`npm ci` lock out of sync) — fixed in 0.1.5.
+
+---
+
+## Tauri / startup / perf pass (post-0.1.5)
+
+**Date:** 2026-10-12 (Asia/Shanghai, UTC+8)  
+**SHA tip:** see `git log -1` after this commit.
+
+### Tauri versions (crates.io latest **2.x**, stay off 3.0-alpha)
+
+| Crate | Cargo.toml pin | Locked / tree |
+|-------|----------------|---------------|
+| tauri | **2.12.3** (was 2.10.3) | 2.12.3 |
+| tauri-build | **2.7.2** (was 2.5.6) | 2.7.2 |
+| tauri-plugin-log | **2.10** | 2.10.1 |
+| tauri-plugin-dialog | **2.8** | 2.8.2 |
+| tauri-plugin-shell | **2.5** | 2.5.0 |
+| tauri-plugin-single-instance | 2.5.3 | 2.5.3 |
+| tauri-plugin-deep-link | 2.6.1 | 2.6.1 |
+| @tauri-apps/api / cli (npm) | ^2.12.3 / ^2.12.2 | latest stable 2.x |
+| wasmtime | 49 | 49.0.2 (lazy Engine) |
+
+rustc **1.99.0**; Tauri 2.12 requires rustc ≥1.90 — OK. **Did not** take Tauri 3.0 alpha.
+
+### Plugin / cold-path review
+
+| Item | Decision |
+|------|----------|
+| dialog + shell | Keep on Builder (Open/Save + external open from first paint) |
+| single-instance + deep-link | Keep on Builder (CLI / `sidex://`) |
+| log | Debug-only inside `setup` (not release cold path) |
+| deep-link `register_all` (Linux) | **Deferred** to background thread after window show |
+| AI / `sidex-server` | Still register-only; spawn via `server_ensure_started` when `sidex.chat.enabled` |
+| Wasmtime | Still lazy on first WASM extension load |
+
+### Startup smoke (`scripts/smoke-startup.mjs`) — measured on box
+
+Web (static `dist` from 0.1.5 linux package, Playwright headless):
+
+```
+webDomContentLoaded  ~843ms
+webWorkbenchProxy    ~1468ms (after DCL)
+webTotalFromNav      ~2312ms
+no agent :7433 probe
+```
+
+Native (`target/release/SideX`, rustc 1.99, `SIDEX_STARTUP_TRACE=1`, Xvfb):
+
+```
+[sidex-startup] builder begin                 +0ms
+[sidex-startup] window restore_and_show     +487ms
+[sidex-startup] setup complete (AI off)     +515ms
+script wall: nativeWindowRestore ~827ms, nativeSetupComplete ~1239ms
+no sidex-server process
+```
+
+Evidence: `smoke-artifacts/startup-evidence.json`, `startup-web.png`, `startup-native.log`.
+
+### Intact
+
+EmbedPDF EditorPane, MD WYSIWYG (VS Code 1.141 markdown-editor-out), marketplace install path — **not intentionally changed**.
+

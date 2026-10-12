@@ -17,17 +17,17 @@ name = "sidex_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.5.6", features = [] }
+tauri-build = { version = "2.7.2", features = [] }
 
 [dependencies]
-tauri = { version = "2.10.3", features = [
+tauri = { version = "2.12.3", features = [
   "protocol-asset",
   "tray-icon",
   "devtools",
 ] }
-tauri-plugin-log = "2"
-tauri-plugin-dialog = "2"
-tauri-plugin-shell = "2"
+tauri-plugin-log = "2.10"
+tauri-plugin-dialog = "2.8"
+tauri-plugin-shell = "2.5"
 jsonwebtoken = { version = "10.4", features = ["aws_lc_rs"] }
 
 serde = { version = "1.0", features = ["derive"] }

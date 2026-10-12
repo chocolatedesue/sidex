@@ -442,6 +442,30 @@ fn fix_macos_path() {
     }
 }
 
+
+fn startup_trace_mark(label: &str) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    static START_MS: AtomicU64 = AtomicU64::new(0);
+    if std::env::var_os("SIDEX_STARTUP_TRACE").is_none() {
+        return;
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let start = START_MS.load(Ordering::Relaxed);
+    if start == 0 {
+        START_MS.store(now, Ordering::Relaxed);
+        eprintln!("[sidex-startup] {label} +0ms");
+        return;
+    }
+    eprintln!(
+        "[sidex-startup] {label} +{}ms",
+        now.saturating_sub(start)
+    );
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[allow(clippy::too_many_lines)]
 pub fn run() {
@@ -459,6 +483,13 @@ pub fn run() {
     if env_path.exists() {
         dotenvy::from_path(&env_path).ok();
     }
+
+    // Plugin set (cold path):
+    // - dialog + shell: needed for Open/Save and external open from first paint.
+    // - single-instance + deep-link: folder/file/CLI interop (must be on Builder).
+    // - log: installed only under debug_assertions inside setup (not release cold path).
+    // AI / Wasmtime / sidex-server stay opt-in or lazy (see setup + WasmExtensionRuntime).
+    startup_trace_mark("builder begin");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -606,6 +637,7 @@ pub fn run() {
             };
 
             restore_and_show(app, &db);
+            startup_trace_mark("window restore_and_show");
 
             // Debug-only: SIDEX_DEVTOOLS=1 auto-opens devtools to capture boot errors
             #[cfg(debug_assertions)]
@@ -701,9 +733,17 @@ pub fn run() {
 
                 let handle = app.handle().clone();
 
+                // OS protocol registration can be slow on Linux; do it after the
+                // window is up so it does not stretch time-to-first-paint.
                 #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
-                if let Err(err) = app.deep_link().register_all() {
-                    log::warn!("could not register deep link handlers: {err}");
+                {
+                    let reg = app.handle().clone();
+                    std::thread::spawn(move || {
+                        use tauri_plugin_deep_link::DeepLinkExt;
+                        if let Err(err) = reg.deep_link().register_all() {
+                            log::warn!("could not register deep link handlers: {err}");
+                        }
+                    });
                 }
 
                 app.deep_link().on_open_url(move |event| {
@@ -728,6 +768,7 @@ pub fn run() {
             // itself is spawned by `server_ensure_started` when the AI stack is
             // switched on. A plain editor launch must not pay for it.
             server::register(app.handle());
+            startup_trace_mark("setup complete (AI server not started)");
             Ok(())
         })
         .on_menu_event(|app, event| {
