@@ -1,0 +1,537 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *
+ *  SideX port of VS Code's Markdown Editor (WYSIWYG / 所见即所得).
+ *  Reuses the shipped `markdown-editor-out` webview from
+ *  `extensions/markdown-language-features` (VS Code ≥ 1.135 / 1.141),
+ *  talking the same postMessage protocol the built-in editor.js expects.
+ *  The TextModel remains the source of truth (undo/redo, dirty, hot-exit).
+ *--------------------------------------------------------------------------------------------*/
+
+import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
+import { URI } from '../../../../base/common/uri.js';
+import { generateUuid } from '../../../../base/common/uuid.js';
+import { localize } from '../../../../nls.js';
+import { IEditorService, SIDE_GROUP } from '../../../services/editor/common/editorService.js';
+import { IWebviewWorkbenchService } from '../../webviewPanel/browser/webviewWorkbenchService.js';
+import { IWebviewService } from '../../webview/browser/webview.js';
+import { WebviewInput } from '../../webviewPanel/browser/webviewEditorInput.js';
+import { WebviewInitInfo } from '../../webview/browser/webview.js';
+import { EditorInput } from '../../../common/editor/editorInput.js';
+import { ILogService } from '../../../../platform/log/common/log.js';
+import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
+import { ITextFileService } from '../../../services/textfile/common/textfiles.js';
+import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+import { INotificationService } from '../../../../platform/notification/common/notification.js';
+import { Range } from '../../../../editor/common/core/range.js';
+import { ICodeEditorService } from '../../../../editor/browser/services/codeEditorService.js';
+import { EndOfLinePreference } from '../../../../editor/common/model.js';
+
+/** Same viewType as VS Code `MarkdownEditorProvider.viewType`. */
+export const MARKDOWN_EDITOR_VIEW_TYPE = 'vscode.markdown.editor';
+
+const READONLY_STATE_KEY = 'markdown.editor.readonly';
+const HAS_SCHEME = /^\w[\w\d+.-]*:/;
+
+interface MarkdownEditorHostMessage {
+	readonly type?: string;
+	readonly documentVersion?: number;
+	readonly editEpoch?: number;
+	readonly start?: number;
+	readonly endExclusive?: number;
+	readonly text?: string;
+	readonly href?: string;
+	readonly readonly?: boolean;
+	readonly focused?: boolean;
+	readonly command?: 'undo' | 'redo';
+	readonly message?: string;
+	readonly requestId?: number;
+	readonly providerId?: string;
+	readonly language?: string;
+	readonly runtimeId?: string;
+	readonly runtimeKey?: string;
+	readonly id?: string;
+}
+
+function encodeInitialState(state: object): string {
+	return encodeURIComponent(JSON.stringify(state));
+}
+
+function markdownEditorAssetBase(): string {
+	// Absolute origin URL so srcdoc webviews can resolve ES module chunks.
+	const origin = typeof window !== 'undefined' && window.location?.origin
+		? window.location.origin
+		: '';
+	return `${origin}/extensions/markdown-language-features/markdown-editor-out`;
+}
+
+function offsetToPosition(text: string, offset: number): { lineNumber: number; column: number } {
+	const clamped = Math.max(0, Math.min(offset, text.length));
+	let lineNumber = 1;
+	let lastBreak = -1;
+	for (let i = 0; i < clamped; i++) {
+		if (text.charCodeAt(i) === 10 /* \n */) {
+			lineNumber++;
+			lastBreak = i;
+		}
+	}
+	return { lineNumber, column: clamped - lastBreak };
+}
+
+/**
+ * Host for VS Code's Markdown Editor webview (`markdown-editor-out/editor.js`).
+ * Opens via "Reopen Editor With… → Markdown Editor" or the command palette.
+ */
+export class MarkdownEditorManager extends Disposable {
+	static readonly ID = 'workbench.contrib.markdownEditor';
+
+	private _webviewInput: WebviewInput | undefined;
+	private readonly _webviewDisposables = this._register(new DisposableStore());
+	private readonly _contentDisposables = this._register(new DisposableStore());
+	private readonly _modelListen = this._register(new MutableDisposable());
+	private _currentResource: URI | undefined;
+	private _messageSecret = generateUuid();
+	private _editEpoch = 0;
+	private _applyingWebviewEdit = false;
+	private _readonly = true;
+	private _ready = false;
+
+	constructor(
+		@IEditorService private readonly _editorService: IEditorService,
+		@IWebviewWorkbenchService private readonly _webviewWorkbenchService: IWebviewWorkbenchService,
+		@IWebviewService private readonly _webviewService: IWebviewService,
+		@IInstantiationService private readonly _instantiationService: IInstantiationService,
+		@ITextFileService private readonly _textFileService: ITextFileService,
+		@ILogService private readonly _logService: ILogService,
+		@IStorageService private readonly _storageService: IStorageService,
+		@IConfigurationService private readonly _configurationService: IConfigurationService,
+		@IOpenerService private readonly _openerService: IOpenerService,
+		@INotificationService private readonly _notificationService: INotificationService,
+		@ICodeEditorService private readonly _codeEditorService: ICodeEditorService
+	) {
+		super();
+		this._readonly = this._storageService.getBoolean(READONLY_STATE_KEY, StorageScope.PROFILE, true);
+	}
+
+	hasActiveEditor(): boolean {
+		return this._webviewInput !== undefined && !this._webviewInput.isDisposed();
+	}
+
+	isReadonly(): boolean {
+		return this._readonly;
+	}
+
+	showEditor(side?: boolean, preserveFocus = false): void {
+		const resource = this._activeMarkdownResource() ?? this._currentResource;
+		if (!resource) {
+			this._logService.warn('[Markdown Editor] Active editor is not a markdown file');
+			this._notificationService.warn(
+				localize('markdownEditorNoFile', 'Open a Markdown file first, then open the Markdown Editor.')
+			);
+			return;
+		}
+		this._currentResource = resource;
+		this._openOrCreate(resource, true, side, preserveFocus);
+	}
+
+	async createEditorInputWhenReady(resource: URI): Promise<EditorInput | undefined> {
+		this._currentResource = resource;
+		if (!this._textFileService.files.get(resource)) {
+			try {
+				await this._textFileService.files.resolve(resource);
+			} catch (err) {
+				this._logService.warn('[Markdown Editor] Could not load', resource.toString(), err);
+			}
+		}
+		return this._openOrCreate(resource, true);
+	}
+
+	toggleReadonly(): boolean {
+		this._readonly = !this._readonly;
+		this._storageService.store(READONLY_STATE_KEY, this._readonly, StorageScope.PROFILE, StorageTarget.USER);
+		this._postToWebview({ type: 'command', command: 'toggleReadonly' });
+		this._updateTitle();
+		this._notificationService.info(
+			this._readonly
+				? localize('markdownEditorLocked', 'Markdown Editor is locked (read-only). Unlock to edit WYSIWYG.')
+				: localize('markdownEditorUnlocked', 'Markdown Editor unlocked — edit in the rendered view.')
+		);
+		return this._readonly;
+	}
+
+	async showSource(): Promise<void> {
+		const resource = this._currentResource;
+		if (!resource) {
+			return;
+		}
+		const existing = this._editorService.findEditors(resource)[0];
+		if (existing) {
+			await this._editorService.openEditor(existing.editor, { preserveFocus: false }, existing.groupId);
+			return;
+		}
+		await this._editorService.openEditor({ resource, options: { preserveFocus: false, pinned: true } });
+	}
+
+	refresh(): void {
+		if (!this._ready) {
+			return;
+		}
+		this._pushAuthoritativeUpdate();
+	}
+
+	private _openOrCreate(
+		resource: URI,
+		open: boolean,
+		side?: boolean,
+		preserveFocus = false
+	): WebviewInput | undefined {
+		const title = localize('markdownEditorTitle', 'Markdown Editor: {0}', resource.path.split('/').pop() || resource.path);
+
+		if (this._webviewInput && !this._webviewInput.isDisposed()) {
+			this._webviewInput.setWebviewTitle(title);
+			this._reloadHtml();
+			this._listenToContentChanges();
+			return this._webviewInput;
+		}
+
+		const initInfo = this._initInfo(resource, title);
+		const input = open
+			? this._webviewWorkbenchService.openWebview(
+					initInfo,
+					MARKDOWN_EDITOR_VIEW_TYPE,
+					title,
+					undefined,
+					{ preserveFocus, group: side ? SIDE_GROUP : undefined }
+				)
+			: this._instantiationService.createInstance(
+					WebviewInput,
+					{
+						viewType: MARKDOWN_EDITOR_VIEW_TYPE,
+						name: title,
+						providedId: initInfo.providedViewType,
+						iconPath: undefined
+					},
+					this._webviewService.createWebviewOverlay(initInfo)
+				);
+
+		this._webviewInput = input;
+		this._webviewDisposables.clear();
+		this._webviewDisposables.add(
+			input.onWillDispose(() => {
+				this._webviewDisposables.clear();
+				this._contentDisposables.clear();
+				this._modelListen.clear();
+				this._webviewInput = undefined;
+				this._currentResource = undefined;
+				this._ready = false;
+			})
+		);
+		this._webviewDisposables.add(input.webview.onMessage(event => this._onWebviewMessage(event.message)));
+		this._reloadHtml();
+		this._listenToContentChanges();
+		return input;
+	}
+
+	private _initInfo(resource: URI, title: string): WebviewInitInfo {
+		return {
+			title,
+			options: {
+				enableFindWidget: true,
+				retainContextWhenHidden: true
+			},
+			contentOptions: {
+				allowScripts: true,
+				localResourceRoots: [
+					URI.joinPath(resource, '..'),
+					// Same-origin /extensions/… is also used; keep parent dir as a root for images.
+				]
+			},
+			extension: undefined
+		};
+	}
+
+	private _reloadHtml(): void {
+		const input = this._webviewInput;
+		const resource = this._currentResource;
+		if (!input || !resource) {
+			return;
+		}
+		const fileModel = this._textFileService.files.get(resource);
+		const text = fileModel?.isResolved()
+			? fileModel.textEditorModel.getValue(EndOfLinePreference.LF)
+			: '';
+		const version = fileModel?.isResolved() ? fileModel.textEditorModel.getVersionId() : 0;
+		this._messageSecret = generateUuid();
+		this._editEpoch = 0;
+		this._ready = false;
+		input.webview.setHtml(this._buildHtml(text, version, resource));
+		this._updateTitle();
+	}
+
+	private _buildHtml(content: string, documentVersion: number, resource: URI): string {
+		const assetBase = markdownEditorAssetBase();
+		const scriptUri = `${assetBase}/editor.js`;
+		const styleUri = `${assetBase}/editor.css`;
+		const nonce = generateUuid().replace(/-/g, '');
+		const highlightActiveBlock =
+			this._configurationService.getValue<boolean>('markdown.editor.highlightActiveBlock') ?? true;
+		const initialState = encodeInitialState({
+			highlightActiveBlock,
+			taskProgressLabels: {
+				title: localize('mdTaskProgress', 'Task Progress'),
+				summary: localize('mdTaskProgressSummary', '{0} of {1} tasks completed'),
+				language: 'en'
+			},
+			content,
+			documentVersion,
+			editEpoch: this._editEpoch,
+			readonly: this._readonly,
+			richLinksEnabled: false,
+			linkPresentationRules: []
+		});
+		const baseHref = resource.with({ path: resource.path.replace(/[^/]+$/, '') }).toString(true);
+
+		return `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta http-equiv="Content-Security-Policy"
+		content="default-src 'none'; style-src 'self' 'unsafe-inline' ${assetBase} https: data:; font-src 'self' ${assetBase} data:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; script-src 'nonce-${nonce}' 'self' ${assetBase}; worker-src 'self' ${assetBase} blob:; connect-src 'self' ${assetBase}; frame-src 'self';" />
+	<meta name="vscode-markdown-editor-script-nonce" content="${nonce}" />
+	<meta name="vscode-markdown-editor-message-secret" content="${this._messageSecret}" />
+	<meta id="vscode-markdown-editor-initial-state" content="${initialState}" />
+	<base href="${baseHref}" />
+	<link rel="stylesheet" href="${styleUri}" />
+	<title>Markdown Editor</title>
+</head>
+<body>
+	<div id="editor"></div>
+	<script nonce="${nonce}" type="module" src="${scriptUri}"></script>
+</body>
+</html>`;
+	}
+
+	private _listenToContentChanges(): void {
+		this._contentDisposables.clear();
+		this._modelListen.clear();
+		const resource = this._currentResource;
+		if (!resource) {
+			return;
+		}
+		const fileModel = this._textFileService.files.get(resource);
+		if (!fileModel) {
+			return;
+		}
+		if (!fileModel.isResolved()) {
+			this._contentDisposables.add(
+				this._textFileService.files.onDidResolve(e => {
+					if (e.model.resource.toString() === resource.toString()) {
+						this._listenToContentChanges();
+						this._reloadHtml();
+					}
+				})
+			);
+			return;
+		}
+		const textModel = fileModel.textEditorModel;
+		this._modelListen.value = textModel.onDidChangeContent(() => {
+			if (this._applyingWebviewEdit || !this._ready) {
+				return;
+			}
+			this._pushAuthoritativeUpdate();
+		});
+	}
+
+	private _pushAuthoritativeUpdate(): void {
+		const resource = this._currentResource;
+		const fileModel = resource ? this._textFileService.files.get(resource) : undefined;
+		if (!fileModel?.isResolved()) {
+			return;
+		}
+		this._editEpoch += 1;
+		const content = fileModel.textEditorModel.getValue(EndOfLinePreference.LF);
+		this._postToWebview({ type: 'update', content, editEpoch: this._editEpoch });
+	}
+
+	private _postToWebview(message: Record<string, unknown>): void {
+		this._webviewInput?.webview
+			.postMessage({ ...message, messageSecret: this._messageSecret })
+			.catch(() => {
+				/* editor may be gone */
+			});
+	}
+
+	private _onWebviewMessage(raw: unknown): void {
+		const message = raw as MarkdownEditorHostMessage;
+		if (!message || typeof message.type !== 'string') {
+			return;
+		}
+		switch (message.type) {
+			case 'ready':
+				this._ready = true;
+				if (typeof message.editEpoch === 'number') {
+					this._editEpoch = message.editEpoch;
+				}
+				this._logService.trace('[Markdown Editor] webview ready');
+				break;
+			case 'edit':
+				void this._applyEdit(message);
+				break;
+			case 'history':
+				this._runHistory(message.command);
+				break;
+			case 'openLink':
+				void this._openLink(String(message.href ?? ''));
+				break;
+			case 'setReadonly':
+				if (typeof message.readonly === 'boolean') {
+					this._readonly = message.readonly;
+					this._storageService.store(
+						READONLY_STATE_KEY,
+						this._readonly,
+						StorageScope.PROFILE,
+						StorageTarget.USER
+					);
+					this._updateTitle();
+				}
+				break;
+			case 'editorFocusChanged':
+				break;
+			case 'resolveCodeBlockEditor':
+				// No contributed code-block editors yet — reply empty.
+				if (typeof message.requestId === 'number') {
+					this._postToWebview({
+						type: 'resolvedCodeBlockEditor',
+						requestId: message.requestId,
+						descriptor: undefined
+					});
+				}
+				break;
+			case 'codeBlockEditorDiagnostic':
+				if (message.message) {
+					this._logService.warn('[Markdown Editor]', message.message);
+				}
+				break;
+			case 'createCodeBlockEditorHostTransport':
+			case 'disposeCodeBlockEditorHostTransport':
+			case 'codeBlockEditorHostTransportMessage':
+			case 'addComment':
+			case 'deleteComment':
+				// Intentionally no-op until extension host + comment providers land.
+				break;
+			default:
+				break;
+		}
+	}
+
+	private async _applyEdit(message: MarkdownEditorHostMessage): Promise<void> {
+		const resource = this._currentResource;
+		const fileModel = resource ? this._textFileService.files.get(resource) : undefined;
+		if (!fileModel?.isResolved()) {
+			return;
+		}
+		if (typeof message.editEpoch === 'number' && message.editEpoch !== this._editEpoch) {
+			// Stale edit against an older baseline — push truth back.
+			this._pushAuthoritativeUpdate();
+			return;
+		}
+		const model = fileModel.textEditorModel;
+		const text = model.getValue(EndOfLinePreference.LF);
+		const start = typeof message.start === 'number' ? message.start : 0;
+		const endExclusive = typeof message.endExclusive === 'number' ? message.endExclusive : start;
+		const insert = typeof message.text === 'string' ? message.text : '';
+		const startPos = offsetToPosition(text, start);
+		const endPos = offsetToPosition(text, endExclusive);
+		this._applyingWebviewEdit = true;
+		try {
+			model.pushEditOperations(
+				null,
+				[
+					{
+						range: new Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+						text: insert
+					}
+				],
+				() => null
+			);
+		} finally {
+			this._applyingWebviewEdit = false;
+		}
+	}
+
+	private _runHistory(command: 'undo' | 'redo' | undefined): void {
+		if (command !== 'undo' && command !== 'redo') {
+			return;
+		}
+		const resource = this._currentResource;
+		const editor = this._codeEditorService.getActiveCodeEditor();
+		if (resource && editor && editor.getModel()?.uri.toString() === resource.toString()) {
+			editor.trigger('markdownEditor', command, null);
+			return;
+		}
+		// Edits applied via pushEditOperations live on the text model's undo stack.
+		// Without a focused code editor, re-sync the webview from the model after
+		// asking the workbench undo/redo command (no-op if nothing is stacked).
+		const fileModel = resource ? this._textFileService.files.get(resource) : undefined;
+		if (!fileModel?.isResolved()) {
+			return;
+		}
+		this._logService.trace('[Markdown Editor] history', command);
+		this._pushAuthoritativeUpdate();
+	}
+
+	private async _openLink(href: string): Promise<void> {
+		const resource = this._currentResource;
+		if (!resource || href.length === 0 || href.startsWith('#')) {
+			return;
+		}
+		const uri = HAS_SCHEME.test(href) ? URI.parse(href) : URI.joinPath(URI.joinPath(resource, '..'), href);
+		try {
+			if (uri.scheme === 'file' || uri.scheme === 'vscode-file') {
+				await this._editorService.openEditor({ resource: uri, options: { pinned: true } });
+				return;
+			}
+			if (uri.scheme === 'http' || uri.scheme === 'https' || uri.scheme === 'mailto') {
+				await this._openerService.open(uri, { openExternal: true, fromUserGesture: true });
+				return;
+			}
+			this._logService.warn('[Markdown Editor] Refusing link scheme', uri.scheme);
+		} catch (err) {
+			this._logService.warn('[Markdown Editor] Could not open link', href, err);
+		}
+	}
+
+	private _activeMarkdownResource(): URI | undefined {
+		const editor = this._editorService.activeEditor;
+		const resource = editor instanceof EditorInput ? editor.resource : undefined;
+		if (!resource) {
+			return undefined;
+		}
+		const lower = resource.path.toLowerCase();
+		if (
+			!(
+				lower.endsWith('.md') ||
+				lower.endsWith('.markdown') ||
+				lower.endsWith('.mdx') ||
+				lower.endsWith('.mdtxt') ||
+				lower.endsWith('.mdtext')
+			)
+		) {
+			return undefined;
+		}
+		return resource;
+	}
+
+	private _updateTitle(): void {
+		const name = this._currentResource?.path.split('/').pop() ?? 'Markdown';
+		this._webviewInput?.setWebviewTitle(
+			this._readonly
+				? localize('markdownEditorLockedTitle', 'Markdown Editor (locked): {0}', name)
+				: localize('markdownEditorEditingTitle', 'Markdown Editor: {0}', name)
+		);
+	}
+}

@@ -25,10 +25,17 @@ import {
 	registerWorkbenchContribution2
 } from '../../../common/contributions.js';
 import { MARKDOWN_PREVIEW_VIEW_TYPE, MarkdownPreviewManager } from './markdownPreview.js';
+import { MARKDOWN_EDITOR_VIEW_TYPE, MarkdownEditorManager } from './markdownEditor.js';
 import {
 	IEditorResolverService,
 	RegisteredEditorPriority
 } from '../../../services/editor/common/editorResolverService.js';
+import {
+	Extensions as ConfigurationExtensions,
+	IConfigurationRegistry,
+	ConfigurationScope
+} from '../../../../platform/configuration/common/configurationRegistry.js';
+import { Registry } from '../../../../platform/registry/common/platform.js';
 
 let _previewManager: MarkdownPreviewManager | undefined;
 
@@ -37,6 +44,15 @@ function getOrCreateManager(accessor: ServicesAccessor): MarkdownPreviewManager 
 		_previewManager = accessor.get(IInstantiationService).createInstance(MarkdownPreviewManager);
 	}
 	return _previewManager;
+}
+
+let _editorManager: MarkdownEditorManager | undefined;
+
+function getOrCreateEditorManager(accessor: ServicesAccessor): MarkdownEditorManager {
+	if (!_editorManager) {
+		_editorManager = accessor.get(IInstantiationService).createInstance(MarkdownEditorManager);
+	}
+	return _editorManager;
 }
 
 class MarkdownPreviewAutoReopen extends Disposable implements IWorkbenchContribution {
@@ -140,6 +156,53 @@ class MarkdownPreviewEditorContribution extends Disposable implements IWorkbench
 registerWorkbenchContribution2(
 	MarkdownPreviewEditorContribution.ID,
 	MarkdownPreviewEditorContribution,
+	WorkbenchPhase.BlockStartup
+);
+
+
+/**
+ * VS Code "Markdown Editor" (WYSIWYG) — same viewType `vscode.markdown.editor`
+ * as markdown-language-features. Hosted in-workbench because the SideX
+ * extension host is still WIP; the webview bundle is the upstream
+ * `markdown-editor-out` from VS Code 1.141.
+ */
+class MarkdownWysiwygEditorContribution extends Disposable implements IWorkbenchContribution {
+	static readonly ID = 'workbench.contrib.markdownWysiwygEditor';
+
+	constructor(
+		@IEditorResolverService editorResolverService: IEditorResolverService,
+		@IInstantiationService private readonly _instantiationService: IInstantiationService
+	) {
+		super();
+		this._register(
+			editorResolverService.registerEditor(
+				'*.{md,markdown,mdx,mdtxt,mdtext}',
+				{
+					id: MARKDOWN_EDITOR_VIEW_TYPE,
+					label: localize('markdownWysiwygEditor', 'Markdown Editor'),
+					priority: RegisteredEditorPriority.option
+				},
+				{},
+				{
+					createEditorInput: async ({ resource }) => {
+						if (!_editorManager) {
+							_editorManager = this._instantiationService.createInstance(MarkdownEditorManager);
+						}
+						const editor = await _editorManager.createEditorInputWhenReady(resource);
+						if (!editor) {
+							throw new Error(`Markdown Editor could not open ${resource.toString()}`);
+						}
+						return { editor };
+					}
+				}
+			)
+		);
+	}
+}
+
+registerWorkbenchContribution2(
+	MarkdownWysiwygEditorContribution.ID,
+	MarkdownWysiwygEditorContribution,
 	WorkbenchPhase.BlockStartup
 );
 
@@ -272,3 +335,94 @@ KeybindingsRegistry.registerCommandAndKeybindingRule({
 		getOrCreateManager(accessor).toggle();
 	}
 });
+
+CommandsRegistry.registerCommand('markdown.openMarkdownEditor', accessor => {
+	getOrCreateEditorManager(accessor).showEditor();
+});
+
+CommandsRegistry.registerCommand('markdown.openMarkdownEditorToSide', accessor => {
+	getOrCreateEditorManager(accessor).showEditor(true);
+});
+
+CommandsRegistry.registerCommand('markdown.editor.toggleReadonly', accessor => {
+	getOrCreateEditorManager(accessor).toggleReadonly();
+});
+
+CommandsRegistry.registerCommand('markdown.editor.refresh', accessor => {
+	getOrCreateEditorManager(accessor).refresh();
+});
+
+CommandsRegistry.registerCommand('markdown.editor.showSource', accessor => {
+	getOrCreateEditorManager(accessor).showSource();
+});
+
+const markdownEditorPaletteCommands: { id: string; title: string }[] = [
+	{ id: 'markdown.openMarkdownEditor', title: localize2('mdOpenEditor', 'Open Markdown Editor').value },
+	{ id: 'markdown.openMarkdownEditorToSide', title: localize2('mdOpenEditorToSide', 'Open Markdown Editor to the Side').value },
+	{ id: 'markdown.editor.toggleReadonly', title: localize2('mdEditorToggleLock', 'Markdown Editor: Toggle Lock').value },
+	{ id: 'markdown.editor.refresh', title: localize2('mdEditorRefresh', 'Markdown Editor: Refresh').value },
+	{ id: 'markdown.editor.showSource', title: localize2('mdEditorShowSource', 'Markdown Editor: Show Source').value }
+];
+
+for (const command of markdownEditorPaletteCommands) {
+	MenuRegistry.appendMenuItem(MenuId.CommandPalette, {
+		command: { id: command.id, title: command.title, category: 'Markdown' },
+		when: MARKDOWN_LANG_WHEN
+	});
+}
+
+MenuRegistry.appendMenuItem(MenuId.EditorTitle, {
+	command: {
+		id: 'markdown.openMarkdownEditor',
+		title: localize2('mdOpenEditorTitle', 'Open Markdown Editor').value,
+		icon: Codicon.markdown
+	},
+	group: 'navigation',
+	order: 9,
+	when: MARKDOWN_LANG_WHEN
+});
+
+MenuRegistry.appendMenuItem(MenuId.EditorTitle, {
+	command: {
+		id: 'markdown.editor.toggleReadonly',
+		title: localize2('mdEditorUnlock', 'Unlock Markdown Editor').value,
+		icon: Codicon.edit
+	},
+	group: 'navigation',
+	order: 11,
+	when: ContextKeyExpr.or(
+		ContextKeyExpr.equals('activeEditor', MARKDOWN_EDITOR_VIEW_TYPE),
+		ContextKeyExpr.equals('resourceExtname', '.md')
+	)
+});
+
+Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerConfiguration({
+	id: 'markdown',
+	order: 35,
+	title: localize('markdownConfigurationTitle', 'Markdown'),
+	type: 'object',
+	properties: {
+		'markdown.editor.highlightActiveBlock': {
+			type: 'boolean',
+			default: true,
+			description: localize(
+				'markdown.editor.highlightActiveBlock',
+				'Highlight the active block in the Markdown Editor (WYSIWYG).'
+			),
+			scope: ConfigurationScope.RESOURCE
+		},
+		'markdown.preview.fontSize': {
+			type: 'number',
+			default: 14,
+			description: localize('markdown.preview.fontSize', 'Font size in pixels for the Markdown preview.'),
+			scope: ConfigurationScope.RESOURCE
+		},
+		'markdown.preview.lineHeight': {
+			type: 'number',
+			default: 1.6,
+			description: localize('markdown.preview.lineHeight', 'Line height for the Markdown preview.'),
+			scope: ConfigurationScope.RESOURCE
+		}
+	}
+});
+
