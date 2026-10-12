@@ -15,7 +15,7 @@ import { IInstantiationService, ServicesAccessor } from '../../../../platform/in
 import { KeybindingsRegistry, KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
 import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { IStorageService } from '../../../../platform/storage/common/storage.js';
-import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+import { KeyChord, KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
 import { Codicon } from '../../../../base/common/codicons.js';
 import { EditorInput } from '../../../common/editor/editorInput.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
@@ -317,9 +317,9 @@ KeybindingsRegistry.registerCommandAndKeybindingRule({
 	id: 'markdown.showPreviewToSide',
 	weight: KeybindingWeight.WorkbenchContrib,
 	when: MARKDOWN_LANG_WHEN,
-	primary: KeyMod.CtrlCmd | KeyCode.KeyK,
-	secondary: [KeyMod.CtrlCmd | KeyCode.KeyV],
-	mac: { primary: KeyMod.WinCtrl | KeyCode.KeyK, secondary: [KeyMod.CtrlCmd | KeyCode.KeyV] },
+	// Match VS Code markdown-language-features: chord Ctrl/Cmd+K then V.
+	primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyCode.KeyV),
+	mac: { primary: KeyChord(KeyMod.WinCtrl | KeyCode.KeyK, KeyCode.KeyV) },
 	handler: accessor => {
 		getOrCreateManager(accessor).showPreview(true);
 	}
