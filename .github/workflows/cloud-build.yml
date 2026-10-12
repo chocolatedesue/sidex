@@ -1,0 +1,139 @@
+name: Cloud build (no signing secrets)
+
+# Downloadable Linux and Windows binaries without any release secrets.
+#
+# The upstream `release.yml` is the real release pipeline: it runs `tauri build`
+# for six targets, signs them (Apple certificate, Azure Trusted Signing) and
+# publishes to Cloudflare R2 with an updater manifest — all of which needs
+# secrets this mirror does not have. This workflow is the "just give me a
+# binary" path: it builds release binaries and attaches them as workflow
+# artifacts, nothing else.
+#
+# Trigger it from the Actions tab ("Run workflow") or by pushing a tag; tags
+# additionally attach the files to a GitHub Release.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux-x86_64:
+    name: linux-x86_64
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+      - name: Frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Build
+        run: cargo build --locked --release --manifest-path src-tauri/Cargo.toml
+
+      - name: Package
+        run: |
+          set -e
+          VERSION=$(node -p "require('./package.json').version")
+          NAME="sidex-${VERSION}-linux-x86_64"
+          mkdir -p "dist-pkg/${NAME}"
+          cp src-tauri/target/release/SideX "dist-pkg/${NAME}/SideX"
+          cp -a src-tauri/extension-host "dist-pkg/${NAME}/" 2>/dev/null || true
+          cp -a src-tauri/shell-integration "dist-pkg/${NAME}/" 2>/dev/null || true
+          cp -a dist "dist-pkg/${NAME}/dist"
+          cp docs/CLOUD-BUILD.md "dist-pkg/${NAME}/README.md"
+          ( cd dist-pkg && tar czf "../${NAME}.tar.gz" "${NAME}" )
+          ls -lh "${NAME}.tar.gz"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidex-linux-x86_64
+          path: sidex-*.tar.gz
+
+  windows-x86_64:
+    name: windows-x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Build
+        run: cargo build --locked --release --manifest-path src-tauri/Cargo.toml
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $name = "sidex-$version-windows-x86_64"
+          New-Item -ItemType Directory -Force -Path "dist-pkg/$name" | Out-Null
+          Copy-Item "src-tauri/target/release/SideX.exe" "dist-pkg/$name/SideX.exe"
+          foreach ($dir in @("extension-host", "shell-integration")) {
+            if (Test-Path "src-tauri/$dir") { Copy-Item -Recurse "src-tauri/$dir" "dist-pkg/$name/" }
+          }
+          Copy-Item -Recurse "dist" "dist-pkg/$name/dist"
+          Copy-Item "docs/CLOUD-BUILD.md" "dist-pkg/$name/README.md"
+          Compress-Archive -Path "dist-pkg/$name" -DestinationPath "$name.zip"
+          Get-ChildItem "$name.zip" | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidex-windows-x86_64
+          path: sidex-*.zip
+
+  release:
+    name: attach to release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux-x86_64, windows-x86_64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Attach to the tag's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "Cloud build ${GITHUB_REF_NAME}"
+          gh release upload "${GITHUB_REF_NAME}" artifacts/* --clobber
