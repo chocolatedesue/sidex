@@ -360,25 +360,41 @@ pub fn dispatch_own_args(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
+    /// A platform-appropriate absolute directory to hang test paths off. The
+    /// fixtures used to be hard-coded Unix paths (`/work`), which are not
+    /// absolute on Windows and made these tests fail there.
     fn cwd() -> PathBuf {
-        PathBuf::from("/work")
+        std::env::temp_dir().join("sidex-cli-tests")
+    }
+
+    /// The `file://` URI the platform produces for `path`. Assertions compare
+    /// against the same conversion the code under test uses, so they hold on
+    /// Windows (`file:///C:/...`) as well as on Unix (`file:///tmp/...`).
+    fn uri(path: &Path) -> String {
+        Url::from_file_path(path)
+            .expect("test paths are absolute")
+            .to_string()
+    }
+
+    /// Forward-slash form of a path, for embedding in deep-link URLs.
+    fn url_path(path: &Path) -> String {
+        path.to_string_lossy().replace('\\', "/")
     }
 
     #[test]
     fn bare_directory_becomes_a_folder() {
         let request = parse_args(&["src".to_string()], &cwd());
-        assert_eq!(request.folders, vec!["file:///work/src".to_string()]);
+        assert_eq!(request.folders, vec![uri(&cwd().join("src"))]);
         assert!(request.files.is_empty());
     }
 
     #[test]
     fn absolute_uri_passthrough() {
-        let request = parse_args(
-            &["file:///tmp/demo.md".to_string()],
-            &PathBuf::from("/work"),
-        );
+        // A URI handed in as-is is passed through untouched, whatever the host
+        // platform's path syntax is.
+        let request = parse_args(&["file:///tmp/demo.md".to_string()], &cwd());
         assert_eq!(request.files, vec!["file:///tmp/demo.md".to_string()]);
     }
 
@@ -401,7 +417,7 @@ mod tests {
     fn window_flags() {
         let request = parse_args(&["-n".to_string(), ".".to_string()], &cwd());
         assert!(request.new_window);
-        assert_eq!(request.folders, vec!["file:///work".to_string()]);
+        assert_eq!(request.folders, vec![uri(&cwd())]);
     }
 
     #[test]
@@ -411,7 +427,7 @@ mod tests {
             &cwd(),
         );
         let goto = request.goto.expect("goto target");
-        assert_eq!(goto.path, "file:///work/src/main.ts");
+        assert_eq!(goto.path, uri(&cwd().join("src").join("main.ts")));
         assert_eq!(goto.line, 12);
         assert_eq!(goto.character, 5);
     }
@@ -424,28 +440,25 @@ mod tests {
         );
         assert_eq!(
             request.diff,
-            Some([
-                "file:///work/a.ts".to_string(),
-                "file:///work/b.ts".to_string()
-            ])
+            Some([uri(&cwd().join("a.ts")), uri(&cwd().join("b.ts"))])
         );
     }
 
     #[test]
     fn deep_link_with_query() {
-        let request = parse_deep_link("sidex://open?folder=/tmp/ws&file=/tmp/ws/a.md");
-        assert_eq!(request.folders, vec!["file:///tmp/ws".to_string()]);
-        assert_eq!(request.files, vec!["file:///tmp/ws/a.md".to_string()]);
+        let ws = url_path(&cwd().join("ws"));
+        let request = parse_deep_link(&format!("sidex://open?folder={ws}&file={ws}/a.md"));
+        assert_eq!(request.folders, vec![uri(&cwd().join("ws"))]);
+        assert_eq!(request.files, vec![uri(&cwd().join("ws").join("a.md"))]);
         assert_eq!(request.source, Some(OpenRequestSource::DeepLink));
     }
 
     #[test]
     fn deep_link_path_style_decodes_percent_escapes() {
-        let request = parse_deep_link("sidex://folder/tmp/my%20project");
-        assert_eq!(
-            request.folders,
-            vec!["file:///tmp/my%20project".to_string()]
-        );
+        let dir = cwd().join("my project");
+        let encoded = url_path(&dir).replace(' ', "%20");
+        let request = parse_deep_link(&format!("sidex://folder/{encoded}"));
+        assert_eq!(request.folders, vec![uri(&dir)]);
     }
 
     #[test]
