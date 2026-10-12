@@ -26,6 +26,8 @@ import {
 } from '../../../common/contributions.js';
 import { MARKDOWN_PREVIEW_VIEW_TYPE, MarkdownPreviewManager } from './markdownPreview.js';
 import { MARKDOWN_EDITOR_VIEW_TYPE, MarkdownEditorManager } from './markdownEditor.js';
+import { MarkdownDiffEditorManager } from './markdownDiffEditor.js';
+import { SideBySideEditorInput } from '../../../common/editor/sideBySideEditorInput.js';
 import {
 	IEditorResolverService,
 	RegisteredEditorPriority
@@ -53,6 +55,16 @@ function getOrCreateEditorManager(accessor: ServicesAccessor): MarkdownEditorMan
 		_editorManager = accessor.get(IInstantiationService).createInstance(MarkdownEditorManager);
 	}
 	return _editorManager;
+}
+
+let _diffEditorManager: MarkdownDiffEditorManager | undefined;
+
+function getOrCreateDiffEditorManager(accessor: ServicesAccessor): MarkdownDiffEditorManager {
+	const editorManager = getOrCreateEditorManager(accessor);
+	if (!_diffEditorManager) {
+		_diffEditorManager = accessor.get(IInstantiationService).createInstance(MarkdownDiffEditorManager, editorManager);
+	}
+	return _diffEditorManager;
 }
 
 class MarkdownPreviewAutoReopen extends Disposable implements IWorkbenchContribution {
@@ -191,6 +203,22 @@ class MarkdownWysiwygEditorContribution extends Disposable implements IWorkbench
 						const editor = await _editorManager.createEditorInputWhenReady(resource);
 						if (!editor) {
 							throw new Error(`Markdown Editor could not open ${resource.toString()}`);
+						}
+						return { editor };
+					},
+					createDiffEditorInput: async (diff) => {
+						if (!_editorManager) {
+							_editorManager = this._instantiationService.createInstance(MarkdownEditorManager);
+						}
+						if (!_diffEditorManager) {
+							_diffEditorManager = this._instantiationService.createInstance(
+								MarkdownDiffEditorManager,
+								_editorManager
+							);
+						}
+						const editor = await _diffEditorManager.createDiffEditorInput(diff);
+						if (!editor) {
+							throw new Error('Markdown Diff Editor could not open the requested diff');
 						}
 						return { editor };
 					}
@@ -393,6 +421,38 @@ MenuRegistry.appendMenuItem(MenuId.EditorTitle, {
 	when: ContextKeyExpr.or(
 		ContextKeyExpr.equals('activeEditor', MARKDOWN_EDITOR_VIEW_TYPE),
 		ContextKeyExpr.equals('resourceExtname', '.md')
+	)
+});
+
+
+CommandsRegistry.registerCommand('markdown.openMarkdownDiffEditor', accessor => {
+	void getOrCreateDiffEditorManager(accessor).openFromActiveDiff();
+});
+
+MenuRegistry.appendMenuItem(MenuId.CommandPalette, {
+	command: {
+		id: 'markdown.openMarkdownDiffEditor',
+		title: localize2('mdOpenDiffEditor', 'Open Markdown Diff Editor').value,
+		category: 'Markdown'
+	},
+	when: ContextKeyExpr.or(
+		MARKDOWN_LANG_WHEN,
+		ContextKeyExpr.equals('activeEditor', 'workbench.editors.textDiffEditor'),
+		ContextKeyExpr.equals('activeEditor', SideBySideEditorInput.ID)
+	)
+});
+
+MenuRegistry.appendMenuItem(MenuId.EditorTitle, {
+	command: {
+		id: 'markdown.openMarkdownDiffEditor',
+		title: localize2('mdOpenDiffEditorTitle', 'Open Markdown Diff Editor').value,
+		icon: Codicon.diff
+	},
+	group: 'navigation',
+	order: 8,
+	when: ContextKeyExpr.or(
+		ContextKeyExpr.equals('activeEditor', 'workbench.editors.textDiffEditor'),
+		ContextKeyExpr.and(MARKDOWN_LANG_WHEN, ContextKeyExpr.equals('resourceExtname', '.md'))
 	)
 });
 

@@ -98,6 +98,17 @@ export class MarkdownEditorManager extends Disposable {
 	private _applyingWebviewEdit = false;
 	private _readonly = true;
 	private _ready = false;
+	/** Standalone panes (e.g. Markdown Diff sides) keyed by instance id. */
+	private readonly _standalone = new Map<string, {
+		input: WebviewInput;
+		resource: URI;
+		readonly: boolean;
+		messageSecret: string;
+		editEpoch: number;
+		ready: boolean;
+		applying: boolean;
+		store: DisposableStore;
+	}>();
 
 	constructor(
 		@IEditorService private readonly _editorService: IEditorService,
@@ -147,6 +158,202 @@ export class MarkdownEditorManager extends Disposable {
 			}
 		}
 		return this._openOrCreate(resource, true);
+	}
+
+	/**
+	 * Create an independent Markdown Editor webview for Diff / multi-pane use.
+	 * Does not replace the singleton "active" Markdown Editor instance.
+	 */
+	async createStandaloneEditorInput(
+		resource: URI,
+		options?: { readonly?: boolean; titlePrefix?: string; open?: boolean }
+	): Promise<WebviewInput | undefined> {
+		if (!this._textFileService.files.get(resource)) {
+			try {
+				await this._textFileService.files.resolve(resource);
+			} catch (err) {
+				this._logService.warn('[Markdown Editor] Could not load', resource.toString(), err);
+			}
+		}
+		const readonly = options?.readonly ?? true;
+		const name = resource.path.split('/').pop() || resource.path;
+		const title = options?.titlePrefix
+			? `${options.titlePrefix}: ${name}`
+			: (readonly
+				? localize('markdownEditorLockedTitle', 'Markdown Editor (locked): {0}', name)
+				: localize('markdownEditorEditingTitle', 'Markdown Editor: {0}', name));
+		const instanceId = generateUuid();
+		const messageSecret = generateUuid();
+		const store = new DisposableStore();
+		const initInfo = this._initInfo(resource, title);
+		const open = options?.open !== false;
+		const input = open
+			? this._webviewWorkbenchService.openWebview(
+					initInfo,
+					MARKDOWN_EDITOR_VIEW_TYPE,
+					title,
+					undefined,
+					{ preserveFocus: true }
+				)
+			: this._instantiationService.createInstance(
+					WebviewInput,
+					{
+						viewType: MARKDOWN_EDITOR_VIEW_TYPE,
+						name: title,
+						providedId: initInfo.providedViewType,
+						iconPath: undefined
+					},
+					this._webviewService.createWebviewOverlay(initInfo)
+				);
+
+		const session = {
+			input,
+			resource,
+			readonly,
+			messageSecret,
+			editEpoch: 0,
+			ready: false,
+			applying: false,
+			store,
+		};
+		this._standalone.set(instanceId, session);
+		this._register(store);
+
+		store.add(input.onWillDispose(() => {
+			store.dispose();
+			this._standalone.delete(instanceId);
+		}));
+		store.add(input.webview.onMessage(event => this._onStandaloneMessage(instanceId, event.message)));
+
+		// Initial HTML
+		const fileModel = this._textFileService.files.get(resource);
+		const text = fileModel?.isResolved()
+			? fileModel.textEditorModel.getValue(EndOfLinePreference.LF)
+			: '';
+		const version = fileModel?.isResolved() ? fileModel.textEditorModel.getVersionId() : 0;
+		// Temporarily swap secrets/readonly for build helpers
+		const prevSecret = this._messageSecret;
+		const prevReadonly = this._readonly;
+		const prevEpoch = this._editEpoch;
+		this._messageSecret = messageSecret;
+		this._readonly = readonly;
+		this._editEpoch = 0;
+		input.webview.setHtml(this._buildHtml(text, version, resource));
+		this._messageSecret = prevSecret;
+		this._readonly = prevReadonly;
+		this._editEpoch = prevEpoch;
+
+		if (fileModel?.isResolved()) {
+			store.add(fileModel.textEditorModel.onDidChangeContent(() => {
+				const s = this._standalone.get(instanceId);
+				if (!s || s.applying) {
+					return;
+				}
+				s.editEpoch += 1;
+				const content = fileModel.textEditorModel.getValue(EndOfLinePreference.LF);
+				input.webview.postMessage({
+					type: 'update',
+					content,
+					editEpoch: s.editEpoch,
+					messageSecret: s.messageSecret,
+				}).catch(() => { /* gone */ });
+			}));
+		}
+
+		input.setWebviewTitle(title);
+		return input;
+	}
+
+	private _onStandaloneMessage(instanceId: string, raw: unknown): void {
+		const session = this._standalone.get(instanceId);
+		if (!session) {
+			return;
+		}
+		const message = raw as MarkdownEditorHostMessage;
+		if (!message || typeof message.type !== 'string') {
+			return;
+		}
+		switch (message.type) {
+			case 'ready':
+				session.ready = true;
+				if (typeof message.editEpoch === 'number') {
+					session.editEpoch = message.editEpoch;
+				}
+				break;
+			case 'edit':
+				void this._applyStandaloneEdit(session, message);
+				break;
+			case 'history':
+				session.editEpoch += 1;
+				{
+					const fileModel = this._textFileService.files.get(session.resource);
+					if (fileModel?.isResolved()) {
+						session.input.webview.postMessage({
+							type: 'update',
+							content: fileModel.textEditorModel.getValue(EndOfLinePreference.LF),
+							editEpoch: session.editEpoch,
+							messageSecret: session.messageSecret,
+						}).catch(() => { /* */ });
+					}
+				}
+				break;
+			case 'openLink':
+				void this._openLink(String(message.href ?? ''));
+				break;
+			default:
+				break;
+		}
+	}
+
+	private async _applyStandaloneEdit(
+		session: {
+			input: WebviewInput;
+			resource: URI;
+			readonly: boolean;
+			messageSecret: string;
+			editEpoch: number;
+			ready: boolean;
+			applying: boolean;
+		},
+		message: MarkdownEditorHostMessage
+	): Promise<void> {
+		if (session.readonly) {
+			return;
+		}
+		const fileModel = this._textFileService.files.get(session.resource);
+		if (!fileModel?.isResolved()) {
+			return;
+		}
+		if (typeof message.editEpoch === 'number' && message.editEpoch !== session.editEpoch) {
+			session.editEpoch += 1;
+			session.input.webview.postMessage({
+				type: 'update',
+				content: fileModel.textEditorModel.getValue(EndOfLinePreference.LF),
+				editEpoch: session.editEpoch,
+				messageSecret: session.messageSecret,
+			}).catch(() => { /* */ });
+			return;
+		}
+		const model = fileModel.textEditorModel;
+		const text = model.getValue(EndOfLinePreference.LF);
+		const start = typeof message.start === 'number' ? message.start : 0;
+		const endExclusive = typeof message.endExclusive === 'number' ? message.endExclusive : start;
+		const insert = typeof message.text === 'string' ? message.text : '';
+		const startPos = offsetToPosition(text, start);
+		const endPos = offsetToPosition(text, endExclusive);
+		session.applying = true;
+		try {
+			model.pushEditOperations(
+				null,
+				[{
+					range: new Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+					text: insert,
+				}],
+				() => null
+			);
+		} finally {
+			session.applying = false;
+		}
 	}
 
 	toggleReadonly(): boolean {

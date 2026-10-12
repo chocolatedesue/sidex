@@ -92,6 +92,8 @@ import {
 	RegisteredEditorPriority,
 } from '../../../services/editor/common/editorResolverService.js';
 import { PdfPreviewEditorInput } from '../../pdfPreview/browser/pdfPreviewEditorInput.js';
+import { basename } from '../../../../base/common/resources.js';
+import { generateUuid } from '../../../../base/common/uuid.js';
 
 
 
@@ -3117,7 +3119,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 	private _registerExtensionCustomEditor(ce: {
 		viewType: string;
 		displayName: string;
-		priority?: string;
+		priority?: string | { textEditor?: string; diffEditor?: string };
 		selectors: string[];
 		extensionId?: string;
 		registered?: boolean;
@@ -3128,32 +3130,187 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		const pdfSelectors = selectors.filter(s => s.toLowerCase().includes('.pdf'));
 		const isPdfView = ce.viewType.toLowerCase().includes('pdf') || pdfSelectors.length > 0;
 
-		// Full custom-editor webview resolve is still incomplete. PDF associations
-		// reopen through built-in EmbedPDF so Reopen With stays useful (LAB-707).
-		if (!isPdfView) {
-			this.logService.info(`[ExtHost] custom editor ${ce.viewType} (${label}) selectors=${selectors.join(',')} — deferred (non-PDF webview bridge pending)`);
-			return;
-		}
-
 		this._customEditorDisposables.get(key)?.dispose();
 		this._customEditorDisposables.delete(key);
 
-		const glob = pdfSelectors[0] || '*.pdf';
-		const disposable = this.editorResolverService.registerEditor(
-			glob,
-			{
-				id: ce.viewType,
-				label: `${label} (via EmbedPDF)`,
-				priority: RegisteredEditorPriority.option,
+		const priorityRaw = typeof ce.priority === 'string'
+			? ce.priority
+			: (ce.priority?.textEditor || 'option');
+		const priority =
+			priorityRaw === 'default' ? RegisteredEditorPriority.default
+				: priorityRaw === 'exclusive' ? RegisteredEditorPriority.exclusive
+					: priorityRaw === 'builtin' ? RegisteredEditorPriority.builtin
+						: RegisteredEditorPriority.option;
+
+		// PDF associations still prefer built-in EmbedPDF (no extension host needed).
+		if (isPdfView) {
+			const glob = pdfSelectors[0] || '*.pdf';
+			const disposable = this.editorResolverService.registerEditor(
+				glob,
+				{
+					id: ce.viewType,
+					label: `${label} (via EmbedPDF)`,
+					priority: RegisteredEditorPriority.option,
+				},
+				{},
+				{
+					createEditorInput: ({ resource }) => ({ editor: new PdfPreviewEditorInput(resource) }),
+				}
+			);
+			this._customEditorDisposables.set(key, disposable);
+			this._register(disposable);
+			this.logService.info(`[ExtHost] Registered custom editor association ${ce.viewType} → ${glob} (${label})`);
+			return;
+		}
+
+		// Common preview / custom-editor plugins: register each selector and resolve
+		// via the Node extension host webview bridge (resolveCustomEditor).
+		const disposables: IDisposable[] = [];
+		for (const glob of selectors) {
+			const disposable = this.editorResolverService.registerEditor(
+				glob,
+				{
+					id: ce.viewType,
+					label,
+					priority,
+				},
+				{
+					singlePerResource: true,
+					canSupportResource: (resource) => resource.scheme === 'file' || resource.scheme === 'untitled' || resource.scheme === 'vscode-remote',
+				},
+				{
+					createEditorInput: async ({ resource }) => {
+						const editor = await this._openExtensionCustomEditor(ce.viewType, label, resource, ce.extensionId);
+						if (!editor) {
+							throw new Error(`Custom editor ${ce.viewType} could not open ${resource.toString()}`);
+						}
+						return { editor };
+					},
+				}
+			);
+			disposables.push(disposable);
+			this._register(disposable);
+		}
+		this._customEditorDisposables.set(key, {
+			dispose: () => {
+				for (const d of disposables) {
+					d.dispose();
+				}
 			},
-			{},
-			{
-				createEditorInput: ({ resource }) => ({ editor: new PdfPreviewEditorInput(resource) }),
+		});
+		this.logService.info(`[ExtHost] Registered custom editor ${ce.viewType} → ${selectors.join(',')} (${label}) [webview bridge]`);
+	}
+
+	/**
+	 * Open a marketplace/extension custom editor by creating a workbench webview
+	 * and asking the Node extension host to resolveCustomEditor / resolveCustomTextEditor.
+	 */
+	private async _openExtensionCustomEditor(
+		viewType: string,
+		label: string,
+		resource: URI,
+		extensionId?: string,
+	): Promise<WebviewInput | undefined> {
+		try {
+			// Activate providers that register onCustomEditor:<viewType>
+			this._send({
+				id: this._nextId(),
+				type: 'activateByEvent',
+				params: { event: `onCustomEditor:${viewType}` },
+			});
+			if (extensionId) {
+				this._send({
+					id: this._nextId(),
+					type: 'activateExtension',
+					params: { extensionId },
+				});
 			}
-		);
-		this._customEditorDisposables.set(key, disposable);
-		this._register(disposable);
-		this.logService.info(`[ExtHost] Registered custom editor association ${ce.viewType} → ${glob} (${label})`);
+
+			// Ensure the document is synced to the extension host before resolve.
+			try {
+				const model = this.modelService.getModel(resource);
+				const text = model?.getValue() ?? await this.textFileService.read(resource).then(r => r.value, () => '');
+				const languageId = model?.getLanguageId() || 'plaintext';
+				const version = model?.getVersionId() || 1;
+				this._send({
+					id: this._nextId(),
+					type: 'documentOpened',
+					params: {
+						uri: resource.toString(),
+						languageId,
+						version,
+						text,
+					},
+				});
+			} catch (e) {
+				this.logService.warn(`[ExtHost] custom editor document sync failed for ${resource.toString()}`, e);
+			}
+
+			const panelId = `sidex-custom-${viewType}-${generateUuid()}`;
+			const title = `${label}: ${basename(resource)}`;
+			const webviewInput = this.webviewWorkbenchService.openWebview(
+				{
+					providedViewType: viewType,
+					title,
+					options: {
+						retainContextWhenHidden: true,
+						enableFindWidget: true,
+					},
+					contentOptions: {
+						allowScripts: true,
+						localResourceRoots: [
+							URI.joinPath(resource, '..'),
+							URI.from({ scheme: 'file', path: '/' }),
+						],
+					},
+					extension: undefined,
+				},
+				viewType,
+				title,
+				undefined,
+				{ preserveFocus: false },
+			);
+
+			this._webviewPanels.set(panelId, webviewInput);
+
+			const msgSub = webviewInput.webview.onMessage(e => {
+				this._send({
+					id: this._nextId(),
+					type: 'webviewMessage',
+					params: { panelId, message: e.message },
+				});
+			});
+
+			webviewInput.onWillDispose(() => {
+				msgSub.dispose();
+				this._webviewPanels.delete(panelId);
+				this._send({
+					id: this._nextId(),
+					type: 'customEditorClosed',
+					params: { panelId, viewType },
+				});
+				this._send({
+					id: this._nextId(),
+					type: 'webviewPanelClosed',
+					params: { panelId },
+				});
+			});
+
+			await this._request('resolveCustomEditor', {
+				viewType,
+				panelId,
+				resource: resource.toString(),
+				title,
+				languageId: this.modelService.getModel(resource)?.getLanguageId(),
+			}, { timeoutMs: 30000 });
+
+			this.logService.info(`[ExtHost] Resolved custom editor ${viewType} for ${resource.toString()} (panel=${panelId})`);
+			return webviewInput;
+		} catch (e) {
+			this.logService.warn(`[ExtHost] open custom editor ${viewType} failed:`, e);
+			this.notificationService.warn(`Preview plugin "${label}" failed to open: ${e instanceof Error ? e.message : String(e)}`);
+			return undefined;
+		}
 	}
 
 }

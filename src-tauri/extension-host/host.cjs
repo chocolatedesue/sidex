@@ -301,6 +301,10 @@ class ExtensionHost extends EventEmitter {
         return { id, result: true };
       case 'resolveWebviewView':
         return this._handleResolveWebviewView(id, params);
+      case 'resolveCustomEditor':
+        return this._handleResolveCustomEditor(id, params);
+      case 'customEditorClosed':
+        return this._handleCustomEditorClosed(id, params);
       case 'webviewViewMessage':
         return this._handleWebviewViewMessage(id, params);
       case 'webviewViewVisible':
@@ -1195,6 +1199,194 @@ class ExtensionHost extends EventEmitter {
       if (panel._messageEmitter) panel._messageEmitter.dispose();
       if (panel._viewStateEmitter) panel._viewStateEmitter.dispose();
       this._webviewPanels.delete(params.panelId);
+    }
+    return { id, result: true };
+  }
+
+  /**
+   * Resolve a CustomTextEditorProvider / CustomReadonlyEditorProvider into an
+   * already-created workbench webview (panelId owned by the main thread).
+   * This is what makes marketplace preview plugins actually open a pane —
+   * not just install.
+   */
+  async _handleResolveCustomEditor(id, params) {
+    const viewType = params?.viewType;
+    const panelId = params?.panelId;
+    const resourceUri = params?.resource;
+    if (!viewType || !panelId || !resourceUri) {
+      return { id, error: 'resolveCustomEditor requires viewType, panelId, resource' };
+    }
+
+    this._checkActivationEvents(`onCustomEditor:${viewType}`);
+
+    const provider = this._customEditorProviders?.get(viewType);
+    if (!provider) {
+      return { id, error: `no custom editor provider for ${viewType}` };
+    }
+
+    // Ensure TextDocument is available (sync from disk if workbench has not pushed it yet).
+    let uriStr = typeof resourceUri === 'string' ? resourceUri : (resourceUri.toString?.() || String(resourceUri));
+    if (!this._textDocuments.has(uriStr)) {
+      try {
+        const u = typeof resourceUri === 'string' ? VscUri.parse(resourceUri) : resourceUri;
+        const filePath = u.fsPath || uriPathToFsPath(u.path || '');
+        let text = '';
+        let languageId = params?.languageId || 'plaintext';
+        if (filePath && fs.existsSync(filePath)) {
+          text = fs.readFileSync(filePath, 'utf-8');
+        }
+        this._textDocuments.set(uriStr, { uri: uriStr, languageId, version: 1, text });
+        this._onDocumentEvent.fire(this._makeDocumentProxy(uriStr));
+      } catch (e) {
+        log(`resolveCustomEditor: document sync failed: ${e.message}`);
+      }
+    }
+
+    const document = this._makeDocumentProxy(uriStr);
+
+    // Build a WebviewPanel facade bound to the workbench panelId (do NOT emit createWebviewPanel).
+    // VscEventEmitter lives inside the vscode shim factory — use a compatible local emitter.
+    const makeEmitter = () => {
+      const listeners = [];
+      return {
+        event(listener) {
+          listeners.push(listener);
+          return { dispose() { const i = listeners.indexOf(listener); if (i >= 0) listeners.splice(i, 1); } };
+        },
+        fire(data) {
+          for (const l of listeners.slice()) {
+            try { l(data); } catch (e) { log(`custom editor emitter error: ${e.message}`); }
+          }
+        },
+        dispose() { listeners.length = 0; },
+      };
+    };
+    const messageEmitter = makeEmitter();
+    const disposeEmitter = makeEmitter();
+    const viewStateEmitter = makeEmitter();
+    let _html = '';
+    let _title = params?.title || path.basename(uriStr) || viewType;
+    let _options = {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      ...(params?.options || {}),
+    };
+    const host = this;
+    const panel = {
+      viewType,
+      get title() { return _title; },
+      set title(v) { _title = v; host.emit('event', { type: 'webviewPanelUpdate', panelId, title: v }); },
+      iconPath: undefined,
+      webview: {
+        get options() { return _options; },
+        set options(v) { _options = { ..._options, ...v }; },
+        get html() { return _html; },
+        set html(v) {
+          _html = v;
+          host.emit('event', { type: 'webviewHtmlUpdate', panelId, html: inlineWebviewResources(v) });
+        },
+        onDidReceiveMessage: messageEmitter.event,
+        postMessage(msg) {
+          host.emit('event', { type: 'webviewPostMessage', panelId, message: msg });
+          return Promise.resolve(true);
+        },
+        asWebviewUri(localUri) {
+          if (!localUri) return localUri;
+          const scheme = localUri.scheme || 'file';
+          const uriPath = localUri.path || '';
+          const nativePath = localUri.fsPath || uriPathToFsPath(uriPath) || '';
+          if (scheme === 'http' || scheme === 'https') return localUri;
+          const imgMimes = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon' };
+          const ext = path.extname(nativePath).toLowerCase();
+          if (imgMimes[ext]) {
+            try {
+              const dataUri = `data:${imgMimes[ext]};base64,${fs.readFileSync(nativePath).toString('base64')}`;
+              return { scheme: 'data', authority: '', path: dataUri.slice(5), query: '', fragment: '', fsPath: nativePath, toString() { return dataUri; }, with(change) { return { ...this, ...change }; }, toJSON() { return { $mid: 1, scheme: 'data', path: this.path }; } };
+            } catch {}
+          }
+          const RESOURCE_AUTHORITY = 'vscode-resource.vscode-cdn.net';
+          return {
+            scheme: 'https',
+            authority: `${scheme}+${localUri.authority || ''}.${RESOURCE_AUTHORITY}`,
+            path: uriPath,
+            query: localUri.query || '',
+            fragment: localUri.fragment || '',
+            fsPath: nativePath,
+            toString() { return `https://${this.authority}${this.path}`; },
+            with(change) { return { ...this, ...change }; },
+            toJSON() { return { scheme: this.scheme, authority: this.authority, path: this.path }; },
+          };
+        },
+        cspSource: "https://*.vscode-resource.vscode-cdn.net 'self' http://localhost:* *",
+      },
+      get options() { return _options; },
+      get viewColumn() { return 1; },
+      get active() { return true; },
+      get visible() { return true; },
+      onDidDispose: disposeEmitter.event,
+      onDidChangeViewState: viewStateEmitter.event,
+      reveal() {},
+      dispose() {
+        disposeEmitter.fire();
+        disposeEmitter.dispose();
+        messageEmitter.dispose();
+        viewStateEmitter.dispose();
+      },
+      _panelId: panelId,
+      _disposeEmitter: disposeEmitter,
+      _messageEmitter: messageEmitter,
+      _viewStateEmitter: viewStateEmitter,
+      _isCustomEditor: true,
+      _customEditorViewType: viewType,
+    };
+
+    if (!this._webviewPanels) this._webviewPanels = new Map();
+    this._webviewPanels.set(panelId, panel);
+
+    const token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
+
+    try {
+      if (typeof provider.resolveCustomTextEditor === 'function') {
+        await Promise.resolve(provider.resolveCustomTextEditor(document, panel, token));
+      } else if (typeof provider.resolveCustomEditor === 'function') {
+        let customDoc = document;
+        if (typeof provider.openCustomDocument === 'function') {
+          customDoc = await Promise.resolve(provider.openCustomDocument(
+            document.uri,
+            { backupId: undefined, untitledDocumentData: undefined },
+            token
+          ));
+          if (!this._customDocuments) this._customDocuments = new Map();
+          this._customDocuments.set(panelId, customDoc);
+        }
+        await Promise.resolve(provider.resolveCustomEditor(customDoc, panel, token));
+      } else {
+        return { id, error: `provider for ${viewType} has no resolveCustomTextEditor/resolveCustomEditor` };
+      }
+    } catch (e) {
+      log(`resolveCustomEditor error (${viewType}): ${e && e.message ? e.message : e}`);
+      return { id, error: String(e && e.message ? e.message : e) };
+    }
+
+    return { id, result: { resolved: true, panelId, viewType } };
+  }
+
+  _handleCustomEditorClosed(id, params) {
+    const panelId = params?.panelId;
+    if (!panelId) return { id, result: true };
+    const panel = this._webviewPanels?.get(panelId);
+    if (panel) {
+      try {
+        if (panel._disposeEmitter) panel._disposeEmitter.fire();
+      } catch {}
+      this._webviewPanels.delete(panelId);
+    }
+    const customDoc = this._customDocuments?.get(panelId);
+    if (customDoc) {
+      try {
+        if (typeof customDoc.dispose === 'function') customDoc.dispose();
+      } catch {}
+      this._customDocuments.delete(panelId);
     }
     return { id, result: true };
   }

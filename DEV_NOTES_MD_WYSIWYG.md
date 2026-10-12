@@ -67,7 +67,7 @@ Gitignored runtime assets (populated by `npm run setup:full` / setup script):
 - Install path: Rust `sidex-extensions` marketplace client → default `https://marketplace.siden.ai/api` (Open-VSX-compatible).
 - This change: if that worker errors on search, **retry once against `https://open-vsx.org/api`** so Markdown-related extensions remain discoverable.
 - Install-by-id resolves siden/Open VSX download then `install_extension_from_url` (web can search via HTTP fallback).
-- Hard limit: **extension host activate** for Node `vscode` API extensions is still incomplete on a full LocalProcess host. Themes / language basics / many web-capable pieces can load; non-PDF extension **customEditors** still need `resolveCustomEditor`. PDF uses built-in EmbedPDF instead of extension custom editors.
+- Extension host: Node LocalProcess host activates many providers. **customEditors** now resolve via `resolveCustomEditor` webview bridge for common preview plugins; PDF still uses built-in EmbedPDF. Full VS Code parity (all APIs) remains incomplete.
 
 ## Build status (box)
 
@@ -80,11 +80,23 @@ Gitignored runtime assets (populated by `npm run setup:full` / setup script):
 
 ## Remaining gaps vs VS Code Markdown Editor
 
-1. Extension-host activation of upstream `MarkdownEditorProvider` (rich links, rename, completions, code-block editors, comments, syntax highlighting via proposed API).
-2. Workbench `customEditor` service is still largely stubbed — “Reopen Editor With” for *extension*-contributed custom editors needs that restore.
-3. Diff / inline-diff Markdown Editor path not ported.
+1. Extension-host activation of upstream `MarkdownEditorProvider` (rich links, rename, completions, code-block editors, comments, syntax highlighting via proposed API). Workbench still hosts `markdown-editor-out` directly.
+2. Workbench `customEditor` service remains a stub; marketplace custom editors now resolve through the Tauri extension-host **webview bridge** (`resolveCustomEditor`) instead of being deferred (non-PDF). PDF stays on EmbedPDF.
+3. ~~Diff / inline-diff Markdown Editor path not ported.~~ **Ported (2026-10-13):** `MarkdownDiffEditorManager` + `createDiffEditorInput` + command `markdown.openMarkdownDiffEditor` (side-by-side WYSIWYG via `SideBySideEditorInput`). Inline custom-diff highlight API (`customEditorDiffs` / line markers) still not ported.
 4. Undo/redo from the webview prefers a focused text editor; model edits still apply via `pushEditOperations`.
 5. `setup-extensions.sh` GitHub *source* tarball path does not include `markdown-editor-out`; the script now pulls the **product** linux build when those assets are missing.
+
+## 2026-10-13 — Preview plugins + Markdown Diff WYSIWYG
+
+### Preview / custom-editor plugins
+- **Root cause:** `_registerExtensionCustomEditor` skipped every non-PDF viewType (`deferred (non-PDF webview bridge pending)`), so Open VSX preview extensions could install but never open a pane.
+- **Fix:** Node `host.cjs` gains `resolveCustomEditor` / `customEditorClosed` (CustomTextEditorProvider + CustomReadonlyEditorProvider). Workbench registers selectors and opens a webview, then asks the host to resolve. PDF associations still map to EmbedPDF.
+- **Smoke:** `npm run smoke:preview-md-diff` (16/16).
+
+### Markdown Diff Editor (WYSIWYG)
+- New `markdownDiffEditor.ts`; resolver `createDiffEditorInput` for `vscode.markdown.editor`.
+- Commands / Editor title: **Markdown: Open Markdown Diff Editor**.
+- How to try: open a changed `.md` from SCM (text diff) → Command Palette / title icon → Markdown Diff Editor; or Reopen Editor With → Markdown Editor on a diff.
 
 ## Out of scope
 
