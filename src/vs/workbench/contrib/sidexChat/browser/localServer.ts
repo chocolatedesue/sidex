@@ -61,7 +61,13 @@ function isValidEndpoint(value: unknown): value is IServerEndpoint {
 	// malformed IPC reply from being handed straight to a WebSocket
 	// constructor as if it were a real port.
 	const ep = value as Partial<IServerEndpoint> | null | undefined;
-	return !!ep && typeof ep.wsUrl === 'string' && typeof ep.httpUrl === 'string' && typeof ep.port === 'number' && typeof ep.running === 'boolean';
+	return (
+		!!ep &&
+		typeof ep.wsUrl === 'string' &&
+		typeof ep.httpUrl === 'string' &&
+		typeof ep.port === 'number' &&
+		typeof ep.running === 'boolean'
+	);
 }
 
 let cached: IServerEndpoint = FALLBACK;
@@ -178,7 +184,7 @@ export async function ensureServerStarted(): Promise<IServerEndpoint> {
 /**
  * Restart the server so newly-saved provider credentials are picked up, then
  * refresh the cached endpoint (the port changes across restarts).
- */export async function restartServer(): Promise<IServerEndpoint> {
+ */ export async function restartServer(): Promise<IServerEndpoint> {
 	const invoke = getTauriInvoke();
 	if (!invoke) {
 		return cached;

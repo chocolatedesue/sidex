@@ -248,7 +248,9 @@ fn find_server_binary(app: &AppHandle) -> Option<PathBuf> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let cwd = std::env::current_dir().unwrap_or_default();
     for candidate in [
-        manifest_dir.join("../sidexai/sidex-server").join(SERVER_BIN),
+        manifest_dir
+            .join("../sidexai/sidex-server")
+            .join(SERVER_BIN),
         cwd.join("sidexai/sidex-server").join(SERVER_BIN),
         cwd.join("../sidexai/sidex-server").join(SERVER_BIN),
     ] {

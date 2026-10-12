@@ -2,16 +2,16 @@
  *  Sidex Complete — Registers the FIM inline-completion provider.
  *--------------------------------------------------------------------------------------------*/
 
-import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
+import {
+	IWorkbenchContribution,
+	registerWorkbenchContribution2,
+	WorkbenchPhase
+} from '../../../common/contributions.js';
 import { ILanguageFeaturesService } from '../../../../editor/common/services/languageFeatures.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { SidexCompleteProvider } from './sidexCompleteProvider.js';
-import {
-	ensureServerStarted,
-	serverHttpUrl,
-	SIDEX_CHAT_ENABLED_SETTING
-} from '../../sidexChat/browser/localServer.js';
+import { ensureServerStarted, serverHttpUrl, SIDEX_CHAT_ENABLED_SETTING } from '../../sidexChat/browser/localServer.js';
 
 class SidexCompleteContribution implements IWorkbenchContribution {
 	static readonly ID = 'sidex.complete';
@@ -21,7 +21,7 @@ class SidexCompleteContribution implements IWorkbenchContribution {
 
 	constructor(
 		@ILanguageFeaturesService private readonly languageFeaturesService: ILanguageFeaturesService,
-		@IConfigurationService private readonly configurationService: IConfigurationService,
+		@IConfigurationService private readonly configurationService: IConfigurationService
 	) {
 		// Inline completions come from the same local agent server, so they are
 		// part of the same opt-in AI stack: with the panel off there is no

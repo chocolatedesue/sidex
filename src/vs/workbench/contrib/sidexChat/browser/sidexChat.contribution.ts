@@ -11,7 +11,7 @@ import {
 	Extensions as ViewExtensions,
 	IViewContainersRegistry,
 	IViewsRegistry,
-	ViewContainerLocation,
+	ViewContainerLocation
 } from '../../../common/views.js';
 import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
 import { Codicon } from '../../../../base/common/codicons.js';
@@ -27,16 +27,23 @@ import './sidexChatService.js';
 export const SIDEX_CHAT_CONTAINER_ID = 'workbench.view.sidexChat';
 export const SIDEX_CHAT_VIEW_ID = 'workbench.view.sidexChat.main';
 
-const sidexChatIcon = registerIcon('sidex-chat-icon', Codicon.commentDiscussion, nls.localize('sidexChatIcon', 'Sidex icon'));
+const sidexChatIcon = registerIcon(
+	'sidex-chat-icon',
+	Codicon.commentDiscussion,
+	nls.localize('sidexChatIcon', 'Sidex icon')
+);
 
 const viewContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer(
 	{
 		id: SIDEX_CHAT_CONTAINER_ID,
 		title: nls.localize2('sidex', 'Sidex'),
 		icon: sidexChatIcon,
-		ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [SIDEX_CHAT_CONTAINER_ID, { mergeViewWithContainerWhenSingleView: true }]),
+		ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [
+			SIDEX_CHAT_CONTAINER_ID,
+			{ mergeViewWithContainerWhenSingleView: true }
+		]),
 		hideIfEmpty: false,
-		order: -100,
+		order: -100
 	},
 	ViewContainerLocation.Sidex,
 	{ isDefault: true, doNotRegisterOpenCommand: true }
@@ -51,42 +58,46 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews(
 			ctorDescriptor: new SyncDescriptor(SidexChatViewPane),
 			canToggleVisibility: false,
 			canMoveView: false,
-			hideByDefault: false,
-		},
+			hideByDefault: false
+		}
 	],
 	viewContainer
 );
 
 // Cmd+Shift+I toggles the Sidex panel
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'workbench.action.toggleSidexChat',
-			title: nls.localize2('toggleSidex', 'Toggle Sidex'),
-			keybinding: {
-				primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyI,
-				weight: KeybindingWeight.WorkbenchContrib,
-			},
-			f1: true,
-		});
+registerAction2(
+	class extends Action2 {
+		constructor() {
+			super({
+				id: 'workbench.action.toggleSidexChat',
+				title: nls.localize2('toggleSidex', 'Toggle Sidex'),
+				keybinding: {
+					primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyI,
+					weight: KeybindingWeight.WorkbenchContrib
+				},
+				f1: true
+			});
+		}
+		async run(accessor: ServicesAccessor): Promise<void> {
+			toggleSidexChatPanel(accessor);
+		}
 	}
-	async run(accessor: ServicesAccessor): Promise<void> {
-		toggleSidexChatPanel(accessor);
-	}
-});
+);
 
 // Status bar toggle icon (layout-sidebar-right)
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'workbench.action.sidexStatusBarToggle',
-			title: nls.localize2('sidexStatusBarToggle', 'Toggle Sidex'),
-		});
+registerAction2(
+	class extends Action2 {
+		constructor() {
+			super({
+				id: 'workbench.action.sidexStatusBarToggle',
+				title: nls.localize2('sidexStatusBarToggle', 'Toggle Sidex')
+			});
+		}
+		async run(accessor: ServicesAccessor): Promise<void> {
+			toggleSidexChatPanel(accessor);
+		}
 	}
-	async run(accessor: ServicesAccessor): Promise<void> {
-		toggleSidexChatPanel(accessor);
-	}
-});
+);
 
 /**
  * Flip the panel and remember the choice: turning the panel on enables the
@@ -101,7 +112,11 @@ function toggleSidexChatPanel(accessor: ServicesAccessor): void {
 }
 
 // Register the status bar entries on startup
-import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
+import {
+	IWorkbenchContribution,
+	registerWorkbenchContribution2,
+	WorkbenchPhase
+} from '../../../common/contributions.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import {
@@ -169,13 +184,12 @@ registerWorkbenchContribution2(
 	WorkbenchPhase.AfterRestored
 );
 
-
 class SidexStatusBarContribution implements IWorkbenchContribution {
 	static readonly ID = 'sidex.statusbar';
 
 	constructor(
 		@IStatusbarService private readonly statusbarService: IStatusbarService,
-		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
+		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService
 	) {
 		// Sidex panel toggle (far right)
 		const sidexEntry = statusbarService.addEntry(
@@ -184,7 +198,7 @@ class SidexStatusBarContribution implements IWorkbenchContribution {
 				text: this._sidexIcon(),
 				ariaLabel: nls.localize('toggleSidex', 'Toggle Sidex'),
 				command: 'workbench.action.sidexStatusBarToggle',
-				tooltip: this._sidexTooltip(),
+				tooltip: this._sidexTooltip()
 			},
 			'sidex.toggle',
 			StatusbarAlignment.RIGHT,
@@ -198,7 +212,7 @@ class SidexStatusBarContribution implements IWorkbenchContribution {
 				text: this._auxIcon(),
 				ariaLabel: nls.localize('toggleAux', 'Toggle Secondary Sidebar'),
 				command: 'workbench.action.toggleAuxiliaryBar',
-				tooltip: this._auxTooltip(),
+				tooltip: this._auxTooltip()
 			},
 			'sidex.aux.toggle',
 			StatusbarAlignment.RIGHT,
@@ -212,14 +226,14 @@ class SidexStatusBarContribution implements IWorkbenchContribution {
 				text: this._sidexIcon(),
 				ariaLabel: nls.localize('toggleSidex', 'Toggle Sidex'),
 				command: 'workbench.action.sidexStatusBarToggle',
-				tooltip: this._sidexTooltip(),
+				tooltip: this._sidexTooltip()
 			});
 			auxEntry.update({
 				name: nls.localize('auxToggle', 'Secondary Sidebar'),
 				text: this._auxIcon(),
 				ariaLabel: nls.localize('toggleAux', 'Toggle Secondary Sidebar'),
 				command: 'workbench.action.toggleAuxiliaryBar',
-				tooltip: this._auxTooltip(),
+				tooltip: this._auxTooltip()
 			});
 		};
 
@@ -231,9 +245,7 @@ class SidexStatusBarContribution implements IWorkbenchContribution {
 	}
 
 	private _sidexIcon(): string {
-		return this.layoutService.isVisible(Parts.SIDEX_PART)
-			? '$(sidex-panel-open)'
-			: '$(sidex-panel-closed)';
+		return this.layoutService.isVisible(Parts.SIDEX_PART) ? '$(sidex-panel-open)' : '$(sidex-panel-closed)';
 	}
 
 	private _sidexTooltip(): string {
@@ -264,38 +276,40 @@ registerWorkbenchContribution2(SidexStatusBarContribution.ID, SidexStatusBarCont
 // One InlineEditController per editor, lazily created
 const controllerMap = new WeakMap<object, InlineEditController>();
 
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'sidex.inlineEdit.activate',
-			title: nls.localize2('sidexInlineEdit', 'Sidex: Inline Edit'),
-			keybinding: {
-				primary: KeyMod.CtrlCmd | KeyCode.KeyK,
-				weight: KeybindingWeight.EditorContrib + 100,
-				when: EditorContextKeys.editorTextFocus,
-			},
-			f1: true,
-		});
-	}
-	async run(accessor: ServicesAccessor): Promise<void> {
-		const codeEditorService = accessor.get(ICodeEditorService);
-		const configService = accessor.get(IConfigurationService);
-		const editor = codeEditorService.getFocusedCodeEditor();
-		if (!editor || !isCodeEditor(editor)) {
-			return;
-		}
-
-		let controller = controllerMap.get(editor);
-		if (!controller) {
-			controller = new InlineEditController(editor, configService);
-			controllerMap.set(editor, controller);
-			// Clean up when editor is disposed
-			editor.onDidDispose(() => {
-				controller?.dispose();
-				controllerMap.delete(editor);
+registerAction2(
+	class extends Action2 {
+		constructor() {
+			super({
+				id: 'sidex.inlineEdit.activate',
+				title: nls.localize2('sidexInlineEdit', 'Sidex: Inline Edit'),
+				keybinding: {
+					primary: KeyMod.CtrlCmd | KeyCode.KeyK,
+					weight: KeybindingWeight.EditorContrib + 100,
+					when: EditorContextKeys.editorTextFocus
+				},
+				f1: true
 			});
 		}
+		async run(accessor: ServicesAccessor): Promise<void> {
+			const codeEditorService = accessor.get(ICodeEditorService);
+			const configService = accessor.get(IConfigurationService);
+			const editor = codeEditorService.getFocusedCodeEditor();
+			if (!editor || !isCodeEditor(editor)) {
+				return;
+			}
 
-		controller.activate();
+			let controller = controllerMap.get(editor);
+			if (!controller) {
+				controller = new InlineEditController(editor, configService);
+				controllerMap.set(editor, controller);
+				// Clean up when editor is disposed
+				editor.onDidDispose(() => {
+					controller?.dispose();
+					controllerMap.delete(editor);
+				});
+			}
+
+			controller.activate();
+		}
 	}
-});
+);

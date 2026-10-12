@@ -12,7 +12,13 @@ import { IWorkspaceContextService } from '../../../../platform/workspace/common/
 import { IEditorGroupsService } from '../../../services/editor/common/editorGroupsService.js';
 import { isCodeEditor } from '../../../../editor/browser/editorBrowser.js';
 import { LocalToolExecutor, ILocalToolRequest, LOCAL_TOOLS_SUPPORTED } from './localToolExecutor.js';
-import { SubagentRegistry, SubagentType, SUBAGENT_CONFIGS, getAllowedTools, buildSubagentPrompt } from './subagentTypes.js';
+import {
+	SubagentRegistry,
+	SubagentType,
+	SUBAGENT_CONFIGS,
+	getAllowedTools,
+	buildSubagentPrompt
+} from './subagentTypes.js';
 import { IExplorerService } from '../../files/browser/files.js';
 import {
 	ensureServerStarted,
@@ -53,12 +59,33 @@ export interface IToolCallInfo {
 }
 
 export interface IStreamChunk {
-	type: 'text' | 'tool_call' | 'tool_result' | 'error' | 'done' | 'session' | 'usage'
-		| 'cost_update' | 'cost_summary' | 'mode_change' | 'brief' | 'tick' | 'notice'
-		| 'thinking' | 'thinking_done' | 'permission_request' | 'turn_complete'
-		| 'subagent_spawned' | 'subagent_update' | 'subagent_complete'
-		| 'subagent_start' | 'subagent_running' | 'subagent_done'
-		| 'ask_question' | 'checkpoint_created' | 'checkpoint_restored';
+	type:
+		| 'text'
+		| 'tool_call'
+		| 'tool_result'
+		| 'error'
+		| 'done'
+		| 'session'
+		| 'usage'
+		| 'cost_update'
+		| 'cost_summary'
+		| 'mode_change'
+		| 'brief'
+		| 'tick'
+		| 'notice'
+		| 'thinking'
+		| 'thinking_done'
+		| 'permission_request'
+		| 'turn_complete'
+		| 'subagent_spawned'
+		| 'subagent_update'
+		| 'subagent_complete'
+		| 'subagent_start'
+		| 'subagent_running'
+		| 'subagent_done'
+		| 'ask_question'
+		| 'checkpoint_created'
+		| 'checkpoint_restored';
 	content?: string;
 	error?: string;
 	done?: boolean;
@@ -146,15 +173,28 @@ export interface ISidexChatService {
 	respondToQuestion(toolCallId: string, selectedIds: string[]): void;
 	revertToMessage(messageIndex: number): void;
 	redoCheckpoint(): void;
-	getSavedSessions(): Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>;
-	getSavedSessionsAsync(): Promise<Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>>;
+	getSavedSessions(): Array<{
+		id: string;
+		title: string;
+		date: string;
+		messageCount: number;
+		pinned?: boolean;
+		archived?: boolean;
+	}>;
+	getSavedSessionsAsync(): Promise<
+		Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>
+	>;
 	loadSession(sessionId: string): void;
 	loadSessionAsync(sessionId: string): Promise<void>;
 	deleteSession(sessionId: string): Promise<void>;
 	pinSession(sessionId: string, pinned: boolean): Promise<void>;
 	archiveSession(sessionId: string, archived: boolean): Promise<void>;
 	renameSession(sessionId: string, title: string): Promise<void>;
-	searchSessions(query: string): Promise<Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>>;
+	searchSessions(
+		query: string
+	): Promise<
+		Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>
+	>;
 	readonly onDidChangeModels: Event<Array<{ id: string; name: string; provider: string }>>;
 	readonly availableModels: Array<{ id: string; name: string; provider: string; contextWindow?: number }>;
 	refreshModels(): void;
@@ -195,22 +235,35 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 	private static readonly MAX_SAVED_SESSIONS = 50;
 	private static readonly MAX_RECENT_EDIT_CONTEXT = 5;
 	private readonly _localExecutor = new LocalToolExecutor(() => ({
-		cwd: this._gatherWorkspaceContext().cwd,
+		cwd: this._gatherWorkspaceContext().cwd
 	}));
 	private readonly _subagentRegistry = new SubagentRegistry();
 	private _contextIndexed = false;
 
 	/** Tool names whose execution makes the semantic index stale. */
 	private static readonly EDIT_TOOLS = new Set([
-		'edit_file', 'write_file', 'multi_edit', 'create_file',
-		'str_replace_editor', 'delete_file', 'regex_replace', 'patch_file',
+		'edit_file',
+		'write_file',
+		'multi_edit',
+		'create_file',
+		'str_replace_editor',
+		'delete_file',
+		'regex_replace',
+		'patch_file'
 	]);
 	/** Set when the agent edits files during a turn; consumed on 'done'. */
 	private _indexDirty = false;
 	private _reindexTimer: ReturnType<typeof setTimeout> | undefined;
 	private _reindexInterval: ReturnType<typeof setInterval> | undefined;
 	private _contextIndexing = false;
-	private _cachedSessions: Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }> = [];
+	private _cachedSessions: Array<{
+		id: string;
+		title: string;
+		date: string;
+		messageCount: number;
+		pinned?: boolean;
+		archived?: boolean;
+	}> = [];
 	private _dbSessionCreated = false;
 	private _msgCounter = 0;
 	private readonly _persistedMessages = new Set<IChatMessage>();
@@ -227,19 +280,38 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 	private readonly _onDidChangeStreaming = this._register(new Emitter<boolean>());
 	readonly onDidChangeStreaming = this._onDidChangeStreaming.event;
 
-	private readonly _onDidChangeModels = this._register(new Emitter<Array<{ id: string; name: string; provider: string }>>());
+	private readonly _onDidChangeModels = this._register(
+		new Emitter<Array<{ id: string; name: string; provider: string }>>()
+	);
 	readonly onDidChangeModels = this._onDidChangeModels.event;
 
-
-	get messages(): readonly IChatMessage[] { return this._messages; }
-	get revertedMessages(): readonly IChatMessage[] { return this._revertedMessages; }
-	get connectionState(): ConnectionState { return this._connectionState; }
-	get sessionId(): string | null { return this._dbSessionId ?? this._sessionId; }
-	get isStreaming(): boolean { return this._isStreaming; }
-	get isThinking(): boolean { return this._isThinking; }
-	get currentMode(): AgentMode { return this._currentMode; }
-	get serverModel(): string { return this._serverModel; }
-	get lastPromptTokens(): number { return this._lastPromptTokens; }
+	get messages(): readonly IChatMessage[] {
+		return this._messages;
+	}
+	get revertedMessages(): readonly IChatMessage[] {
+		return this._revertedMessages;
+	}
+	get connectionState(): ConnectionState {
+		return this._connectionState;
+	}
+	get sessionId(): string | null {
+		return this._dbSessionId ?? this._sessionId;
+	}
+	get isStreaming(): boolean {
+		return this._isStreaming;
+	}
+	get isThinking(): boolean {
+		return this._isThinking;
+	}
+	get currentMode(): AgentMode {
+		return this._currentMode;
+	}
+	get serverModel(): string {
+		return this._serverModel;
+	}
+	get lastPromptTokens(): number {
+		return this._lastPromptTokens;
+	}
 	get contextWindow(): number {
 		const listed = this._availableModels.find(m => m.id === this._serverModel);
 		if (listed?.contextWindow && listed.contextWindow > 0) {
@@ -247,7 +319,9 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		}
 		return contextWindowForModel(this._serverModel);
 	}
-	get availableModels(): Array<{ id: string; name: string; provider: string }> { return this._availableModels; }
+	get availableModels(): Array<{ id: string; name: string; provider: string }> {
+		return this._availableModels;
+	}
 
 	constructor(
 		@IConfigurationService private readonly configurationService: IConfigurationService,
@@ -257,7 +331,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		@IExplorerService private readonly explorerService: IExplorerService,
 		@IProductService private readonly productService: IProductService,
 		@IUpdateService private readonly updateService: IUpdateService,
-		@IRecentEditTracker private readonly recentEditTracker: IRecentEditTracker,
+		@IRecentEditTracker private readonly recentEditTracker: IRecentEditTracker
 	) {
 		super();
 		SidexChatService.INSTANCE = this;
@@ -307,10 +381,12 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		// sign-in state or chat-socket connectivity. (It previously only
 		// triggered on WebSocket open, so signed-out users never indexed.)
 		setTimeout(() => this._triggerWorkspaceIndexing(), 2500);
-		this._register(this.contextService.onDidChangeWorkspaceFolders(() => {
-			this._contextIndexed = false;
-			this._triggerWorkspaceIndexing();
-		}));
+		this._register(
+			this.contextService.onDidChangeWorkspaceFolders(() => {
+				this._contextIndexed = false;
+				this._triggerWorkspaceIndexing();
+			})
+		);
 	}
 
 	private _aiStackStarted = false;
@@ -352,7 +428,9 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		this._maxMode = on;
 	}
 
-	get maxMode(): boolean { return this._maxMode; }
+	get maxMode(): boolean {
+		return this._maxMode;
+	}
 
 	setThinkingBudget(budget: number): void {
 		this._thinkingBudget = budget;
@@ -362,7 +440,9 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		this._thinkingEffort = (level || 'none').toLowerCase();
 	}
 
-	get thinkingBudget(): number { return this._thinkingBudget; }
+	get thinkingBudget(): number {
+		return this._thinkingBudget;
+	}
 
 	get workspacePath(): string | null {
 		const folders = this.contextService.getWorkspace().folders;
@@ -371,7 +451,11 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 
 	setSelectedModel(modelId: string): void {
 		this._serverModel = modelId;
-		try { localStorage.setItem(SidexChatService.MODEL_STORAGE_KEY, modelId); } catch { /* */ }
+		try {
+			localStorage.setItem(SidexChatService.MODEL_STORAGE_KEY, modelId);
+		} catch {
+			/* */
+		}
 	}
 
 	setPermissionMode(mode: PermissionMode): void {
@@ -380,22 +464,26 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 
 	respondToPermission(toolCallId: string, approved: boolean): void {
 		if (this._ws && this._connectionState === 'connected') {
-			this._ws.send(JSON.stringify({
-				type: 'permission_response',
-				tool_call_id: toolCallId,
-				approved,
-			}));
+			this._ws.send(
+				JSON.stringify({
+					type: 'permission_response',
+					tool_call_id: toolCallId,
+					approved
+				})
+			);
 		}
 	}
 
 	respondToQuestion(toolCallId: string, selectedIds: string[]): void {
 		if (this._ws && this._connectionState === 'connected') {
-			this._ws.send(JSON.stringify({
-				type: 'tool_response',
-				tool_call_id: toolCallId,
-				output: JSON.stringify({ selected: selectedIds }),
-				error: '',
-			}));
+			this._ws.send(
+				JSON.stringify({
+					type: 'tool_response',
+					tool_call_id: toolCallId,
+					output: JSON.stringify({ selected: selectedIds }),
+					error: ''
+				})
+			);
 		}
 	}
 
@@ -434,7 +522,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 					startLine: sel.startLineNumber,
 					startColumn: sel.startColumn,
 					endLine: sel.endLineNumber,
-					endColumn: sel.endColumn,
+					endColumn: sel.endColumn
 				};
 			}
 		}
@@ -457,7 +545,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			selectionRange,
 			workspaceFolders: folders,
 			cwd: folders[0] ?? '',
-			openFiles,
+			openFiles
 		};
 	}
 
@@ -466,16 +554,21 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			return;
 		}
 		const ctx = this._gatherWorkspaceContext();
-		this._localExecutor.execute({
-			type: 'tool_request',
-			tool_call_id: `git-status-${Date.now()}`,
-			name: 'git_status',
-			arguments: JSON.stringify({ cwd: ctx.cwd }),
-		}).then(result => {
-			if (result.output && !result.error) {
-				this._sessionGitStatus = result.output;
-			}
-		}).catch(() => { /* git status is best-effort */ });
+		this._localExecutor
+			.execute({
+				type: 'tool_request',
+				tool_call_id: `git-status-${Date.now()}`,
+				name: 'git_status',
+				arguments: JSON.stringify({ cwd: ctx.cwd })
+			})
+			.then(result => {
+				if (result.output && !result.error) {
+					this._sessionGitStatus = result.output;
+				}
+			})
+			.catch(() => {
+				/* git status is best-effort */
+			});
 	}
 
 	connect(): void {
@@ -491,8 +584,9 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			if (!ep.running || ep.port <= 0) {
 				this._setConnectionState('disconnected');
 				if (this._reconnectAttempts === 0) {
-					const why = ep.error?.trim()
-						|| 'The local AI server is not running. Chat cannot send until sidex-server is built and the app is restarted.';
+					const why =
+						ep.error?.trim() ||
+						'The local AI server is not running. Chat cannot send until sidex-server is built and the app is restarted.';
 					this._onDidReceiveChunk.fire({ type: 'error', content: why } as IStreamChunk);
 				}
 				this._scheduleReconnect();
@@ -517,7 +611,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				this._fetchServerInfo();
 			};
 
-			this._ws.onmessage = (event) => {
+			this._ws.onmessage = event => {
 				try {
 					const raw = JSON.parse(event.data);
 					if (raw && raw.type === 'update_available') {
@@ -535,7 +629,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				}
 			};
 
-			this._ws.onclose = (event) => {
+			this._ws.onclose = event => {
 				console.warn('[sidex-ws] CLOSED code:', event.code, 'reason:', event.reason, 'wasClean:', event.wasClean);
 				this._ws = null;
 				this._setConnectionState('disconnected');
@@ -545,7 +639,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				this._scheduleReconnect();
 			};
 
-			this._ws.onerror = (ev) => {
+			this._ws.onerror = ev => {
 				console.error('[sidex-ws] ERROR:', ev);
 				this._ws?.close();
 			};
@@ -578,7 +672,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		if (!this._ws || this._connectionState !== 'connected') {
 			console.warn('[sidex-ws] Not connected, attempting reconnect...');
 			this.connect();
-			const disposable = this._onDidChangeConnectionState.event((state) => {
+			const disposable = this._onDidChangeConnectionState.event(state => {
 				if (state === 'connected') {
 					disposable.dispose();
 					this.sendMessage(text);
@@ -590,7 +684,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 					this._setStreaming(false);
 					this._onDidReceiveChunk.fire({
 						type: 'error',
-						content: 'Unable to reach the server. Please check your connection and try again.',
+						content: 'Unable to reach the server. Please check your connection and try again.'
 					} as IStreamChunk);
 				}
 			}, 5000);
@@ -619,7 +713,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			role: 'user',
 			content: text,
 			timestamp: Date.now(),
-			checkpointLabel,
+			checkpointLabel
 		};
 		this._messages.push(userMsg);
 		this._revertedMessages = [];
@@ -647,14 +741,14 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		// The server counts user-authored messages, so send how many of those
 		// survive the revert (the reverted-to user message is the last one kept).
 		if (this._ws && this._connectionState === 'connected') {
-			const keepUserMessages = this._messages
-				.slice(0, messageIndex + 1)
-				.filter(m => m.role === 'user').length;
-			this._ws.send(JSON.stringify({
-				type: 'revert',
-				session_id: this._sessionId,
-				keep_user_messages: keepUserMessages,
-			}));
+			const keepUserMessages = this._messages.slice(0, messageIndex + 1).filter(m => m.role === 'user').length;
+			this._ws.send(
+				JSON.stringify({
+					type: 'revert',
+					session_id: this._sessionId,
+					keep_user_messages: keepUserMessages
+				})
+			);
 		}
 	}
 
@@ -669,18 +763,26 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 
 	private async _createCheckpoint(label: string): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
 			await invoke('checkpoint_create', { label });
-		} catch { /* checkpoint creation is best-effort */ }
+		} catch {
+			/* checkpoint creation is best-effort */
+		}
 	}
 
 	private async _rollbackToCheckpoint(label: string): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
 			await invoke('checkpoint_rollback', { label });
-		} catch { /* rollback is best-effort */ }
+		} catch {
+			/* rollback is best-effort */
+		}
 	}
 
 	private async _sendWithContext(text: string): Promise<void> {
@@ -696,7 +798,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 					type: 'tool_request',
 					tool_call_id: `ctx-search-${Date.now()}`,
 					name: 'context_search',
-					arguments: JSON.stringify({ query: searchQuery, limit: searchLimit, budget: searchBudget }),
+					arguments: JSON.stringify({ query: searchQuery, limit: searchLimit, budget: searchBudget })
 				});
 				if (result.output && !result.error) {
 					contextPrefix = `<workspace_context>\n${result.output}\n</workspace_context>\n\n`;
@@ -741,18 +843,23 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				hour: 'numeric',
 				minute: '2-digit',
 				hour12: true,
-				timeZoneName: 'short',
+				timeZoneName: 'short'
 			}),
 			open_files: ctx.openFiles.slice(0, 10),
 			active_file: ctx.activeFile || '',
-			git_status: this._gitStatusSent ? undefined : (this._sessionGitStatus || undefined),
+			git_status: this._gitStatusSent ? undefined : this._sessionGitStatus || undefined,
 			user_info: {
 				os: this._osInfo?.platform || 'unknown',
 				arch: this._osInfo?.arch || 'unknown',
 				shell: this._osInfo?.shell || 'zsh',
 				workspace_path: ctx.cwd,
 				is_git_repo: this._sessionGitStatus ? true : false,
-				date: new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+				date: new Date().toLocaleDateString('en-US', {
+					weekday: 'long',
+					year: 'numeric',
+					month: 'long',
+					day: 'numeric'
+				})
 			},
 			context: {
 				active_file: ctx.activeFile,
@@ -762,8 +869,8 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				workspace_folders: ctx.workspaceFolders,
 				open_files: this._useDynamicContext
 					? ctx.openFiles.slice(0, 10).map(f => f.split('/').pop() || f)
-					: ctx.openFiles,
-			},
+					: ctx.openFiles
+			}
 		};
 
 		if (!this._gitStatusSent && this._sessionGitStatus) {
@@ -803,12 +910,21 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		this._onDidChangeMessages.fire(this._messages);
 	}
 
-	getSavedSessions(): Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }> {
+	getSavedSessions(): Array<{
+		id: string;
+		title: string;
+		date: string;
+		messageCount: number;
+		pinned?: boolean;
+		archived?: boolean;
+	}> {
 		void this._refreshCachedSessions();
 		return this._cachedSessions;
 	}
 
-	async getSavedSessionsAsync(): Promise<Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>> {
+	async getSavedSessionsAsync(): Promise<
+		Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>
+	> {
 		await this._refreshCachedSessions();
 		return this._cachedSessions;
 	}
@@ -819,20 +935,31 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 
 	async loadSessionAsync(sessionId: string): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
-			const dbMessages = await invoke('session_load', { sessionId }) as Array<{
-				id: string; session_id: string; role: string; content: string;
-				tool_calls: string | null; tool_call_id: string | null; created_at: number;
+			const dbMessages = (await invoke('session_load', { sessionId })) as Array<{
+				id: string;
+				session_id: string;
+				role: string;
+				content: string;
+				tool_calls: string | null;
+				tool_call_id: string | null;
+				created_at: number;
 			}>;
 			this._messages = dbMessages.map(m => {
 				const msg: IChatMessage = {
 					role: m.role as IChatMessage['role'],
 					content: m.content,
-					timestamp: m.created_at * 1000,
+					timestamp: m.created_at * 1000
 				};
 				if (m.tool_calls) {
-					try { msg.toolCalls = JSON.parse(m.tool_calls); } catch { /* */ }
+					try {
+						msg.toolCalls = JSON.parse(m.tool_calls);
+					} catch {
+						/* */
+					}
 				}
 				return msg;
 			});
@@ -848,52 +975,81 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			}
 			this._setStreaming(false);
 			this._onDidChangeMessages.fire(this._messages);
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async deleteSession(sessionId: string): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
 			await invoke('session_delete', { sessionId });
 			this._cachedSessions = this._cachedSessions.filter(s => s.id !== sessionId);
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async pinSession(sessionId: string, pinned: boolean): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
 			await invoke('session_pin', { sessionId, pinned });
 			await this._refreshCachedSessions();
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async archiveSession(sessionId: string, archived: boolean): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
 			await invoke('session_archive', { sessionId, archived });
 			await this._refreshCachedSessions();
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	async renameSession(sessionId: string, title: string): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
 			await invoke('session_update_title', { sessionId, title });
 			await this._refreshCachedSessions();
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
-	async searchSessions(query: string): Promise<Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>> {
+	async searchSessions(
+		query: string
+	): Promise<
+		Array<{ id: string; title: string; date: string; messageCount: number; pinned?: boolean; archived?: boolean }>
+	> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return []; }
+		if (!invoke) {
+			return [];
+		}
 		try {
 			const ctx = this._gatherWorkspaceContext();
-			const results = await invoke('session_search', { query, workspace: ctx.cwd }) as Array<{
-				id: string; title: string; updated_at: number; message_count: number; pinned: boolean; archived: boolean;
+			const results = (await invoke('session_search', { query, workspace: ctx.cwd })) as Array<{
+				id: string;
+				title: string;
+				updated_at: number;
+				message_count: number;
+				pinned: boolean;
+				archived: boolean;
 			}>;
 			return results
 				.filter(s => !s.archived)
@@ -903,9 +1059,11 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 					date: new Date(s.updated_at * 1000).toISOString(),
 					messageCount: s.message_count,
 					pinned: s.pinned,
-					archived: s.archived,
+					archived: s.archived
 				}));
-		} catch { return []; }
+		} catch {
+			return [];
+		}
 	}
 
 	private static _getTauriInvoke(): ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | null {
@@ -919,11 +1077,17 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 	private _dbSessionPromise: Promise<void> | null = null;
 
 	private _ensureDbSession(): Promise<void> {
-		if (this._dbSessionCreated) { return Promise.resolve(); }
-		if (this._dbSessionPromise) { return this._dbSessionPromise; }
+		if (this._dbSessionCreated) {
+			return Promise.resolve();
+		}
+		if (this._dbSessionPromise) {
+			return this._dbSessionPromise;
+		}
 
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return Promise.resolve(); }
+		if (!invoke) {
+			return Promise.resolve();
+		}
 
 		if (!this._dbSessionId) {
 			this._dbSessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -941,24 +1105,30 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			title,
 			model: this._serverModel,
 			mode: this._currentMode,
-			workspace: ctx.cwd,
-		}).then(() => {
-			this._dbSessionCreated = true;
-			this._dbSessionPromise = null;
-		}).catch(() => {
-			this._dbSessionPromise = null;
-		}) as Promise<void>;
+			workspace: ctx.cwd
+		})
+			.then(() => {
+				this._dbSessionCreated = true;
+				this._dbSessionPromise = null;
+			})
+			.catch(() => {
+				this._dbSessionPromise = null;
+			}) as Promise<void>;
 
 		return this._dbSessionPromise;
 	}
 
 	private async _persistUserMessage(msg: IChatMessage): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 
 		try {
 			await this._ensureDbSession();
-			if (!this._dbSessionId) { return; }
+			if (!this._dbSessionId) {
+				return;
+			}
 
 			this._msgCounter++;
 			await invoke('session_save_message', {
@@ -968,21 +1138,29 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				content: msg.content,
 				toolCalls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
 				toolCallId: null,
-				createdAt: Math.floor(msg.timestamp / 1000),
+				createdAt: Math.floor(msg.timestamp / 1000)
 			});
 			this._persistedMessages.add(msg);
-		} catch { /* persist failed silently */ }
+		} catch {
+			/* persist failed silently */
+		}
 	}
 
 	private _persistAssistantMessage(msg: IChatMessage): void {
-		if (this._persistedMessages.has(msg)) { return; }
+		if (this._persistedMessages.has(msg)) {
+			return;
+		}
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 
 		this._persistedMessages.add(msg);
 
 		const doSave = () => {
-			if (!this._dbSessionId) { return; }
+			if (!this._dbSessionId) {
+				return;
+			}
 			this._msgCounter++;
 			const msgId = `${this._dbSessionId}-msg-${this._msgCounter}`;
 			invoke('session_save_message', {
@@ -992,14 +1170,20 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				content: msg.content,
 				toolCalls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
 				toolCallId: null,
-				createdAt: Math.floor(msg.timestamp / 1000),
-			}).catch(() => { /* persist failed silently */ });
+				createdAt: Math.floor(msg.timestamp / 1000)
+			}).catch(() => {
+				/* persist failed silently */
+			});
 		};
 
 		if (this._dbSessionCreated) {
 			doSave();
 		} else {
-			this._ensureDbSession().then(() => doSave()).catch(() => { /* ignore */ });
+			this._ensureDbSession()
+				.then(() => doSave())
+				.catch(() => {
+					/* ignore */
+				});
 		}
 	}
 
@@ -1013,14 +1197,21 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 
 	private async _refreshCachedSessions(): Promise<void> {
 		const invoke = SidexChatService._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
 			const ctx = this._gatherWorkspaceContext();
-			const sessions = await invoke('session_list', {
+			const sessions = (await invoke('session_list', {
 				workspace: ctx.cwd,
-				limit: SidexChatService.MAX_SAVED_SESSIONS,
-			}) as Array<{
-				id: string; title: string; updated_at: number; message_count: number; pinned: boolean; archived: boolean;
+				limit: SidexChatService.MAX_SAVED_SESSIONS
+			})) as Array<{
+				id: string;
+				title: string;
+				updated_at: number;
+				message_count: number;
+				pinned: boolean;
+				archived: boolean;
 			}>;
 			this._cachedSessions = sessions
 				.filter(s => !s.archived)
@@ -1030,9 +1221,11 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 					date: new Date(s.updated_at * 1000).toISOString(),
 					messageCount: s.message_count,
 					pinned: s.pinned,
-					archived: s.archived,
+					archived: s.archived
 				}));
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	stopStreaming(): void {
@@ -1043,8 +1236,12 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 	private async _handleLocalToolRequest(req: ILocalToolRequest): Promise<void> {
 		// Intercept spawn_agents: run REAL subagents client-side with full tool access
 		const AGENT_TOOLS = new Set([
-			'spawn_agents', 'spawn_agent', 'subagent', 'delegate',
-			'create_agent', 'parallel_agents',
+			'spawn_agents',
+			'spawn_agent',
+			'subagent',
+			'delegate',
+			'create_agent',
+			'parallel_agents'
 		]);
 
 		if (AGENT_TOOLS.has(req.name)) {
@@ -1069,10 +1266,12 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 						question_options: q.options || [],
 						question_allow_multiple: q.allow_multiple || false,
 						question_title: args.title || '',
-						tool_call_id: req.tool_call_id,
+						tool_call_id: req.tool_call_id
 					});
 				}
-			} catch { /* */ }
+			} catch {
+				/* */
+			}
 			// Response will be sent by the UI when user clicks an option
 			return;
 		}
@@ -1112,8 +1311,14 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 	}
 
 	private static readonly FS_MUTATING_TOOLS = new Set([
-		'write_file', 'edit_file', 'multi_edit', 'delete_file',
-		'shell', 'run_command', 'git_commit', 'git_checkout',
+		'write_file',
+		'edit_file',
+		'multi_edit',
+		'delete_file',
+		'shell',
+		'run_command',
+		'git_commit',
+		'git_checkout'
 	]);
 
 	private _refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1129,7 +1334,9 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		}
 		this._refreshDebounceTimer = setTimeout(() => {
 			this._refreshDebounceTimer = null;
-			this.explorerService.refresh().catch(() => { /* best effort */ });
+			this.explorerService.refresh().catch(() => {
+				/* best effort */
+			});
 		}, 300);
 	}
 
@@ -1142,17 +1349,21 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 					checkpoint_label: result.label || `checkpoint-${Date.now()}`,
 					checkpoint_timestamp: (result.timestamp || Date.now() / 1000) * 1000,
 					checkpoint_file_count: result.files_saved || 0,
-					checkpoint_files: result.files || [],
+					checkpoint_files: result.files || []
 				});
-			} catch { /* malformed output */ }
+			} catch {
+				/* malformed output */
+			}
 		} else if (toolName === 'rollback') {
 			try {
 				const result = JSON.parse(output);
 				this._onDidReceiveChunk.fire({
 					type: 'checkpoint_restored',
-					checkpoint_label: result.restored_to || result.label || '',
+					checkpoint_label: result.restored_to || result.label || ''
 				});
-			} catch { /* malformed output */ }
+			} catch {
+				/* malformed output */
+			}
 		}
 	}
 
@@ -1160,7 +1371,9 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 	 * Runs real subagents — each gets its own WebSocket to the server + full local tool access.
 	 * This is how Cursor's Task tool works: subagents are parallel agent loops with full capabilities.
 	 */
-	private async _runSubagents(req: ILocalToolRequest): Promise<{ type: string; tool_call_id: string; output: string; error: string }> {
+	private async _runSubagents(
+		req: ILocalToolRequest
+	): Promise<{ type: string; tool_call_id: string; output: string; error: string }> {
 		let tasks: Array<{ description: string; prompt: string }> = [];
 
 		try {
@@ -1169,7 +1382,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			if (Array.isArray(args.tasks)) {
 				tasks = args.tasks.map((t: { description?: string; prompt?: string; task?: string; goal?: string }) => ({
 					description: t.description || t.task || 'subtask',
-					prompt: t.prompt || t.goal || t.description || '',
+					prompt: t.prompt || t.goal || t.description || ''
 				}));
 			} else if (args.prompt || args.task || args.goal) {
 				tasks = [{ description: args.description || 'subtask', prompt: args.prompt || args.task || args.goal }];
@@ -1181,7 +1394,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				type: 'tool_response',
 				tool_call_id: req.tool_call_id,
 				output: '',
-				error: 'Failed to parse subagent task arguments',
+				error: 'Failed to parse subagent task arguments'
 			};
 		}
 
@@ -1190,25 +1403,25 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 				type: 'tool_response',
 				tool_call_id: req.tool_call_id,
 				output: '',
-				error: 'No tasks provided for subagents',
+				error: 'No tasks provided for subagents'
 			};
 		}
 
 		// Run all subagent tasks in parallel
-		const results = await Promise.all(
-			tasks.map(task => this._runSingleSubagent(task.description, task.prompt))
-		);
+		const results = await Promise.all(tasks.map(task => this._runSingleSubagent(task.description, task.prompt)));
 
-		const output = results.map((r, i) => {
-			const header = `=== Subagent ${i + 1}: ${tasks[i].description} ===`;
-			return `${header}\n${r.success ? r.output : `Error: ${r.error}`}`;
-		}).join('\n\n');
+		const output = results
+			.map((r, i) => {
+				const header = `=== Subagent ${i + 1}: ${tasks[i].description} ===`;
+				return `${header}\n${r.success ? r.output : `Error: ${r.error}`}`;
+			})
+			.join('\n\n');
 
 		return {
 			type: 'tool_response',
 			tool_call_id: req.tool_call_id,
 			output,
-			error: '',
+			error: ''
 		};
 	}
 
@@ -1222,12 +1435,12 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		agentId: string,
 		type: SubagentType,
 		description: string,
-		prompt: string,
+		prompt: string
 	): Promise<{ success: boolean; output: string; error: string; toolsUsed: string[] }> {
 		const allowedTools = getAllowedTools(type);
 		const message = buildSubagentPrompt(type, prompt);
 
-		return new Promise((resolve) => {
+		return new Promise(resolve => {
 			const wsUrl = this._buildStreamUrl();
 			let ws: WebSocket;
 
@@ -1244,32 +1457,40 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			const ctx = this._gatherWorkspaceContext();
 
 			const finish = (success: boolean, error = '') => {
-				if (settled) { return; }
+				if (settled) {
+					return;
+				}
 				settled = true;
-				try { ws.close(); } catch { /* */ }
+				try {
+					ws.close();
+				} catch {
+					/* */
+				}
 				resolve({ success, output: content, error, toolsUsed });
 			};
 
 			const timer = setTimeout(() => finish(true), 120000);
 
 			ws.onopen = () => {
-				ws.send(JSON.stringify({
-					session_id: `${agentId}`,
-					message,
-					mode: 'agent',
-					model: this._serverModel,
-					permission_mode: 'auto_all',
-					cwd: ctx.cwd,
-					local_exec: true,
-					tool_execution: 'local',
-					context: {
-						workspace_folders: ctx.workspaceFolders,
-						active_file: ctx.activeFile,
-					},
-				}));
+				ws.send(
+					JSON.stringify({
+						session_id: `${agentId}`,
+						message,
+						mode: 'agent',
+						model: this._serverModel,
+						permission_mode: 'auto_all',
+						cwd: ctx.cwd,
+						local_exec: true,
+						tool_execution: 'local',
+						context: {
+							workspace_folders: ctx.workspaceFolders,
+							active_file: ctx.activeFile
+						}
+					})
+				);
 			};
 
-			ws.onmessage = async (event) => {
+			ws.onmessage = async event => {
 				try {
 					const chunk = JSON.parse(event.data);
 					switch (chunk.type) {
@@ -1281,12 +1502,14 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 
 							// Enforce tool restrictions based on subagent type
 							if (!allowedTools.has(toolName)) {
-								ws.send(JSON.stringify({
-									type: 'tool_response',
-									tool_call_id: chunk.tool_call_id,
-									output: '',
-									error: `Tool "${toolName}" is not available for ${type} agents. Available: ${[...allowedTools].join(', ')}`,
-								}));
+								ws.send(
+									JSON.stringify({
+										type: 'tool_response',
+										tool_call_id: chunk.tool_call_id,
+										output: '',
+										error: `Tool "${toolName}" is not available for ${type} agents. Available: ${[...allowedTools].join(', ')}`
+									})
+								);
 								break;
 							}
 
@@ -1300,19 +1523,23 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 									const subId = `sub-${agentId}-${Date.now()}`;
 
 									const subResult = await this._runTypedSubagent(subId, subType, subDesc, subPrompt);
-									ws.send(JSON.stringify({
-										type: 'tool_response',
-										tool_call_id: chunk.tool_call_id,
-										output: subResult.output || '(no output)',
-										error: subResult.error || '',
-									}));
+									ws.send(
+										JSON.stringify({
+											type: 'tool_response',
+											tool_call_id: chunk.tool_call_id,
+											output: subResult.output || '(no output)',
+											error: subResult.error || ''
+										})
+									);
 								} catch (e) {
-									ws.send(JSON.stringify({
-										type: 'tool_response',
-										tool_call_id: chunk.tool_call_id,
-										output: '',
-										error: `Sub-subagent failed: ${(e as Error).message}`,
-									}));
+									ws.send(
+										JSON.stringify({
+											type: 'tool_response',
+											tool_call_id: chunk.tool_call_id,
+											output: '',
+											error: `Sub-subagent failed: ${(e as Error).message}`
+										})
+									);
 								}
 								break;
 							}
@@ -1322,7 +1549,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 								type: 'tool_request',
 								tool_call_id: chunk.tool_call_id,
 								name: toolName,
-								arguments: chunk.arguments || '{}',
+								arguments: chunk.arguments || '{}'
 							});
 							if (!settled) {
 								ws.send(JSON.stringify(resp));
@@ -1335,7 +1562,7 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 							this._onDidReceiveChunk.fire({
 								type: 'subagent_update',
 								subagent_id: agentId,
-								subagent_tools: toolsUsed.map(n => ({ name: n, status: 'done' })),
+								subagent_tools: toolsUsed.map(n => ({ name: n, status: 'done' }))
 							});
 							break;
 						}
@@ -1349,16 +1576,29 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 							finish(false, chunk.error || chunk.content || 'Unknown error');
 							break;
 					}
-				} catch { /* ignore */ }
+				} catch {
+					/* ignore */
+				}
 			};
 
-			ws.onerror = () => { clearTimeout(timer); finish(false, 'WebSocket error'); };
-			ws.onclose = () => { clearTimeout(timer); if (!settled) { finish(true); } };
+			ws.onerror = () => {
+				clearTimeout(timer);
+				finish(false, 'WebSocket error');
+			};
+			ws.onclose = () => {
+				clearTimeout(timer);
+				if (!settled) {
+					finish(true);
+				}
+			};
 		});
 	}
 
-	private _runSingleSubagent(description: string, prompt: string): Promise<{ success: boolean; output: string; error: string }> {
-		return new Promise((resolve) => {
+	private _runSingleSubagent(
+		description: string,
+		prompt: string
+	): Promise<{ success: boolean; output: string; error: string }> {
+		return new Promise(resolve => {
 			const wsUrl = this._buildStreamUrl();
 			let ws: WebSocket;
 
@@ -1374,9 +1614,15 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			const ctx = this._gatherWorkspaceContext();
 
 			const finish = (success: boolean, error = '') => {
-				if (settled) { return; }
+				if (settled) {
+					return;
+				}
 				settled = true;
-				try { ws.close(); } catch { /* */ }
+				try {
+					ws.close();
+				} catch {
+					/* */
+				}
 				resolve({ success, output: content, error });
 			};
 
@@ -1399,13 +1645,13 @@ ${prompt}`,
 					tool_execution: 'local',
 					context: {
 						workspace_folders: ctx.workspaceFolders,
-						active_file: ctx.activeFile,
-					},
+						active_file: ctx.activeFile
+					}
 				};
 				ws.send(JSON.stringify(payload));
 			};
 
-			ws.onmessage = async (event) => {
+			ws.onmessage = async event => {
 				try {
 					const chunk = JSON.parse(event.data);
 					switch (chunk.type) {
@@ -1418,7 +1664,7 @@ ${prompt}`,
 								type: 'tool_request',
 								tool_call_id: chunk.tool_call_id,
 								name: chunk.name,
-								arguments: chunk.arguments || '{}',
+								arguments: chunk.arguments || '{}'
 							});
 							if (!settled) {
 								ws.send(JSON.stringify(resp));
@@ -1432,14 +1678,12 @@ ${prompt}`,
 									id: chunk.tool_call_id,
 									name: chunk.name,
 									input: chunk.arguments || '',
-									status: 'running',
+									status: 'running'
 								});
 								this._onDidChangeMessages.fire(this._messages);
 								// Mark done after a short delay
 								setTimeout(() => {
-									const tc = this._currentAssistantMessage?.toolCalls?.find(
-										t => t.id === chunk.tool_call_id
-									);
+									const tc = this._currentAssistantMessage?.toolCalls?.find(t => t.id === chunk.tool_call_id);
 									if (tc) {
 										tc.status = 'done';
 										tc.output = resp.output?.slice(0, 200);
@@ -1459,7 +1703,9 @@ ${prompt}`,
 							finish(false, chunk.error || chunk.content || 'Unknown error');
 							break;
 					}
-				} catch { /* ignore */ }
+				} catch {
+					/* ignore */
+				}
 			};
 
 			ws.onerror = () => {
@@ -1469,7 +1715,9 @@ ${prompt}`,
 
 			ws.onclose = () => {
 				clearTimeout(timer);
-				if (!settled) { finish(true); }
+				if (!settled) {
+					finish(true);
+				}
 			};
 		});
 	}
@@ -1502,11 +1750,20 @@ ${prompt}`,
 			} else {
 				taskList = [args];
 			}
-		} catch { /* */ }
+		} catch {
+			/* */
+		}
 
 		if (taskList.length === 0 || (!taskList[0].prompt && !taskList[0].task && !taskList[0].goal)) {
 			if (this._ws && this._connectionState === 'connected') {
-				this._ws.send(JSON.stringify({ type: 'tool_response', tool_call_id: toolCallId, output: '', error: 'No tasks provided. Pass { prompt, description, subagent_type }.' }));
+				this._ws.send(
+					JSON.stringify({
+						type: 'tool_response',
+						tool_call_id: toolCallId,
+						output: '',
+						error: 'No tasks provided. Pass { prompt, description, subagent_type }.'
+					})
+				);
 			}
 			return;
 		}
@@ -1523,9 +1780,13 @@ ${prompt}`,
 			const resumeId = task.resume;
 
 			// Validate type
-			if (!SUBAGENT_CONFIGS[type]) { type = 'generalPurpose'; }
+			if (!SUBAGENT_CONFIGS[type]) {
+				type = 'generalPurpose';
+			}
 			// Force readonly if specified
-			if (isReadonly && type === 'generalPurpose') { type = 'explore'; }
+			if (isReadonly && type === 'generalPurpose') {
+				type = 'explore';
+			}
 
 			// RESUME: continue a previous agent's conversation
 			if (resumeId && resumeId !== 'self') {
@@ -1542,7 +1803,7 @@ ${prompt}`,
 						subagent_description: `${prev.description} (resumed)`,
 						subagent_model: model,
 						subagent_status: 'running',
-						subagent_prompt: prompt,
+						subagent_prompt: prompt
 					});
 
 					// Resume = send follow-up prompt to same session
@@ -1567,7 +1828,7 @@ ${prompt}`,
 				completedAt: null,
 				model,
 				conversationHistory: [{ role: 'user', content: prompt }],
-				parentId: null,
+				parentId: null
 			});
 
 			this._onDidReceiveChunk.fire({
@@ -1576,7 +1837,7 @@ ${prompt}`,
 				subagent_description: description,
 				subagent_model: model,
 				subagent_status: 'running',
-				subagent_prompt: prompt,
+				subagent_prompt: prompt
 			});
 
 			promises.push(this._runTypedSubagent(id, type, description, prompt));
@@ -1584,34 +1845,38 @@ ${prompt}`,
 
 		// Run all in parallel
 		const results = await Promise.all(
-			promises.map((p, i) => p.then(r => {
-				const agentId = subagentIds[i];
-				this._subagentRegistry.update(agentId, {
-					status: r.success ? 'completed' : 'failed',
-					output: r.output,
-					toolsUsed: r.toolsUsed || [],
-					completedAt: Date.now(),
-					conversationHistory: [
-						...(this._subagentRegistry.get(agentId)?.conversationHistory || []),
-						{ role: 'assistant', content: r.output },
-					],
-				});
-				this._onDidReceiveChunk.fire({
-					type: 'subagent_complete',
-					subagent_id: agentId,
-					subagent_status: r.success ? 'completed' : 'failed',
-					subagent_output: r.output.slice(0, 500),
-					subagent_tools: (r.toolsUsed || []).map((name: string) => ({ name, status: 'done' })),
-				});
-				return r;
-			}))
+			promises.map((p, i) =>
+				p.then(r => {
+					const agentId = subagentIds[i];
+					this._subagentRegistry.update(agentId, {
+						status: r.success ? 'completed' : 'failed',
+						output: r.output,
+						toolsUsed: r.toolsUsed || [],
+						completedAt: Date.now(),
+						conversationHistory: [
+							...(this._subagentRegistry.get(agentId)?.conversationHistory || []),
+							{ role: 'assistant', content: r.output }
+						]
+					});
+					this._onDidReceiveChunk.fire({
+						type: 'subagent_complete',
+						subagent_id: agentId,
+						subagent_status: r.success ? 'completed' : 'failed',
+						subagent_output: r.output.slice(0, 500),
+						subagent_tools: (r.toolsUsed || []).map((name: string) => ({ name, status: 'done' }))
+					});
+					return r;
+				})
+			)
 		);
 
-		const output = results.map((r, i) => {
-			const desc = this._subagentRegistry.get(subagentIds[i])?.description || `Task ${i + 1}`;
-			const type = this._subagentRegistry.get(subagentIds[i])?.type || 'generalPurpose';
-			return `=== ${desc} (${type}) ===\n${r.success ? r.output : `Error: ${r.error}`}`;
-		}).join('\n\n');
+		const output = results
+			.map((r, i) => {
+				const desc = this._subagentRegistry.get(subagentIds[i])?.description || `Task ${i + 1}`;
+				const type = this._subagentRegistry.get(subagentIds[i])?.type || 'generalPurpose';
+				return `=== ${desc} (${type}) ===\n${r.success ? r.output : `Error: ${r.error}`}`;
+			})
+			.join('\n\n');
 
 		// Mark tool call done in UI
 		if (this._currentAssistantMessage?.toolCalls) {
@@ -1645,7 +1910,7 @@ ${prompt}`,
 						role: 'assistant',
 						content: '',
 						toolCalls: [],
-						timestamp: Date.now(),
+						timestamp: Date.now()
 					};
 					this._messages.push(this._currentAssistantMessage);
 				}
@@ -1659,7 +1924,7 @@ ${prompt}`,
 						role: 'assistant',
 						content: '',
 						toolCalls: [],
-						timestamp: Date.now(),
+						timestamp: Date.now()
 					};
 					this._messages.push(this._currentAssistantMessage);
 				}
@@ -1676,7 +1941,7 @@ ${prompt}`,
 								id: tc.id,
 								name: tc.function.name,
 								input: tc.function.arguments,
-								status: 'running',
+								status: 'running'
 							});
 							this._onDidChangeMessages.fire(this._messages);
 							// Server handles subagents now — cards created via subagent_running chunks
@@ -1686,7 +1951,7 @@ ${prompt}`,
 							id: tc.id,
 							name: tc.function.name,
 							input: tc.function.arguments,
-							status: 'running',
+							status: 'running'
 						});
 					}
 				}
@@ -1724,29 +1989,29 @@ ${prompt}`,
 				break;
 
 			case 'thinking':
-			if (!this._currentAssistantMessage) {
-				this._currentAssistantMessage = {
-					role: 'assistant',
-					content: '',
-					thinkingContent: '',
-					toolCalls: [],
-					timestamp: Date.now(),
-				};
-				this._messages.push(this._currentAssistantMessage);
-			}
-			if (this._currentAssistantMessage.thinkingContent === undefined) {
-				this._currentAssistantMessage.thinkingContent = '';
-			}
-			this._currentAssistantMessage.thinkingContent += chunk.content || '';
-			this._isThinking = true;
-			this._onDidChangeMessages.fire(this._messages);
-			break;
+				if (!this._currentAssistantMessage) {
+					this._currentAssistantMessage = {
+						role: 'assistant',
+						content: '',
+						thinkingContent: '',
+						toolCalls: [],
+						timestamp: Date.now()
+					};
+					this._messages.push(this._currentAssistantMessage);
+				}
+				if (this._currentAssistantMessage.thinkingContent === undefined) {
+					this._currentAssistantMessage.thinkingContent = '';
+				}
+				this._currentAssistantMessage.thinkingContent += chunk.content || '';
+				this._isThinking = true;
+				this._onDidChangeMessages.fire(this._messages);
+				break;
 
-		case 'thinking_done':
-			this._isThinking = false;
-			break;
+			case 'thinking_done':
+				this._isThinking = false;
+				break;
 
-		case 'done':
+			case 'done':
 				if (this._currentAssistantMessage) {
 					this._persistAssistantMessage(this._currentAssistantMessage);
 				}
@@ -1765,7 +2030,10 @@ ${prompt}`,
 			case 'error':
 				// Don't pollute the chat with error messages — emit a separate event
 				// so the view can show it as a dismissible banner above the input.
-				this._onDidReceiveChunk.fire({ type: 'error', content: chunk.error || 'An unexpected error occurred.' } as IStreamChunk);
+				this._onDidReceiveChunk.fire({
+					type: 'error',
+					content: chunk.error || 'An unexpected error occurred.'
+				} as IStreamChunk);
 				if (this._currentAssistantMessage) {
 					this._persistAssistantMessage(this._currentAssistantMessage);
 					this._currentAssistantMessage = null;
@@ -1785,9 +2053,7 @@ ${prompt}`,
 				if (typeof chunk.total_cost === 'number') {
 					this._sessionCost = chunk.total_cost;
 				}
-				const fromSummary = chunk.total_input_tokens
-					?? chunk.usage?.input_tokens
-					?? 0;
+				const fromSummary = chunk.total_input_tokens ?? chunk.usage?.input_tokens ?? 0;
 				if (fromSummary > 0) {
 					this._lastPromptTokens = fromSummary;
 				}
@@ -1826,7 +2092,7 @@ ${prompt}`,
 							subagent_description: description,
 							subagent_model: this._serverModel,
 							subagent_status: 'running',
-							subagent_prompt: description,
+							subagent_prompt: description
 						});
 					} else if (chunk.type === 'subagent_done') {
 						const status = content.includes('failed') ? 'failed' : 'completed';
@@ -1834,7 +2100,7 @@ ${prompt}`,
 							type: 'subagent_complete',
 							subagent_id: agentId,
 							subagent_status: status as 'completed' | 'failed',
-							subagent_output: description,
+							subagent_output: description
 						});
 					}
 				}
@@ -1882,8 +2148,12 @@ ${prompt}`,
 	}
 
 	override dispose(): void {
-		if (this._reindexTimer) { clearTimeout(this._reindexTimer); }
-		if (this._reindexInterval) { clearInterval(this._reindexInterval); }
+		if (this._reindexTimer) {
+			clearTimeout(this._reindexTimer);
+		}
+		if (this._reindexInterval) {
+			clearInterval(this._reindexInterval);
+		}
 		this.disconnect();
 		super.dispose();
 	}
@@ -1900,63 +2170,81 @@ ${prompt}`,
 		}
 		this._contextIndexing = true;
 
-		this._localExecutor.execute({
-			type: 'tool_request',
-			tool_call_id: `ctx-index-${Date.now()}`,
-			name: 'context_index',
-			arguments: '{}',
-		}).then(result => {
-			if (!result.error) {
-				this._contextIndexed = true;
-				this._startFileWatcher();
-			} else {
-				// Background feature: log, don't alarm the user with a popup.
-				// context_search degrades gracefully to grep when unavailable.
-				console.warn('[sidex-index] local index unavailable:', result.error);
-			}
-		}).catch(err => {
-			console.warn('[sidex-index] local index unavailable:', err);
-		}).finally(() => {
-			this._contextIndexing = false;
-		});
+		this._localExecutor
+			.execute({
+				type: 'tool_request',
+				tool_call_id: `ctx-index-${Date.now()}`,
+				name: 'context_index',
+				arguments: '{}'
+			})
+			.then(result => {
+				if (!result.error) {
+					this._contextIndexed = true;
+					this._startFileWatcher();
+				} else {
+					// Background feature: log, don't alarm the user with a popup.
+					// context_search degrades gracefully to grep when unavailable.
+					console.warn('[sidex-index] local index unavailable:', result.error);
+				}
+			})
+			.catch(err => {
+				console.warn('[sidex-index] local index unavailable:', err);
+			})
+			.finally(() => {
+				this._contextIndexing = false;
+			});
 	}
 
 	private _triggerAutoIndex(): void {
 		const invoke = SidexChatService._getTauriInvoke();
 		const wsPath = this.workspacePath;
-		if (!invoke || !wsPath || wsPath === '.') { return; }
+		if (!invoke || !wsPath || wsPath === '.') {
+			return;
+		}
 
 		// autoIndex defaults ON (like Cursor). The local BM25 index always
 		// builds — it powers the files count and local search; the CLOUD
 		// upload additionally requires sign-in and the setting not being off.
-		invoke('settings_get', { section: 'sidex.indexing.autoIndex' }).then(raw => {
-			const autoIndexOff = raw === false || raw === 'false';
+		invoke('settings_get', { section: 'sidex.indexing.autoIndex' })
+			.then(raw => {
+				const autoIndexOff = raw === false || raw === 'false';
 
-			window.dispatchEvent(new CustomEvent('sidex-indexing-status', {
-				detail: { status: 'indexing', path: wsPath }
-			}));
+				window.dispatchEvent(
+					new CustomEvent('sidex-indexing-status', {
+						detail: { status: 'indexing', path: wsPath }
+					})
+				);
 
-			invoke('index_build', { root: wsPath }).then(() => {
-				if (!autoIndexOff) {
-					// Keep the index fresh: periodic incremental
-					// re-sync (Merkle diff makes unchanged syncs ~free).
-					this._startReindexInterval();
-				}
-			}).catch(err => {
-				console.error('[sidex-index] index build failed:', err);
-				window.dispatchEvent(new CustomEvent('sidex-indexing-status', {
-					detail: { status: 'error', path: wsPath, error: err }
-				}));
+				invoke('index_build', { root: wsPath })
+					.then(() => {
+						if (!autoIndexOff) {
+							// Keep the index fresh: periodic incremental
+							// re-sync (Merkle diff makes unchanged syncs ~free).
+							this._startReindexInterval();
+						}
+					})
+					.catch(err => {
+						console.error('[sidex-index] index build failed:', err);
+						window.dispatchEvent(
+							new CustomEvent('sidex-indexing-status', {
+								detail: { status: 'error', path: wsPath, error: err }
+							})
+						);
+					});
+			})
+			.catch(() => {
+				// Setting store unavailable — still build the local index.
+				invoke('index_build', { root: wsPath }).catch(() => {
+					/* logged in Rust */
+				});
 			});
-		}).catch(() => {
-			// Setting store unavailable — still build the local index.
-			invoke('index_build', { root: wsPath }).catch(() => { /* logged in Rust */ });
-		});
 	}
 
 	/** Debounced incremental re-index (after agent edits). */
 	private _scheduleReindex(): void {
-		if (this._reindexTimer) { clearTimeout(this._reindexTimer); }
+		if (this._reindexTimer) {
+			clearTimeout(this._reindexTimer);
+		}
 		this._reindexTimer = setTimeout(() => {
 			this._reindexTimer = undefined;
 			this._runReindex();
@@ -1965,14 +2253,18 @@ ${prompt}`,
 
 	/** Periodic catch-all re-index for edits made outside the agent. */
 	private _startReindexInterval(): void {
-		if (this._reindexInterval) { return; }
+		if (this._reindexInterval) {
+			return;
+		}
 		this._reindexInterval = setInterval(() => this._runReindex(), 5 * 60_000);
 	}
 
 	private _runReindex(): void {
 		const invoke = SidexChatService._getTauriInvoke();
 		const wsPath = this.workspacePath;
-		if (!invoke || !wsPath || wsPath === '.') { return; }
+		if (!invoke || !wsPath || wsPath === '.') {
+			return;
+		}
 		invoke('index_build', { root: wsPath }).catch(() => {
 			// Non-fatal: the next interval/edit will retry.
 		});
@@ -1982,14 +2274,16 @@ ${prompt}`,
 		if (!LOCAL_TOOLS_SUPPORTED() || !this._contextIndexed) {
 			return;
 		}
-		this._localExecutor.execute({
-			type: 'tool_request',
-			tool_call_id: `ctx-watch-${Date.now()}`,
-			name: 'context_watch',
-			arguments: '{}',
-		}).catch(() => {
-			// File watcher failed to start — incremental indexing unavailable
-		});
+		this._localExecutor
+			.execute({
+				type: 'tool_request',
+				tool_call_id: `ctx-watch-${Date.now()}`,
+				name: 'context_watch',
+				arguments: '{}'
+			})
+			.catch(() => {
+				// File watcher failed to start — incremental indexing unavailable
+			});
 	}
 
 	/** Re-fetch and re-filter the model list. Call after toggling models in Settings. */
@@ -2001,25 +2295,33 @@ ${prompt}`,
 	}
 
 	private _fetchOsInfo(): void {
-		const invoke = (globalThis as { __TAURI_INTERNALS__?: { invoke: (cmd: string) => Promise<unknown> } }).__TAURI_INTERNALS__?.invoke;
-		if (!invoke) { return; }
-		invoke('get_os_info').then((info: unknown) => {
-			const os = info as { platform?: string; arch?: string; hostname?: string };
-			if (os) {
-				const shell = os.platform === 'windows' ? 'powershell' : 'zsh';
-				// Format like Cursor: "darwin 25.4.0" or "win32 10.0.22000"
-				const platformStr = os.platform === 'macos'
-					? `macOS (Apple Silicon)` // aarch64 = Apple Silicon
-					: os.platform === 'windows'
-						? `Windows (${os.arch})`
-						: `Linux (${os.arch})`;
-				this._osInfo = {
-					platform: platformStr,
-					arch: os.arch || 'unknown',
-					shell,
-				};
-			}
-		}).catch(() => { /* not critical */ });
+		const invoke = (globalThis as { __TAURI_INTERNALS__?: { invoke: (cmd: string) => Promise<unknown> } })
+			.__TAURI_INTERNALS__?.invoke;
+		if (!invoke) {
+			return;
+		}
+		invoke('get_os_info')
+			.then((info: unknown) => {
+				const os = info as { platform?: string; arch?: string; hostname?: string };
+				if (os) {
+					const shell = os.platform === 'windows' ? 'powershell' : 'zsh';
+					// Format like Cursor: "darwin 25.4.0" or "win32 10.0.22000"
+					const platformStr =
+						os.platform === 'macos'
+							? `macOS (Apple Silicon)` // aarch64 = Apple Silicon
+							: os.platform === 'windows'
+								? `Windows (${os.arch})`
+								: `Linux (${os.arch})`;
+					this._osInfo = {
+						platform: platformStr,
+						arch: os.arch || 'unknown',
+						shell
+					};
+				}
+			})
+			.catch(() => {
+				/* not critical */
+			});
 	}
 
 	private _fetchServerInfo(): void {
@@ -2035,42 +2337,70 @@ ${prompt}`,
 			if (saved) {
 				this._serverModel = saved;
 			}
-		} catch { /* */ }
+		} catch {
+			/* */
+		}
 		if (!this._serverModel) {
 			this._serverModel = SidexChatService.DEFAULT_MODEL;
 		}
 
 		const httpUrl = this._serverUrl.replace(/^ws/, 'http');
-		const tauriInvoke = (globalThis as { __TAURI_INTERNALS__?: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__?.invoke;
+		const tauriInvoke = (
+			globalThis as {
+				__TAURI_INTERNALS__?: { invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> };
+			}
+		).__TAURI_INTERNALS__?.invoke;
 
 		Promise.all([
-			fetch(httpUrl + '/v1/models').then(r => r.json()).catch(() => []),
+			fetch(httpUrl + '/v1/models')
+				.then(r => r.json())
+				.catch(() => []),
 			tauriInvoke
 				? tauriInvoke('settings_get', { section: 'sidex.models.enabled' })
-					.then(raw => {
-						if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return null; } }
-						return raw;
-					})
-					.catch(() => null)
+						.then(raw => {
+							if (typeof raw === 'string') {
+								try {
+									return JSON.parse(raw);
+								} catch {
+									return null;
+								}
+							}
+							return raw;
+						})
+						.catch(() => null)
 				: Promise.resolve(null),
 			tauriInvoke
 				? tauriInvoke('settings_get', { section: 'sidex.models.custom' })
-					.then(raw => {
-						if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return null; } }
-						return raw;
-					})
-					.catch(() => null)
+						.then(raw => {
+							if (typeof raw === 'string') {
+								try {
+									return JSON.parse(raw);
+								} catch {
+									return null;
+								}
+							}
+							return raw;
+						})
+						.catch(() => null)
 				: Promise.resolve(null),
 			tauriInvoke
 				? tauriInvoke('settings_get', { section: 'sidex.general' })
-					.then(raw => {
-						if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return null; } }
-						return raw;
-					})
-					.catch(() => null)
-				: Promise.resolve(null),
+						.then(raw => {
+							if (typeof raw === 'string') {
+								try {
+									return JSON.parse(raw);
+								} catch {
+									return null;
+								}
+							}
+							return raw;
+						})
+						.catch(() => null)
+				: Promise.resolve(null)
 		]).then(([allModels, enabledRaw, customRaw, generalRaw]) => {
-			if (!Array.isArray(allModels)) { return; }
+			if (!Array.isArray(allModels)) {
+				return;
+			}
 
 			let defaultModelId = SidexChatService.DEFAULT_MODEL;
 			if (generalRaw && typeof generalRaw === 'object') {
@@ -2087,11 +2417,20 @@ ${prompt}`,
 				}
 			}
 
-			let models = (allModels as Array<{ id: string; name: string; provider: string; default?: boolean; context_window?: number; contextWindow?: number }>).map(m => ({
+			let models = (
+				allModels as Array<{
+					id: string;
+					name: string;
+					provider: string;
+					default?: boolean;
+					context_window?: number;
+					contextWindow?: number;
+				}>
+			).map(m => ({
 				id: m.id,
 				name: m.name,
 				provider: m.provider,
-				contextWindow: m.contextWindow || m.context_window || contextWindowForModel(m.id),
+				contextWindow: m.contextWindow || m.context_window || contextWindowForModel(m.id)
 			}));
 
 			// Custom models (arbitrary OpenRouter IDs added in Settings) are
@@ -2113,19 +2452,22 @@ ${prompt}`,
 			this._availableModels = models;
 			this._onDidChangeModels.fire(this._availableModels);
 
-		// Keep the user's pick when it is still in the live list. Anthropic
-		// returns Opus first; blindly adopting that on every fetch is how a
-		// connected Claude login ends up on a model the current window has
-		// already exhausted.
-		const effective = this._availableModels;
-		const stillOffered = effective.some(m => m.id === this._serverModel);
-		if (!stillOffered && effective.length > 0) {
-			const preferred = effective.find(m => /sonnet/i.test(m.id))
-				|| effective.find(m => /haiku/i.test(m.id))
-				|| effective[0];
-			this._serverModel = preferred.id;
-			try { localStorage.setItem(SidexChatService.MODEL_STORAGE_KEY, this._serverModel); } catch { /* */ }
-		}
+			// Keep the user's pick when it is still in the live list. Anthropic
+			// returns Opus first; blindly adopting that on every fetch is how a
+			// connected Claude login ends up on a model the current window has
+			// already exhausted.
+			const effective = this._availableModels;
+			const stillOffered = effective.some(m => m.id === this._serverModel);
+			if (!stillOffered && effective.length > 0) {
+				const preferred =
+					effective.find(m => /sonnet/i.test(m.id)) || effective.find(m => /haiku/i.test(m.id)) || effective[0];
+				this._serverModel = preferred.id;
+				try {
+					localStorage.setItem(SidexChatService.MODEL_STORAGE_KEY, this._serverModel);
+				} catch {
+					/* */
+				}
+			}
 		});
 	}
 }

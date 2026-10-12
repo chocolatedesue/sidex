@@ -275,7 +275,7 @@ export class MarkdownPreviewManager extends Disposable {
 							.map(r => r.path.split('/').pop() ?? r.path)
 							.slice(0, 10)
 							.join(', ')
-				  )
+					)
 		);
 		return references;
 	}
@@ -307,13 +307,10 @@ export class MarkdownPreviewManager extends Disposable {
 				extension: undefined
 			};
 
-			const input = this._webviewWorkbenchService.openWebview(
-				initInfo,
-				MARKDOWN_PREVIEW_VIEW_TYPE,
-				title,
-				undefined,
-				{ preserveFocus, group: side ? SIDE_GROUP : undefined }
-			);
+			const input = this._webviewWorkbenchService.openWebview(initInfo, MARKDOWN_PREVIEW_VIEW_TYPE, title, undefined, {
+				preserveFocus,
+				group: side ? SIDE_GROUP : undefined
+			});
 			if (!input) {
 				this._logService.warn('[Markdown Preview] Could not open the preview editor');
 				return;
@@ -332,9 +329,7 @@ export class MarkdownPreviewManager extends Disposable {
 				})
 			);
 
-			this._webviewDisposables.add(
-				input.webview.onMessage(event => this._onPreviewMessage(event.message))
-			);
+			this._webviewDisposables.add(input.webview.onMessage(event => this._onPreviewMessage(event.message)));
 
 			this._rememberOpenPreview(resource);
 		} else {
@@ -530,11 +525,7 @@ export class MarkdownPreviewManager extends Disposable {
 		);
 	}
 
-	private async _renderHtml(
-		text: string,
-		baseDir: URI,
-		token: CancellationTokenSource['token']
-	): Promise<string> {
+	private async _renderHtml(text: string, baseDir: URI, token: CancellationTokenSource['token']): Promise<string> {
 		const katexExtension = await this._getKatexExtension();
 
 		let body: string;
@@ -560,7 +551,7 @@ export class MarkdownPreviewManager extends Disposable {
 		const katexStyles = katexExtension
 			? `<link rel="stylesheet" href="${asWebviewUri(
 					URI.parse(resolveAmdNodeModulePath('katex', 'dist/katex.min.css'))
-			  ).toString(true)}">`
+				).toString(true)}">`
 			: '';
 
 		// Theme colours are injected by the webview host as live `--vscode-*`

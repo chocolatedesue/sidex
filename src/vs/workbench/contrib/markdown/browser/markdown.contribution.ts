@@ -112,22 +112,26 @@ CommandsRegistry.registerCommand('markdown.preview.refresh', accessor => {
 
 CommandsRegistry.registerCommand('markdown.preview.toggleLock', accessor => {
 	const locked = getOrCreateManager(accessor).toggleLock();
-	accessor.get(INotificationService).info(
-		locked
-			? localize('markdownPreviewLocked', 'Markdown preview locked — it no longer follows the document.')
-			: localize('markdownPreviewUnlocked', 'Markdown preview unlocked — it follows the document again.')
-	);
+	accessor
+		.get(INotificationService)
+		.info(
+			locked
+				? localize('markdownPreviewLocked', 'Markdown preview locked — it no longer follows the document.')
+				: localize('markdownPreviewUnlocked', 'Markdown preview unlocked — it follows the document again.')
+		);
 });
 
 CommandsRegistry.registerCommand('markdown.showPreviewSecuritySelector', accessor => {
 	const level = getOrCreateManager(accessor).cycleSecurityLevel();
-	accessor.get(INotificationService).info(
-		localize(
-			'markdownPreviewSecurity',
-			'Markdown preview content security level: {0}. Run the command again to change it.',
-			level
-		)
-	);
+	accessor
+		.get(INotificationService)
+		.info(
+			localize(
+				'markdownPreviewSecurity',
+				'Markdown preview content security level: {0}. Run the command again to change it.',
+				level
+			)
+		);
 });
 
 CommandsRegistry.registerCommand('markdown.findAllFileReferences', accessor => {

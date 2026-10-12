@@ -175,8 +175,13 @@ pub fn parse_args(args: &[String], cwd: &Path) -> OpenRequest {
                 }
             }
             // Options that take a value and are not part of folder interop.
-            "--user-data-dir" | "--extensions-dir" | "--locale" | "--profile"
-            | "--log" | "--extensions-download-dir" | "--shared-data-dir" => {
+            "--user-data-dir"
+            | "--extensions-dir"
+            | "--locale"
+            | "--profile"
+            | "--log"
+            | "--extensions-download-dir"
+            | "--shared-data-dir" => {
                 index += 1;
             }
             _ if arg.starts_with('-') => {
@@ -199,9 +204,7 @@ pub fn parse_args(args: &[String], cwd: &Path) -> OpenRequest {
                 } else if let Some(uri) = path_to_uri(arg, cwd) {
                     // A directory becomes the workspace, anything else opens as a file.
                     // A path that does not exist yet is treated as a file, like `code new.ts`.
-                    let is_dir = Path::new(arg)
-                        .is_dir()
-                        || cwd.join(arg).is_dir();
+                    let is_dir = Path::new(arg).is_dir() || cwd.join(arg).is_dir();
                     if is_dir {
                         request.folders.push(uri);
                     } else {
@@ -255,7 +258,11 @@ pub fn parse_deep_link(url: &str) -> OpenRequest {
             // Windows drive path (`/C:/x`) loses the artificial leading slash.
             let without_slash = &raw_path[1..];
             let is_windows_drive = without_slash.len() >= 2 && without_slash.as_bytes()[1] == b':';
-            let decoded = percent_decode(if is_windows_drive { without_slash } else { raw_path });
+            let decoded = percent_decode(if is_windows_drive {
+                without_slash
+            } else {
+                raw_path
+            });
             match host {
                 "folder" | "workspace" => {
                     if let Some(uri) = path_to_uri(&decoded, Path::new(".")) {
@@ -318,21 +325,21 @@ impl CliState {
 
 /// Store the request and notify the frontend. Safe to call from any thread.
 pub fn dispatch(app: &AppHandle, request: OpenRequest) {
-	if request.is_empty() {
-		return;
-	}
-	log::info!(
-		"open request: {} folder(s), {} file(s), source={:?}",
-		request.folders.len(),
-		request.files.len(),
-		request.source
-	);
-	if let Some(state) = app.try_state::<CliState>() {
-		state.set(request.clone());
-	}
-	if let Err(err) = app.emit(OPEN_EVENT, &request) {
-		log::warn!("could not emit {OPEN_EVENT}: {err}");
-	}
+    if request.is_empty() {
+        return;
+    }
+    log::info!(
+        "open request: {} folder(s), {} file(s), source={:?}",
+        request.folders.len(),
+        request.files.len(),
+        request.source
+    );
+    if let Some(state) = app.try_state::<CliState>() {
+        state.set(request.clone());
+    }
+    if let Err(err) = app.emit(OPEN_EVENT, &request) {
+        log::warn!("could not emit {OPEN_EVENT}: {err}");
+    }
 }
 
 /// `sidex_take_open_request` — the frontend calls this once on start-up to pick
@@ -368,7 +375,10 @@ mod tests {
 
     #[test]
     fn absolute_uri_passthrough() {
-        let request = parse_args(&["file:///tmp/demo.md".to_string()], &PathBuf::from("/work"));
+        let request = parse_args(
+            &["file:///tmp/demo.md".to_string()],
+            &PathBuf::from("/work"),
+        );
         assert_eq!(request.files, vec!["file:///tmp/demo.md".to_string()]);
     }
 
@@ -414,7 +424,10 @@ mod tests {
         );
         assert_eq!(
             request.diff,
-            Some(["file:///work/a.ts".to_string(), "file:///work/b.ts".to_string()])
+            Some([
+                "file:///work/a.ts".to_string(),
+                "file:///work/b.ts".to_string()
+            ])
         );
     }
 
@@ -429,7 +442,10 @@ mod tests {
     #[test]
     fn deep_link_path_style_decodes_percent_escapes() {
         let request = parse_deep_link("sidex://folder/tmp/my%20project");
-        assert_eq!(request.folders, vec!["file:///tmp/my%20project".to_string()]);
+        assert_eq!(
+            request.folders,
+            vec!["file:///tmp/my%20project".to_string()]
+        );
     }
 
     #[test]
