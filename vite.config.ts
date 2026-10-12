@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import * as path from 'path';
 import { nlsPlugin } from './scripts/vite-plugin-nls';
+import { sidexFsBridge } from './scripts/vite-plugin-sidex-fs-bridge';
 
 function quietMissingSourceMaps() {
   const skip = [/\/vscode-textmate\/.*\.js\.map$/];
@@ -24,7 +25,7 @@ export default defineConfig({
   clearScreen: false,
   assetsInclude: ['**/*.wasm', '**/*.json', '**/*.tmLanguage.json'],
   publicDir: 'public',
-  plugins: [nlsPlugin(), quietMissingSourceMaps()],
+  plugins: [nlsPlugin(), quietMissingSourceMaps(), sidexFsBridge()],
   server: {
     port: 1420,
     strictPort: true,

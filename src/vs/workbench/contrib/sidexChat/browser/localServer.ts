@@ -19,6 +19,18 @@ export interface IServerEndpoint {
 /** Fired once the server has been restarted and its endpoint re-resolved. */
 export const SERVER_RESTARTED_EVENT = 'sidex-server-restarted';
 
+/**
+ * Single switch for every AI surface that would otherwise touch the network on
+ * launch: the built-in agent panel (`sidexChat`), the local `sidex-server`
+ * process behind it, and inline completions (`sidexComplete`).
+ *
+ * Defaults to `false`. An editor launch must not spawn an agent server, probe
+ * `/v1/models` or keep a WebSocket open for a feature the user has not asked
+ * for; enabling the panel turns the whole stack on, and the choice is
+ * remembered.
+ */
+export const SIDEX_CHAT_ENABLED_SETTING = 'sidex.chat.enabled';
+
 type Invoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
 function getTauriInvoke(): Invoke | null {
@@ -142,10 +154,31 @@ export function resolveServerEndpoint(): Promise<IServerEndpoint> {
 }
 
 /**
+ * Ask the Rust side to start the agent server, then resolve its endpoint.
+ *
+ * This is the *only* thing that spawns `sidex-server`. It is called when the AI
+ * stack is switched on, never during a normal launch: starting an editor should
+ * not cost an extra process plus a health check. Idempotent — a second call
+ * while it is already running just returns the current endpoint.
+ */
+export async function ensureServerStarted(): Promise<IServerEndpoint> {
+	const invoke = getTauriInvoke();
+	if (!invoke) {
+		return cached;
+	}
+	try {
+		applyEndpoint(await invoke('server_ensure_started'));
+	} catch {
+		// Leave the cache alone: a failed IPC call is not an answer about the
+		// server's state. `resolveServerEndpoint` will retry on demand.
+	}
+	return cached;
+}
+
+/**
  * Restart the server so newly-saved provider credentials are picked up, then
  * refresh the cached endpoint (the port changes across restarts).
- */
-export async function restartServer(): Promise<IServerEndpoint> {
+ */export async function restartServer(): Promise<IServerEndpoint> {
 	const invoke = getTauriInvoke();
 	if (!invoke) {
 		return cached;

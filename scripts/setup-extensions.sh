@@ -5,7 +5,28 @@ VSCODE_VERSION="1.115.0"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXTENSIONS_DIR="$REPO_ROOT/extensions"
 
+# Copilot is not part of a SideX install: the upstream built-in expects a
+# Microsoft account and a hosted service, and SideX ships no model provider of
+# its own. Dropping it here keeps `npm run setup` from silently installing an
+# extension that can only show "sign in to use Copilot".
+EXCLUDED_EXTENSIONS=("copilot" "copilot-chat" "github-copilot" "copilot-chat-prerelease")
+
+prune_excluded_extensions() {
+  local removed=0
+  local name
+  for name in "${EXCLUDED_EXTENSIONS[@]}"; do
+    if [[ -e "$EXTENSIONS_DIR/$name" ]]; then
+      rm -rf "$EXTENSIONS_DIR/$name"
+      removed=$((removed + 1))
+    fi
+  done
+  if [[ "$removed" -gt 0 ]]; then
+    echo "Removed $removed Copilot extension(s) from the bundle (off by default in SideX)."
+  fi
+}
+
 if [[ -d "$EXTENSIONS_DIR" && "$(ls -A "$EXTENSIONS_DIR" 2>/dev/null | wc -l)" -gt 10 ]]; then
+  prune_excluded_extensions
   echo "extensions/ already populated ($(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') entries) — skipping."
   exit 0
 fi
@@ -26,6 +47,7 @@ for candidate in "${VSCODE_CANDIDATES[@]}"; do
     echo "Found VSCode extensions at: $candidate"
     echo "Copying built-in extensions..."
     cp -r "$candidate"/. "$EXTENSIONS_DIR/"
+    prune_excluded_extensions
     echo "Copied $(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') extensions."
     exit 0
   fi
@@ -43,5 +65,6 @@ curl -L --progress-bar \
 echo "Extracting extensions..."
 tar -xzf "$TMP_DIR/vscode.tar.gz" -C "$TMP_DIR" "vscode-${VSCODE_VERSION}/extensions"
 cp -r "$TMP_DIR/vscode-${VSCODE_VERSION}/extensions/." "$EXTENSIONS_DIR/"
+prune_excluded_extensions
 
 echo "Done — $(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') extensions installed."

@@ -71,8 +71,7 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor): Promise<void> {
-		const layoutService = accessor.get(IWorkbenchLayoutService);
-		layoutService.setPartHidden(layoutService.isVisible(Parts.SIDEX_PART), Parts.SIDEX_PART);
+		toggleSidexChatPanel(accessor);
 	}
 });
 
@@ -85,20 +84,91 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor): Promise<void> {
-		const layoutService = accessor.get(IWorkbenchLayoutService);
-		const isVisible = layoutService.isVisible(Parts.SIDEX_PART);
-		layoutService.setPartHidden(isVisible, Parts.SIDEX_PART);
+		toggleSidexChatPanel(accessor);
 	}
 });
+
+/**
+ * Flip the panel and remember the choice: turning the panel on enables the
+ * setting, turning it off disables it, so the next launch matches the last state.
+ */
+function toggleSidexChatPanel(accessor: ServicesAccessor): void {
+	const layoutService = accessor.get(IWorkbenchLayoutService);
+	const configurationService = accessor.get(IConfigurationService);
+	const willShow = !layoutService.isVisible(Parts.SIDEX_PART);
+	layoutService.setPartHidden(!willShow, Parts.SIDEX_PART);
+	configurationService.updateValue(SIDEX_CHAT_ENABLED_SETTING, willShow);
+}
 
 // Register the status bar entries on startup
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+import {
+	Extensions as ConfigurationExtensions,
+	IConfigurationRegistry
+} from '../../../../platform/configuration/common/configurationRegistry.js';
 import { ICodeEditorService } from '../../../../editor/browser/services/codeEditorService.js';
 import { InlineEditController } from './inline/inlineEditController.js';
 import { isCodeEditor } from '../../../../editor/browser/editorBrowser.js';
 import { EditorContextKeys } from '../../../../editor/common/editorContextKeys.js';
+import { SIDEX_CHAT_ENABLED_SETTING } from './localServer.js';
+
+/**
+ * The Sidex AI panel is off until it is asked for. It used to be the default
+ * container of its part, so every launch opened a chat panel that could not
+ * talk to anything until a model provider was configured.
+ *
+ * The same setting drives the whole AI stack — see `localServer.ts`: with it
+ * off, no agent-server process is spawned, no model list is probed and no
+ * socket is opened, and the inline-completion provider is not registered.
+ * The status bar / Cmd+Shift+I toggles flip it, so a user who wants the panel
+ * gets it back on the next launch too.
+ */
+Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerConfiguration({
+	id: 'sidexChat',
+	order: 20,
+	title: nls.localize('sidexChatConfigurationTitle', 'Sidex AI'),
+	type: 'object',
+	properties: {
+		[SIDEX_CHAT_ENABLED_SETTING]: {
+			type: 'boolean',
+			default: false,
+			description: nls.localize(
+				'sidex.chat.enabled',
+				'Show the Sidex AI panel. Off by default — turn it on to use the built-in agent.'
+			)
+		}
+	}
+});
+
+class SidexChatVisibilityContribution implements IWorkbenchContribution {
+	static readonly ID = 'sidex.chat.visibility';
+
+	constructor(
+		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
+		@IConfigurationService private readonly configurationService: IConfigurationService
+	) {
+		this._apply();
+		this.configurationService.onDidChangeConfiguration(e => {
+			if (e.affectsConfiguration(SIDEX_CHAT_ENABLED_SETTING)) {
+				this._apply();
+			}
+		});
+	}
+
+	private _apply(): void {
+		const enabled = this.configurationService.getValue<boolean>(SIDEX_CHAT_ENABLED_SETTING) === true;
+		this.layoutService.setPartHidden(!enabled, Parts.SIDEX_PART);
+	}
+}
+
+registerWorkbenchContribution2(
+	SidexChatVisibilityContribution.ID,
+	SidexChatVisibilityContribution,
+	WorkbenchPhase.AfterRestored
+);
+
 
 class SidexStatusBarContribution implements IWorkbenchContribution {
 	static readonly ID = 'sidex.statusbar';

@@ -14,7 +14,13 @@ import { isCodeEditor } from '../../../../editor/browser/editorBrowser.js';
 import { LocalToolExecutor, ILocalToolRequest, LOCAL_TOOLS_SUPPORTED } from './localToolExecutor.js';
 import { SubagentRegistry, SubagentType, SUBAGENT_CONFIGS, getAllowedTools, buildSubagentPrompt } from './subagentTypes.js';
 import { IExplorerService } from '../../files/browser/files.js';
-import { resolveServerEndpoint, serverWsUrl, SERVER_RESTARTED_EVENT } from './localServer.js';
+import {
+	ensureServerStarted,
+	resolveServerEndpoint,
+	serverWsUrl,
+	SERVER_RESTARTED_EVENT,
+	SIDEX_CHAT_ENABLED_SETTING
+} from './localServer.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
 import { IUpdateService } from '../../../../platform/update/common/update.js';
 import { IRecentEditTracker } from '../../sidexComplete/browser/recentEditTracker.js';
@@ -270,10 +276,6 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 
 		// Fetch real OS info from Tauri
 		this._fetchOsInfo();
-		
-		// Fetch models immediately, don't wait for WebSocket
-		this._fetchServerInfo();
-
 
 		// A restart we asked for is not an outage: drop the dead socket and
 		// reconnect straight away instead of backing off.
@@ -287,12 +289,19 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 		window.addEventListener(SERVER_RESTARTED_EVENT, onServerRestarted);
 		this._register({ dispose: () => window.removeEventListener(SERVER_RESTARTED_EVENT, onServerRestarted) });
 
-		// Give the local server a moment to bind its port before connecting.
-		setTimeout(() => {
-			if (this._connectionState === 'disconnected') {
-				this.connect();
-			}
-		}, 1500);
+		// Everything below talks to the local agent server. That is opt-in
+		// (see `SIDEX_CHAT_ENABLED_SETTING`): a normal launch must not spawn
+		// the server, probe `/v1/models` or hold a WebSocket open. Enabling the
+		// AI panel starts the stack, and the setting is watched so flipping it
+		// in Settings takes effect without a reload.
+		this._register(
+			this.configurationService.onDidChangeConfiguration(e => {
+				if (e.affectsConfiguration(SIDEX_CHAT_ENABLED_SETTING)) {
+					this._startAiStackIfEnabled();
+				}
+			})
+		);
+		this._startAiStackIfEnabled();
 
 		// Workspace indexing is a LOCAL feature — it must run regardless of
 		// sign-in state or chat-socket connectivity. (It previously only
@@ -302,6 +311,31 @@ export class SidexChatService extends Disposable implements ISidexChatService {
 			this._contextIndexed = false;
 			this._triggerWorkspaceIndexing();
 		}));
+	}
+
+	private _aiStackStarted = false;
+
+	/**
+	 * Spin up the agent server and connect to it — once, and only when the AI
+	 * stack is enabled. Does nothing on a plain editor launch.
+	 */
+	private _startAiStackIfEnabled(): void {
+		if (this._aiStackStarted || !this.configurationService.getValue<boolean>(SIDEX_CHAT_ENABLED_SETTING)) {
+			return;
+		}
+		this._aiStackStarted = true;
+
+		// `server_ensure_started` is what spawns the process; the endpoint it
+		// returns carries the port the supervisor reserved.
+		void ensureServerStarted().then(() => {
+			this._fetchServerInfo();
+			// Give the server a moment to finish binding before connecting.
+			setTimeout(() => {
+				if (this._connectionState === 'disconnected') {
+					this.connect();
+				}
+			}, 500);
+		});
 	}
 
 	/** Kick off local workspace indexing. */

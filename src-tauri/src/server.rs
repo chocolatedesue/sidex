@@ -569,11 +569,42 @@ fn start(app: &AppHandle, server: &Arc<LocalServer>) {
     std::thread::spawn(move || run_supervised(&server, &bin, &provider_env, port, generation));
 }
 
-/// Register the supervisor and start the server. Called once during setup.
-pub fn initialize(app: &AppHandle) {
+/// Register the supervisor without starting anything.
+///
+/// Startup used to spawn `sidex-server` unconditionally, which cost an extra
+/// process (plus a health check and a reserved port) on every launch even
+/// though the AI panel is opt-in. The state is now registered here and the
+/// process is only spawned by [`ensure_started`], which the frontend calls when
+/// the AI stack is switched on.
+pub fn register(app: &AppHandle) {
     let server = Arc::new(LocalServer::new());
     app.manage(Arc::clone(&server));
-    start(app, &server);
+}
+
+/// Start the server if it isn't running yet, and report where it landed.
+/// Idempotent: calling it twice does not spawn a second process.
+pub fn ensure_started(app: &AppHandle) -> ServerEndpoint {
+    let Some(server) = app.try_state::<Arc<LocalServer>>() else {
+        return ServerEndpoint {
+            ws_url: String::new(),
+            http_url: String::new(),
+            port: 0,
+            running: false,
+            error: Some("local server is not registered".to_string()),
+        };
+    };
+    let server = Arc::clone(server.inner());
+    if !server.is_running() {
+        start(app, &server);
+    }
+    server.endpoint()
+}
+
+/// `server_ensure_started` — spawn the agent server on demand (see [`register`]).
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn server_ensure_started(app: AppHandle) -> ServerEndpoint {
+    ensure_started(&app)
 }
 
 /// Restart the server so newly-saved provider credentials take effect.

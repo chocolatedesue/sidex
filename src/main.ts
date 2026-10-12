@@ -25,6 +25,110 @@ function navigateToFolder(folderUri: string) {
 	window.location.href = url.toString();
 }
 
+//#region --- command line / deep link interop ---------------------------------
+//
+// The Rust backend normalises `sidex .`, `sidex file.md`, `--folder-uri`,
+// `--file-uri`, `--goto`, a second-instance launch, and `sidex://` deep links
+// into one request shape (see src-tauri/src/cli.rs). Everything below turns
+// that request into either a navigation (new workspace) or a live command
+// (open a file in the already-open window).
+//
+// The same shape is accepted from the URL (`?folder=&file=&goto=`), which is
+// what makes the flow testable in the browser build.
+
+interface SideXOpenRequest {
+	folders?: string[];
+	files?: string[];
+	goto?: { path: string; line: number; character: number } | null;
+	newWindow?: boolean;
+	reuseWindow?: boolean;
+	addToWorkspace?: boolean;
+	wait?: boolean;
+	url?: string | null;
+	source?: string | null;
+}
+
+interface WorkbenchHandle {
+	create: (container: HTMLElement, options: unknown) => unknown;
+	commands: { executeCommand: (command: string, ...args: unknown[]) => Promise<unknown> };
+}
+
+async function openFileInWorkbench(workbench: WorkbenchHandle, fileUri: string, goto?: SideXOpenRequest['goto']) {
+	const { URI } = await import('./vs/base/common/uri.js');
+	if (goto) {
+		// `_workbench.open` is the internal form of `vscode.open` that also
+		// accepts editor options, so `--goto file:line` can be honoured in the
+		// same call (the public `vscode.open` drops everything after the URI).
+		const selection = {
+			startLineNumber: goto.line,
+			startColumn: goto.character,
+			endLineNumber: goto.line,
+			endColumn: goto.character
+		};
+		await workbench.commands.executeCommand('_workbench.open', URI.parse(fileUri), [undefined, { selection }]);
+		return;
+	}
+	await workbench.commands.executeCommand('vscode.open', URI.parse(fileUri));
+}
+
+/** Apply a request against a workbench that is already running. */
+async function applyOpenRequest(workbench: WorkbenchHandle, request: SideXOpenRequest): Promise<boolean> {
+	const targetFolder = request.folders?.[0];
+	const currentFolder = new URL(window.location.href).searchParams.get('folder');
+
+	if (targetFolder && targetFolder !== currentFolder && !request.addToWorkspace) {
+		navigateToFolder(targetFolder);
+		return true;
+	}
+
+	const files = request.files ?? [];
+	if (files.length > 0) {
+		for (const file of files) {
+			await openFileInWorkbench(workbench, file, request.goto ?? undefined);
+		}
+		return true;
+	}
+
+	if (request.goto) {
+		await openFileInWorkbench(workbench, request.goto.path, request.goto);
+		return true;
+	}
+
+	return false;
+}
+
+/** Listen for open requests coming from the Rust side (`sidex://open`). */
+function setupOpenRequestListener(workbench: WorkbenchHandle) {
+	import('@tauri-apps/api/event')
+		.then(({ listen }) =>
+			listen<SideXOpenRequest>('sidex://open', event => {
+				applyOpenRequest(workbench, event.payload).catch(err =>
+					console.warn('[SideX] failed to apply open request', err)
+				);
+			})
+		)
+		.catch(() => {
+			/* browser build without the Tauri event bridge */
+		});
+}
+
+/** Pick up a request that arrived before this webview registered its listener. */
+function consumePendingOpenRequest(workbench: WorkbenchHandle) {
+	import('@tauri-apps/api/core')
+		.then(({ invoke }) =>
+			invoke<SideXOpenRequest | null>('sidex_take_open_request').then(request => {
+				if (request) {
+					return applyOpenRequest(workbench, request);
+				}
+				return false;
+			})
+		)
+		.catch(() => {
+			/* not running under Tauri */
+		});
+}
+//#endregion
+
 async function boot() {
 	// Load locale translations before any VS Code module imports
 	await loadNlsMessages();
@@ -77,7 +181,8 @@ async function boot() {
 		console.log('[SideX] Rust bridge services initialized');
 	}
 
-	const { create } = await import('./vs/workbench/browser/web.factory.js');
+	const webFactory = await import('./vs/workbench/browser/web.factory.js');
+	const { create } = webFactory;
 	const { URI } = await import('./vs/base/common/uri.js');
 
 	if (document.readyState === 'loading') {
@@ -86,6 +191,8 @@ async function boot() {
 
 	const urlParams = new URLSearchParams(window.location.search);
 	const folderParam = urlParams.get('folder');
+	const fileParam = urlParams.get('file');
+	const gotoLineParam = Number(urlParams.get('goto') ?? '0');
 
 	let workspace: any = undefined;
 	if (folderParam) {
@@ -93,7 +200,18 @@ async function boot() {
 		if (parsed.scheme === 'file' || parsed.scheme === 'vscode-remote' || parsed.scheme === 'vscode-vfs') {
 			workspace = { folderUri: parsed };
 		}
+	} else if (fileParam) {
+		// `sidex file.md` — give the editor a folder root derived from the file,
+		// then open the file itself once the workbench is up.
+		const parsedFile = URI.parse(fileParam);
+		const parent = URI.joinPath(parsedFile, '..');
+		if (parent.path !== parsedFile.path) {
+			workspace = { folderUri: parent };
+		}
 	}
+
+	const initialGoto =
+		fileParam && gotoLineParam > 0 ? { path: fileParam, line: gotoLineParam, character: 1 } : undefined;
 
 	const options: any = {
 		initialColorTheme: {
@@ -154,6 +272,11 @@ async function boot() {
 			'workbench.settings.enableNaturalLanguageSearch': false,
 			'chat.editor.enabled': false,
 			'chat.commandCenter.enabled': false,
+			// Copilot / AI surfaces are off unless the user opts in. SideX ships
+			// no model provider out of the box, so an enabled chat surface only
+			// shows "unable to reach model". `sidex.chat.enabled` (the built-in
+			// agent panel) defaults to false as well.
+			'chat.disableAIFeatures': true,
 			'editor.bracketPairColorization.enabled': true,
 			'editor.guides.bracketPairs': true,
 			'editor.linkedEditing': true,
@@ -206,10 +329,20 @@ async function boot() {
 	};
 
 	const workbenchContainer = document.getElementById('workbench');
+	const workbenchHandle = { create, commands: webFactory.commands };
 	if (workbenchContainer) {
 		create(workbenchContainer, options);
 	} else {
 		create(document.body, options);
+	}
+
+	// Command line / deep link entry points (see src-tauri/src/cli.rs).
+	setupOpenRequestListener(workbenchHandle);
+	consumePendingOpenRequest(workbenchHandle);
+	if (fileParam) {
+		openFileInWorkbench(workbenchHandle, fileParam, initialGoto).catch(err =>
+			console.warn('[SideX] could not open the file from the command line:', err)
+		);
 	}
 
 	setupTauriExternalOpener();
@@ -220,7 +353,10 @@ async function boot() {
 	updateNativeMenuLabels();
 
 	console.log(
-		'[SideX] Workbench created' + (folderParam ? ` (folder: ${folderParam})` : ' (no folder)'),
+		'[SideX] Workbench created' +
+			(folderParam ? ` (folder: ${folderParam})` : ' (no folder)') +
+			(fileParam ? ` (file: ${fileParam})` : '') +
+			(initialGoto ? ` (goto: ${initialGoto.line})` : ''),
 		'workspace:',
 		workspace
 	);

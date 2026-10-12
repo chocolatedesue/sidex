@@ -36,6 +36,21 @@ if (fs.existsSync('extensions-meta.json')) {
 }
 console.log('Post-build: copied extensions\n');
 
+// KaTeX is loaded the way VS Code loads AMD node modules: the workbench asks
+// for `vs/../../node_modules/katex/dist/...`, which resolves to
+// `<root>/node_modules/katex/dist/...`. Vite serves that from the project in
+// dev, but a production build has no `node_modules`, so the markdown preview
+// lost its math. Copy the runtime files (js, css and the fonts the css pulls
+// in) next to the built app.
+const KATEX_SRC = path.join('node_modules', 'katex', 'dist');
+const KATEX_DEST = path.join(DIST_DIR, 'node_modules', 'katex', 'dist');
+if (fs.existsSync(KATEX_SRC)) {
+  fs.cpSync(KATEX_SRC, KATEX_DEST, { recursive: true, force: true });
+  console.log(`Post-build: copied katex runtime to ${KATEX_DEST}\n`);
+} else {
+  console.warn('Post-build: node_modules/katex not found — markdown math will not render in this build\n');
+}
+
 // Calculate bundle sizes
 const js = getFileSizes(ASSETS_DIR, '.js');
 const css = getFileSizes(ASSETS_DIR, '.css');

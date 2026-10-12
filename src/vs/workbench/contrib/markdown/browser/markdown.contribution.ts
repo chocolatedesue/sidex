@@ -7,9 +7,16 @@ import '../common/markdownColors.js';
 import './media/markdown.css';
 
 import { Disposable } from '../../../../base/common/lifecycle.js';
+import { localize, localize2 } from '../../../../nls.js';
+import { MenuId, MenuRegistry } from '../../../../platform/actions/common/actions.js';
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
+import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
 import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
+import { KeybindingsRegistry, KeybindingWeight } from '../../../../platform/keybinding/common/keybindingsRegistry.js';
+import { INotificationService } from '../../../../platform/notification/common/notification.js';
 import { IStorageService } from '../../../../platform/storage/common/storage.js';
+import { KeyCode, KeyMod } from '../../../../base/common/keyCodes.js';
+import { Codicon } from '../../../../base/common/codicons.js';
 import { EditorInput } from '../../../common/editor/editorInput.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import {
@@ -84,44 +91,127 @@ class MarkdownPreviewAutoReopen extends Disposable implements IWorkbenchContribu
 registerWorkbenchContribution2(MarkdownPreviewAutoReopen.ID, MarkdownPreviewAutoReopen, WorkbenchPhase.BlockStartup);
 
 CommandsRegistry.registerCommand('markdown.showPreview', accessor => {
-	const manager = getOrCreateManager(accessor);
-	manager.showPreview();
+	getOrCreateManager(accessor).showPreview();
 });
 
 CommandsRegistry.registerCommand('markdown.showPreviewToSide', accessor => {
-	const manager = getOrCreateManager(accessor);
-	manager.showPreview(true);
+	getOrCreateManager(accessor).showPreview(true);
 });
 
-CommandsRegistry.registerCommand('markdown.showSource', _accessor => {
-	// TODO: implement show source
+CommandsRegistry.registerCommand('markdown.showSource', accessor => {
+	getOrCreateManager(accessor).showSource();
 });
 
 CommandsRegistry.registerCommand('markdown.togglePreview', accessor => {
-	const manager = getOrCreateManager(accessor);
-	manager.toggle();
+	getOrCreateManager(accessor).toggle();
 });
 
-CommandsRegistry.registerCommand('markdown.preview.refresh', _accessor => {
-	// TODO: implement refresh
+CommandsRegistry.registerCommand('markdown.preview.refresh', accessor => {
+	getOrCreateManager(accessor).refresh();
 });
 
-CommandsRegistry.registerCommand('markdown.preview.toggleLock', _accessor => {
-	// TODO: implement toggle lock
+CommandsRegistry.registerCommand('markdown.preview.toggleLock', accessor => {
+	const locked = getOrCreateManager(accessor).toggleLock();
+	accessor.get(INotificationService).info(
+		locked
+			? localize('markdownPreviewLocked', 'Markdown preview locked — it no longer follows the document.')
+			: localize('markdownPreviewUnlocked', 'Markdown preview unlocked — it follows the document again.')
+	);
 });
 
-CommandsRegistry.registerCommand('markdown.showPreviewSecuritySelector', _accessor => {
-	// TODO: implement security selector
+CommandsRegistry.registerCommand('markdown.showPreviewSecuritySelector', accessor => {
+	const level = getOrCreateManager(accessor).cycleSecurityLevel();
+	accessor.get(INotificationService).info(
+		localize(
+			'markdownPreviewSecurity',
+			'Markdown preview content security level: {0}. Run the command again to change it.',
+			level
+		)
+	);
 });
 
-CommandsRegistry.registerCommand('markdown.findAllFileReferences', _accessor => {
-	// TODO: implement find references
+CommandsRegistry.registerCommand('markdown.findAllFileReferences', accessor => {
+	getOrCreateManager(accessor).findAllFileReferences();
 });
 
-CommandsRegistry.registerCommand('markdown.reopenAsPreview', _accessor => {
-	// TODO: implement reopen as preview
+CommandsRegistry.registerCommand('markdown.reopenAsPreview', accessor => {
+	getOrCreateManager(accessor).showPreview();
 });
 
-CommandsRegistry.registerCommand('markdown.reopenAsSource', _accessor => {
-	// TODO: implement reopen as source
+CommandsRegistry.registerCommand('markdown.reopenAsSource', accessor => {
+	getOrCreateManager(accessor).showSource();
+});
+
+// The markdown preview commands normally come from the `markdown-language-features`
+// built-in extension. Since that extension only registers them when its extension
+// host runs, the standalone preview registers its own palette entries, editor
+// title action and keybindings so the feature is reachable on its own.
+//
+// The `when` clause accepts the file extension as well as the language id: the
+// `markdown` language itself is contributed by a built-in extension, so a plain
+// `.md` file has no language id until the extension host is available.
+const MARKDOWN_LANG_WHEN = ContextKeyExpr.or(
+	ContextKeyExpr.equals('editorLangId', 'markdown'),
+	ContextKeyExpr.equals('resourceExtname', '.md'),
+	ContextKeyExpr.equals('resourceExtname', '.markdown')
+);
+
+const markdownPaletteCommands: { id: string; title: string }[] = [
+	{ id: 'markdown.showPreview', title: localize2('mdShowPreview', 'Open Preview').value },
+	{ id: 'markdown.showPreviewToSide', title: localize2('mdShowPreviewToSide', 'Open Preview to the Side').value },
+	{ id: 'markdown.togglePreview', title: localize2('mdTogglePreview', 'Toggle Preview').value },
+	{ id: 'markdown.showSource', title: localize2('mdShowSource', 'Show Source').value },
+	{ id: 'markdown.preview.refresh', title: localize2('mdRefreshPreview', 'Refresh Preview').value },
+	{ id: 'markdown.preview.toggleLock', title: localize2('mdToggleLock', 'Toggle Preview Lock').value },
+	{
+		id: 'markdown.showPreviewSecuritySelector',
+		title: localize2('mdSecuritySelector', 'Change Preview Security Settings').value
+	},
+	{
+		id: 'markdown.findAllFileReferences',
+		title: localize2('mdFindFileReferences', 'Find All File References').value
+	},
+	{ id: 'markdown.reopenAsPreview', title: localize2('mdReopenAsPreview', 'Reopen Editor With Preview').value },
+	{ id: 'markdown.reopenAsSource', title: localize2('mdReopenAsSource', 'Reopen Editor With Source').value }
+];
+
+for (const command of markdownPaletteCommands) {
+	MenuRegistry.appendMenuItem(MenuId.CommandPalette, {
+		command: { id: command.id, title: command.title, category: 'Markdown' },
+		when: MARKDOWN_LANG_WHEN
+	});
+}
+
+MenuRegistry.appendMenuItem(MenuId.EditorTitle, {
+	command: {
+		id: 'markdown.showPreviewToSide',
+		title: localize2('mdOpenPreviewToSide', 'Open Preview to the Side').value,
+		icon: Codicon.openPreview
+	},
+	group: 'navigation',
+	order: 10,
+	when: MARKDOWN_LANG_WHEN
+});
+
+KeybindingsRegistry.registerCommandAndKeybindingRule({
+	id: 'markdown.showPreviewToSide',
+	weight: KeybindingWeight.WorkbenchContrib,
+	when: MARKDOWN_LANG_WHEN,
+	primary: KeyMod.CtrlCmd | KeyCode.KeyK,
+	secondary: [KeyMod.CtrlCmd | KeyCode.KeyV],
+	mac: { primary: KeyMod.WinCtrl | KeyCode.KeyK, secondary: [KeyMod.CtrlCmd | KeyCode.KeyV] },
+	handler: accessor => {
+		getOrCreateManager(accessor).showPreview(true);
+	}
+});
+
+KeybindingsRegistry.registerCommandAndKeybindingRule({
+	id: 'markdown.togglePreview',
+	weight: KeybindingWeight.WorkbenchContrib,
+	when: MARKDOWN_LANG_WHEN,
+	primary: KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyV,
+	mac: { primary: KeyMod.WinCtrl | KeyMod.Shift | KeyCode.KeyV },
+	handler: accessor => {
+		getOrCreateManager(accessor).toggle();
+	}
 });

@@ -1,4 +1,5 @@
 mod app_dirs;
+mod cli;
 mod commands;
 mod server;
 
@@ -451,6 +452,18 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        // Folder/file interop, in the same three shapes VS Code supports:
+        // a second `sidex .` hands its argv to the running instance, and the OS
+        // can hand over a `sidex://` link. Both are normalised in `cli`.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            let cwd = std::path::PathBuf::from(cwd);
+            let args = argv.iter().skip(1).cloned().collect::<Vec<String>>();
+            let mut request = cli::parse_args(&args, &cwd);
+            request.source = Some(cli::OpenRequestSource::SecondInstance);
+            cli::dispatch(app, request);
+        }))
+        .plugin(tauri_plugin_deep_link::init())
+        .manage(cli::CliState::default())
         .manage(AuthState::new())
         .manage(UpdateManagerState::new())
         .manage(Arc::new(commands::extensions::MarketplaceClientState::new()))
@@ -659,6 +672,33 @@ pub fn run() {
                 )?;
             }
 
+            // --- command line / deep link entry points -------------------
+            // `sidex .`, `sidex file.md`, `--folder-uri`, `--goto`, and
+            // `sidex://...` all end up in the same `OpenRequest`, which the
+            // frontend consumes through the `sidex://open` event (or by calling
+            // `sidex_take_open_request` if the webview was not listening yet).
+            //
+            // This runs after the log plugin is installed so the parsed request
+            // shows up in the app log rather than being dropped on the floor.
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+
+                let handle = app.handle().clone();
+
+                #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+                if let Err(err) = app.deep_link().register_all() {
+                    log::warn!("could not register deep link handlers: {err}");
+                }
+
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        cli::dispatch(&handle, cli::parse_deep_link(url.as_str()));
+                    }
+                });
+
+                cli::dispatch_own_args(app.handle());
+            }
+
             #[allow(unexpected_cfgs)]
             {
                 #[cfg(feature = "devtools")]
@@ -668,10 +708,10 @@ pub fn run() {
             }
 
 
-            // Start the local agent server. Failure is non-fatal —
-            // the editor works without it, the chat panel just shows
-            // as disconnected.
-            server::initialize(app.handle());
+            // Register the local agent server supervisor only — the process
+            // itself is spawned by `server_ensure_started` when the AI stack is
+            // switched on. A plain editor launch must not pay for it.
+            server::register(app.handle());
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -684,10 +724,14 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            // Command line / deep link folder interop
+            cli::sidex_take_open_request,
             // AI Agent
             commands::agent::agent_execute_tool,
             // Local account, providers, and the local agent server
+            // Local agent server (opt-in: spawned on demand when AI is enabled)
             server::server_endpoint,
+            server::server_ensure_started,
             server::server_restart,
             commands::providers_catalog,
             commands::providers_status,

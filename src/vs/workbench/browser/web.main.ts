@@ -88,6 +88,7 @@ import {
 	IWorkspaceTrustManagementService
 } from '../../platform/workspace/common/workspaceTrust.js';
 import { TauriFileSystemProvider } from '../../platform/files/browser/tauriFileSystemProvider.js';
+import { WebFileSystemProvider } from '../../platform/files/browser/webFileSystemProvider.js';
 import { TauriUserDataProvider } from '../../platform/files/browser/tauriUserDataProvider.js';
 import { IOpenerService } from '../../platform/opener/common/opener.js';
 import { mixin, safeStringify } from '../../base/common/objects.js';
@@ -642,10 +643,14 @@ export class BrowserMain extends Disposable {
 		// scheme is persisted to the OS app-data directory so settings,
 		// extensions, themes, and keybindings survive refreshes.
 
+		// SideX: Distinguish "the Tauri runtime is actually there" from the
+		// `__SIDEX_TAURI__` feature flag set by index.html. When the frontend is
+		// opened in a plain browser there is no `invoke()`, so the Tauri
+		// providers would fail on every I/O — fall back to the dev-server HTTP
+		// bridge instead (see scripts/vite-plugin-sidex-fs-bridge.ts).
 		const isTauri =
 			typeof (globalThis as any).__TAURI_INTERNALS__ !== 'undefined' ||
-			typeof (globalThis as any).__TAURI__ !== 'undefined' ||
-			(globalThis as any).__SIDEX_TAURI__ === true;
+			typeof (globalThis as any).__TAURI__ !== 'undefined';
 
 		fileService.registerProvider(logsPath.scheme, new InMemoryFileSystemProvider());
 
@@ -666,6 +671,11 @@ export class BrowserMain extends Disposable {
 			fileService.registerProvider(Schemas.vscodeUserData, userDataProvider);
 			this.registerDeveloperActions(userDataProvider);
 			logService.warn('[SideX] Tauri backend not detected — user-data is in-memory only');
+
+			const webFileProvider = new WebFileSystemProvider();
+			fileService.registerProvider(Schemas.file, webFileProvider);
+			fileService.registerProvider(Schemas.vscodeFileResource, webFileProvider);
+			logService.info('[SideX] Registered WebFileSystemProvider (HTTP bridge) for file:// and vscode-file://');
 		}
 
 		fileService.registerProvider(Schemas.tmp, new InMemoryFileSystemProvider());
