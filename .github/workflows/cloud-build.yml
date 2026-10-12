@@ -62,8 +62,19 @@ jobs:
           set -e
           VERSION=$(node -p "require('./package.json').version")
           NAME="sidex-${VERSION}-linux-x86_64"
+          # `src-tauri` is a workspace member, so cargo writes the binary into
+          # the workspace target dir rather than src-tauri/target.
+          BIN=""
+          for candidate in target/release/SideX src-tauri/target/release/SideX; do
+            if [ -f "$candidate" ]; then BIN="$candidate"; break; fi
+          done
+          if [ -z "$BIN" ]; then
+            echo "release binary not found; looked in target/release and src-tauri/target/release"
+            find . -maxdepth 4 -type f -name 'SideX' | head
+            exit 1
+          fi
           mkdir -p "dist-pkg/${NAME}"
-          cp src-tauri/target/release/SideX "dist-pkg/${NAME}/SideX"
+          cp "$BIN" "dist-pkg/${NAME}/SideX"
           cp -a src-tauri/extension-host "dist-pkg/${NAME}/" 2>/dev/null || true
           cp -a src-tauri/shell-integration "dist-pkg/${NAME}/" 2>/dev/null || true
           cp -a dist "dist-pkg/${NAME}/dist"
@@ -106,8 +117,12 @@ jobs:
         run: |
           $version = node -p "require('./package.json').version"
           $name = "sidex-$version-windows-x86_64"
+          # A workspace member's binary lands in the workspace target dir.
+          $bin = @("target/release/SideX.exe", "src-tauri/target/release/SideX.exe") |
+            Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $bin) { throw "release binary not found (target/release or src-tauri/target/release)" }
           New-Item -ItemType Directory -Force -Path "dist-pkg/$name" | Out-Null
-          Copy-Item "src-tauri/target/release/SideX.exe" "dist-pkg/$name/SideX.exe"
+          Copy-Item $bin "dist-pkg/$name/SideX.exe"
           foreach ($dir in @("extension-host", "shell-integration")) {
             if (Test-Path "src-tauri/$dir") { Copy-Item -Recurse "src-tauri/$dir" "dist-pkg/$name/" }
           }
@@ -165,8 +180,17 @@ jobs:
           set -e
           VERSION=$(node -p "require('./package.json').version")
           NAME="sidex-${VERSION}-macos-${{ matrix.arch }}"
-          APP="src-tauri/target/${{ matrix.target }}/release/bundle/macos/SideX.app"
-          test -d "$APP" || { echo "no app bundle at $APP"; exit 1; }
+          APP=""
+          for candidate in \
+            "target/${{ matrix.target }}/release/bundle/macos/SideX.app" \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/macos/SideX.app"; do
+            if [ -d "$candidate" ]; then APP="$candidate"; break; fi
+          done
+          if [ -z "$APP" ]; then
+            echo "no app bundle found for ${{ matrix.target }}"
+            find . -maxdepth 6 -type d -name 'SideX.app' | head
+            exit 1
+          fi
           # ditto keeps the bundle's symlinks and resource forks intact.
           ditto -c -k --sequesterRsrc --keepParent "$APP" "${NAME}.zip"
           ls -lh "${NAME}.zip"
