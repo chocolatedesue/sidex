@@ -70,8 +70,11 @@ Gitignored runtime assets (populated by `npm run setup:full` / setup script):
 ## Build status (box)
 
 - `npm install` — OK (Node 20 on box; tas-client wants ≥22 — warning only).
-- `npm run build` — run after `setup` so `extensions-meta` + vite succeed; full Tauri GUI may not run headless.
-- `cargo check -p sidex-extensions` — marketplace fallback should compile.
+- `npm run setup` — wrote 4 builtin descriptors (markdown-basics / language-features / math / mermaid).
+- `npm run build` — **green** (~30s). `postbuild` copied `extensions/` into `dist/extensions/` including `markdown-editor-out/editor.js`.
+- Dev static: `GET /extensions/markdown-language-features/markdown-editor-out/editor.js` → 200 (~584 KB) via vite middleware.
+- `cargo check -p sidex-extensions` — blocked on box rustc 1.85 (crate wants 1.91); marketplace diff is small/`log::warn` only.
+- Push — **blocked**: no `gh` / HTTPS credentials on the box (`could not read Username for https://github.com`). Commit is local on `feature/markdown-wysiwyg-vscode-parity` (`40708cf`).
 
 ## Remaining gaps vs VS Code Markdown Editor
 
