@@ -14,7 +14,7 @@
 	applicationName: 'sidex',
 	dataFolderName: '.sidex',
 	urlProtocol: 'sidex',
-	version: '1.96.0',
+	version: '1.141.0',
 	commit: '',
 	date: new Date().toISOString(),
 	quality: 'stable',

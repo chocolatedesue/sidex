@@ -232,8 +232,12 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 			const bootstrap = await bootstrapExtensionPlatform();
 			this._applyBootstrap(bootstrap);
 			this._connect(bootstrap.transport.endpoint);
+			// Open VSX icon themes (e.g. vscode-icons) unpack to the user extensions
+			// dir; register them so workbench.iconTheme can select them after restart.
+			void this._syncDiskThemeExtensions(bootstrap.paths?.userExtensionsDir);
 		} catch (error) {
 			this.logService.warn(`[ExtHost] platform bootstrap failed ${(error as Error)?.message ?? String(error)}`);
+			void this._syncDiskThemeExtensions(undefined);
 		}
 	}
 
@@ -272,6 +276,8 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 			if (loadResult?.extensionId && !loadResult.alreadyActive) {
 				this._send({ id: this._nextId(), type: 'activateExtension', params: { extensionId: loadResult.extensionId } });
 			}
+			// Make contributes.iconThemes / themes visible to the workbench (file icons).
+			await this._registerDiskExtensionWithWorkbench(installed.path, extId);
 		} catch (err: any) {
 			this.logService.warn(`[ExtHost] Failed to hot-load ${extId}: ${err?.message ?? err}`);
 		}

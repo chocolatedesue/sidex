@@ -1,5 +1,5 @@
 mod app_dirs;
-mod cli;
+pub mod cli;
 mod commands;
 mod server;
 
@@ -12,7 +12,7 @@ use commands::extension_wasm::WasmExtensionRuntime;
 use commands::index::IndexStore;
 use commands::lsp::LspState;
 use commands::orchestrate::OrchestrationStore;
-use commands::remote::RemoteManagerStore;
+use commands::remote::{RemoteManagerStore, RemotePtyStore};
 use commands::settings::SettingsStore;
 use commands::storage::StorageDb;
 use commands::tasks::TaskProcessStore;
@@ -526,6 +526,7 @@ pub fn run() {
         .manage(Arc::new(SettingsStore::new()))
         .manage(Arc::new(sidex_extension_api::CommandRegistry::new()))
         .manage(Arc::new(RemoteManagerStore::new()))
+        .manage(Arc::new(RemotePtyStore::new()))
         // Wasmtime Engine is created lazily on first WASM extension load (startup win).
         .manage(Arc::new(WasmExtensionRuntime::new()))
         .register_asynchronous_uri_scheme_protocol("sidex-asset", |_ctx, request, responder| {
@@ -1096,6 +1097,10 @@ pub fn run() {
             commands::remote_mkdir,
             commands::remote_delete,
             commands::remote_rename,
+            commands::remote_terminal_spawn,
+            commands::remote_terminal_write,
+            commands::remote_terminal_resize,
+            commands::remote_terminal_kill,
             commands::remote_cancel_connect,
             commands::remote_reconnect,
             commands::remote_detect_platform,

@@ -102,16 +102,56 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 	private _backendId: number | undefined;
 	private _unlisten: (() => void) | undefined;
 	private _unlistenExit: (() => void) | undefined;
+	/** Latest cwd (initial, then OSC 7 / shell-integration updates). */
+	private _trackedCwd: string;
+	/** Incomplete OSC 7 sequence across data chunks. */
+	private _oscPartial = '';
 
 	constructor(
 		private readonly _shellLaunchConfig: IShellLaunchConfig,
 		private readonly _cwd: string,
 		private _cols: number,
 		private _rows: number,
-		private readonly _env?: IProcessEnvironment
+		private readonly _env?: IProcessEnvironment,
+		private readonly _processOptions?: ITerminalProcessOptions
 	) {
 		super();
 		this.id = nextPtyId++;
+		this._trackedCwd = _cwd;
+	}
+
+	/** Parse OSC 7 (file://cwd) from PTY output so getCwd stays in sync like VS Code. */
+	private _consumeOsc7(chunk: string): void {
+		const text = this._oscPartial + chunk;
+		this._oscPartial = '';
+		// OSC 7 ; file://host/path ST  (ST = BEL or ESC \)
+		const re = /\x1b\]7;file:\/\/[^\x07\x1b]*(?:\x07|\x1b\\)/g;
+		let lastIndex = 0;
+		let match: RegExpExecArray | null;
+		while ((match = re.exec(text)) !== null) {
+			lastIndex = re.lastIndex;
+			const raw = match[0];
+			// Strip OSC prefix ESC ] 7 ; and ST terminator
+			const fileUri = raw
+				.replace(/^\x1b\]7;/, '')
+				.replace(/\x07$/, '')
+				.replace(/\x1b\\$/, '');
+			try {
+				const u = new URL(fileUri);
+				const path = decodeURIComponent(u.pathname || '');
+				if (path && path !== this._trackedCwd) {
+					this._trackedCwd = path;
+					this._onDidChangeProperty.fire({ type: ProcessPropertyType.Cwd, value: path });
+				}
+			} catch {
+				/* ignore malformed OSC 7 */
+			}
+		}
+		// Keep a short tail if an OSC sequence might straddle chunks
+		const tail = text.slice(Math.max(lastIndex, text.length - 512));
+		if (/\x1b\]7;?[^\x07\x1b]*$/.test(tail)) {
+			this._oscPartial = tail.match(/\x1b\]7;?[^\x07\x1b]*$/)?.[0] ?? '';
+		}
 	}
 
 	async start(): Promise<ITerminalLaunchError | ITerminalLaunchResult | undefined> {
@@ -135,8 +175,16 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 			envToPass['TERM'] = 'xterm-256color';
 			envToPass['COLORTERM'] = 'truecolor';
 			envToPass['TERM_PROGRAM'] = 'SideX';
+			envToPass['TERM_PROGRAM_VERSION'] = (globalThis as any)._VSCODE_PACKAGE_JSON?.version || '0.1.6';
 			if (!envToPass['LANG']) {
 				envToPass['LANG'] = 'en_US.UTF-8';
+			}
+			// Mirror VS Code: ask the shell-integration scripts to activate when enabled.
+			if (this._processOptions?.shellIntegration?.enabled !== false) {
+				envToPass['VSCODE_INJECTION'] = envToPass['VSCODE_INJECTION'] || '1';
+				if (this._processOptions?.shellIntegration?.nonce) {
+					envToPass['VSCODE_NONCE'] = String(this._processOptions.shellIntegration.nonce);
+				}
 			}
 
 			// Pass args from shell launch config; Rust will add -l if none provided
@@ -154,6 +202,7 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 			this._unlisten = await _listen('terminal-data', event => {
 				const payload = event.payload as { terminal_id: number; data: string };
 				if (this._backendId !== undefined && payload.terminal_id === this._backendId) {
+					this._consumeOsc7(payload.data);
 					if (attached) {
 						this._onProcessData.fire(payload.data);
 					} else {
@@ -243,17 +292,50 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 		return this._cwd;
 	}
 	async getCwd(): Promise<string> {
-		return this._cwd;
+		return this._trackedCwd || this._cwd;
 	}
-	sendSignal(_signal: string): void {}
-	clearBuffer(): void {}
+	sendSignal(signal: string): void {
+		// VS Code sends SIGINT/SIGTERM via the pty host; map common signals.
+		if (this._backendId === undefined || !_invoke) {
+			return;
+		}
+		const upper = (signal || '').toUpperCase();
+		if (upper === 'SIGINT' || upper === '2') {
+			// Ctrl+C
+			_invoke('terminal_write', { terminalId: this._backendId, data: '\u0003' }).catch(() => {});
+			return;
+		}
+		if (upper === 'SIGQUIT' || upper === '3') {
+			_invoke('terminal_write', { terminalId: this._backendId, data: '\u001c' }).catch(() => {});
+			return;
+		}
+		if (upper === 'SIGTSTP' || upper === '20') {
+			_invoke('terminal_write', { terminalId: this._backendId, data: '\u001a' }).catch(() => {});
+			return;
+		}
+		// SIGTERM / default → kill the PTY (relaunch will spawn a fresh one).
+		_invoke('terminal_kill', { terminalId: this._backendId }).catch(() => {});
+	}
+	clearBuffer(): void {
+		// Clear scrollback locally; also send form-feed so the shell redraws like VS Code.
+		if (this._backendId !== undefined && _invoke) {
+			_invoke('terminal_write', { terminalId: this._backendId, data: '\u000c' }).catch(() => {});
+		}
+	}
 	async setUnicodeVersion(_version: '6' | '11'): Promise<void> {}
 
 	async refreshProperty<T extends ProcessPropertyType>(property: T): Promise<IProcessPropertyMap[T]> {
-		if (property === ProcessPropertyType.Cwd || property === ProcessPropertyType.InitialCwd) {
+		if (property === ProcessPropertyType.InitialCwd) {
 			return this._cwd as IProcessPropertyMap[T];
 		}
-		throw new Error(`Unhandled property: ${property}`);
+		if (property === ProcessPropertyType.Cwd) {
+			return (this._trackedCwd || this._cwd) as IProcessPropertyMap[T];
+		}
+		if (property === ProcessPropertyType.Title) {
+			const shell = this._shellLaunchConfig.executable || 'terminal';
+			return getShellBasename(shell) as IProcessPropertyMap[T];
+		}
+		return '' as IProcessPropertyMap[T];
 	}
 
 	async updateProperty<T extends ProcessPropertyType>(_property: T, _value: IProcessPropertyMap[T]): Promise<void> {}
@@ -318,11 +400,16 @@ class TauriTerminalBackend extends Disposable implements ITerminalBackend {
 			shellLaunchConfig.executable = defaultShell;
 		}
 		let resolvedCwd = cwd;
+		if (!resolvedCwd && typeof shellLaunchConfig.cwd === 'string') {
+			resolvedCwd = shellLaunchConfig.cwd;
+		} else if (!resolvedCwd && shellLaunchConfig.cwd && typeof shellLaunchConfig.cwd === 'object') {
+			resolvedCwd = (shellLaunchConfig.cwd as { path?: string }).path || '';
+		}
 		if (!resolvedCwd) {
 			const env = await this.getEnvironment();
-			resolvedCwd = env['HOME'] || '/';
+			resolvedCwd = env['HOME'] || env['USERPROFILE'] || '/';
 		}
-		return new TauriPty(shellLaunchConfig, resolvedCwd, cols, rows, _env);
+		return new TauriPty(shellLaunchConfig, resolvedCwd, cols, rows, _env, _options);
 	}
 
 	async attachToProcess(_id: number): Promise<ITerminalChildProcess | undefined> {

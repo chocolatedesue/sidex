@@ -242,7 +242,7 @@ async function boot() {
 			nameLong: 'SideX',
 			applicationName: 'sidex',
 			dataFolderName: '.sidex',
-			version: '1.110.0',
+			version: '1.141.0',
 			linkProtectionTrustedDomains: ['https://github.com', 'https://*.github.com', 'https://*.githubusercontent.com']
 		},
 		settingsSyncOptions: {
@@ -301,6 +301,31 @@ async function boot() {
 				pwsh: { path: 'pwsh', icon: 'terminal-powershell' }
 			},
 			'terminal.integrated.enablePersistentSessions': false,
+			// VS Code–aligned operator defaults for the integrated terminal.
+			'terminal.integrated.copyOnSelection': true,
+			'terminal.integrated.rightClickBehavior': 'copyPaste',
+			'terminal.integrated.cursorBlinking': true,
+			'terminal.integrated.cursorStyle': 'line',
+			'terminal.integrated.scrollOnLineFeed': true,
+			'terminal.integrated.enableMultiLinePasteWarning': 'auto',
+			'terminal.integrated.confirmOnExit': 'never',
+			'terminal.integrated.confirmOnKill': 'editor',
+			'terminal.integrated.tabs.enabled': true,
+			'terminal.integrated.tabs.hideCondition': 'never',
+			'terminal.integrated.defaultLocation': 'view',
+			'terminal.integrated.shellIntegration.enabled': true,
+			'terminal.integrated.shellIntegration.decorationsEnabled': 'both',
+			// VS Code 1.140+: sharper terminal text on macOS high-DPI (experimental).
+			'terminal.integrated.fontRendering': 'inherit',
+			'terminal.integrated.gpuAcceleration': 'auto',
+			'terminal.integrated.smoothScrolling': true,
+			'terminal.integrated.enableImages': false,
+			// VS Code 1.140 chat terminal output reflow (kept for parity; AI surfaces stay off).
+			'chat.tools.terminal.outputReflow': true,
+			'terminal.integrated.splitCwd': 'workspaceRoot',
+			'terminal.integrated.cwd': '',
+			'terminal.integrated.env.linux': {},
+			'terminal.integrated.env.osx': {},
 			'editor.formatOnPaste': false,
 			'editor.renderWhitespace': 'selection',
 			'editor.smoothScrolling': false,

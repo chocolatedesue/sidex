@@ -11,6 +11,12 @@ EXTENSIONS_DIR="$REPO_ROOT/extensions"
 # extension that can only show "sign in to use Copilot".
 EXCLUDED_EXTENSIONS=("copilot" "copilot-chat" "github-copilot" "copilot-chat-prerelease")
 
+
+# File icons: workbench.iconTheme defaults to vs-seti (theme-seti builtin).
+ensure_theme_seti() {
+  bash "$REPO_ROOT/scripts/ensure-file-icon-theme.sh"
+}
+
 prune_excluded_extensions() {
   local removed=0
   local name
@@ -55,6 +61,7 @@ ensure_markdown_editor_assets() {
 
 if [[ -d "$EXTENSIONS_DIR" && "$(ls -A "$EXTENSIONS_DIR" 2>/dev/null | wc -l)" -gt 10 ]]; then
   prune_excluded_extensions
+  ensure_theme_seti
   ensure_markdown_editor_assets
   echo "extensions/ already populated ($(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') entries) — skipping."
   exit 0
@@ -77,6 +84,7 @@ for candidate in "${VSCODE_CANDIDATES[@]}"; do
     echo "Copying built-in extensions..."
     cp -r "$candidate"/. "$EXTENSIONS_DIR/"
     prune_excluded_extensions
+    ensure_theme_seti
     ensure_markdown_editor_assets
     echo "Copied $(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') extensions."
     exit 0
@@ -96,6 +104,7 @@ echo "Extracting extensions..."
 tar -xzf "$TMP_DIR/vscode.tar.gz" -C "$TMP_DIR" "vscode-${VSCODE_VERSION}/extensions"
 cp -r "$TMP_DIR/vscode-${VSCODE_VERSION}/extensions/." "$EXTENSIONS_DIR/"
 prune_excluded_extensions
+ensure_theme_seti
 ensure_markdown_editor_assets
 
 echo "Done — $(ls "$EXTENSIONS_DIR" | wc -l | tr -d ' ') extensions installed."

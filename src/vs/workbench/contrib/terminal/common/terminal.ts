@@ -198,6 +198,7 @@ export interface ITerminalConfiguration {
 	macOptionIsMeta: boolean;
 	macOptionClickForcesSelection: boolean;
 	gpuAcceleration: 'auto' | 'on' | 'off';
+	fontRendering?: 'inherit' | 'grayscale';
 	rightClickBehavior: 'default' | 'copyPaste' | 'paste' | 'selectWord' | 'nothing';
 	middleClickBehavior: 'default' | 'paste';
 	cursorBlinking: boolean;

@@ -43,7 +43,9 @@ main:
         - name: npm-ci
           script: npm ci --no-audit --no-fund
         - name: frontend-build
-          script: npm run build
+          script: |
+            bash scripts/ensure-file-icon-theme.sh
+            npm run build
         - name: cargo-check
           script: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
         - name: cargo-test-cli
@@ -77,7 +79,9 @@ main:
         - name: npm-ci
           script: npm ci --no-audit --no-fund
         - name: frontend-build
-          script: npm run build
+          script: |
+            bash scripts/ensure-file-icon-theme.sh
+            npm run build
         - name: cargo-build
           script: cargo build --locked --release --manifest-path src-tauri/Cargo.toml
         - name: package
@@ -85,8 +89,13 @@ main:
             set -e
             VERSION=$(node -p "require('./package.json').version")
             NAME="sidex-${VERSION}-linux-x86_64"
-            rm -rf dist-pkg && mkdir -p "dist-pkg/${NAME}"
+            rm -rf dist-pkg && mkdir -p "dist-pkg/${NAME}/bin"
             cp src-tauri/target/release/SideX "dist-pkg/${NAME}/SideX"
+            cp scripts/sidex "dist-pkg/${NAME}/bin/sidex"
+            chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/SideX"
+            ln -sfn ../SideX "dist-pkg/${NAME}/bin/SideX"
+            cp scripts/install-cli.sh "dist-pkg/${NAME}/install-cli.sh"
+            chmod +x "dist-pkg/${NAME}/install-cli.sh"
             # Runtime resources the app looks for next to the executable.
             cp -a src-tauri/extension-host "dist-pkg/${NAME}/" 2>/dev/null || true
             cp -a src-tauri/shell-integration "dist-pkg/${NAME}/" 2>/dev/null || true
@@ -142,7 +151,9 @@ main:
         - name: npm-ci
           script: npm ci --no-audit --no-fund
         - name: frontend-build
-          script: npm run build
+          script: |
+            bash scripts/ensure-file-icon-theme.sh
+            npm run build
         - name: cargo-check
           script: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
         - name: cargo-test-cli

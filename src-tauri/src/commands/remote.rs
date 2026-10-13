@@ -10,11 +10,13 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 
 use sidex_remote::{
@@ -750,4 +752,179 @@ pub async fn remote_rename(
         .rename(&from, &to, overwrite.unwrap_or(false))
         .await
         .map_err(|e| format!("remote rename failed: {e}"))
+}
+
+// ---------------------------------------------------------------------------
+// Remote PTY (integrated terminal over SSH)
+// ---------------------------------------------------------------------------
+
+struct RemotePtySession {
+    write_tx: mpsc::Sender<Vec<u8>>,
+    resize_tx: mpsc::Sender<(u16, u16)>,
+    kill_tx: mpsc::Sender<()>,
+}
+
+pub struct RemotePtyStore {
+    next_id: AtomicU32,
+    sessions: Mutex<HashMap<u32, RemotePtySession>>,
+}
+
+impl RemotePtyStore {
+    pub fn new() -> Self {
+        Self {
+            next_id: AtomicU32::new(1),
+            sessions: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl Default for RemotePtyStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Open a remote interactive PTY (VS Code remote terminal).
+#[tauri::command]
+pub async fn remote_terminal_spawn(
+    app: AppHandle,
+    connection_id: u64,
+    cols: Option<u16>,
+    rows: Option<u16>,
+    store: State<'_, RemoteManagerStore>,
+    pty_store: State<'_, Arc<RemotePtyStore>>,
+) -> Result<u32, String> {
+    let cols = cols.unwrap_or(80);
+    let rows = rows.unwrap_or(24);
+    let transport = store.transport(connection_id).await?;
+    let mut pty = transport
+        .open_pty(cols, rows)
+        .await
+        .map_err(|e| format!("remote open_pty failed: {e}"))?;
+
+    let terminal_id = pty_store.next_id.fetch_add(1, AtomicOrdering::Relaxed);
+    let (write_tx, mut write_rx) = mpsc::channel::<Vec<u8>>(64);
+    let (resize_tx, mut resize_rx) = mpsc::channel::<(u16, u16)>(8);
+    let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
+
+    {
+        let mut guard = pty_store.sessions.lock().await;
+        guard.insert(
+            terminal_id,
+            RemotePtySession {
+                write_tx: write_tx.clone(),
+                resize_tx: resize_tx.clone(),
+                kill_tx: kill_tx.clone(),
+            },
+        );
+    }
+
+    let app_handle = app.clone();
+    let pty_store_inner = pty_store.inner().clone();
+    tauri::async_runtime::spawn(async move {
+        let mut buf = [0u8; 8192];
+        loop {
+            tokio::select! {
+                biased;
+                _ = kill_rx.recv() => { break; }
+                msg = write_rx.recv() => {
+                    match msg {
+                        Some(data) => {
+                            if pty.write(&data).await.is_err() { break; }
+                        }
+                        None => break,
+                    }
+                }
+                r = resize_rx.recv() => {
+                    if let Some((c, r)) = r {
+                        let _ = pty.resize(c, r).await;
+                    }
+                }
+                read = pty.read(&mut buf) => {
+                    match read {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                            let _ = app_handle.emit(
+                                "remote-terminal-data",
+                                serde_json::json!({
+                                    "terminal_id": terminal_id,
+                                    "connection_id": connection_id,
+                                    "data": data,
+                                }),
+                            );
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }
+        }
+        let _ = app_handle.emit(
+            "remote-terminal-exit",
+            serde_json::json!({
+                "terminal_id": terminal_id,
+                "connection_id": connection_id,
+                "exit_code": 0,
+            }),
+        );
+        let mut guard = pty_store_inner.sessions.lock().await;
+        guard.remove(&terminal_id);
+    });
+
+    Ok(terminal_id)
+}
+
+#[tauri::command]
+pub async fn remote_terminal_write(
+    terminal_id: u32,
+    data: String,
+    pty_store: State<'_, Arc<RemotePtyStore>>,
+) -> Result<(), String> {
+    let tx = {
+        let guard = pty_store.sessions.lock().await;
+        guard
+            .get(&terminal_id)
+            .map(|s| s.write_tx.clone())
+            .ok_or_else(|| format!("remote terminal {terminal_id} not found"))?
+    };
+    tx.send(data.into_bytes())
+        .await
+        .map_err(|_| format!("remote terminal {terminal_id} closed"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remote_terminal_resize(
+    terminal_id: u32,
+    cols: u16,
+    rows: u16,
+    pty_store: State<'_, Arc<RemotePtyStore>>,
+) -> Result<(), String> {
+    let tx = {
+        let guard = pty_store.sessions.lock().await;
+        guard
+            .get(&terminal_id)
+            .map(|s| s.resize_tx.clone())
+            .ok_or_else(|| format!("remote terminal {terminal_id} not found"))?
+    };
+    tx.send((cols, rows))
+        .await
+        .map_err(|_| format!("remote terminal {terminal_id} closed"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remote_terminal_kill(
+    terminal_id: u32,
+    pty_store: State<'_, Arc<RemotePtyStore>>,
+) -> Result<(), String> {
+    let tx = {
+        let mut guard = pty_store.sessions.lock().await;
+        guard
+            .remove(&terminal_id)
+            .map(|s| s.kill_tx)
+            .ok_or_else(|| format!("remote terminal {terminal_id} not found"))?
+    };
+    let _ = tx.send(()).await;
+    Ok(())
 }

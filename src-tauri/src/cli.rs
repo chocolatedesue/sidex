@@ -366,6 +366,130 @@ pub fn sidex_take_open_request(state: tauri::State<'_, CliState>) -> Option<Open
 }
 
 /// Parse this process' own command line and queue the result, if it carries one.
+
+/// SideX version string for `--version` (matches Cargo package version).
+pub fn version_string() -> String {
+    format!("SideX {}", env!("CARGO_PKG_VERSION"))
+}
+
+pub fn print_help() {
+    println!(
+        "\
+SideX {} — open files and folders from the terminal.
+
+Usage:
+  sidex [options] [path…]
+  SideX [options] [path…]
+
+Options:
+  -h, --help                 Show this help and exit
+  -v, --version              Print version and exit
+  --install-cli              Install `sidex` / `SideX` onto ~/.local/bin (or $SIDEX_CLI_BIN_DIR)
+  -n, --new-window           Open in a new window
+  -r, --reuse-window         Force reuse the running window
+  -a, --add                  Add folder(s) to the last active window
+  -g, --goto <file:line[:col]> Open at line (and column)
+  -d, --diff <file> <file>   Open a diff editor
+  -w, --wait                 Wait for the files to close
+  --folder-uri <uri>         Open a folder by URI
+  --file-uri <uri>           Open a file by URI
+
+Examples:
+  sidex .
+  sidex README.md
+  sidex -g src/main.ts:42
+",
+        env!("CARGO_PKG_VERSION")
+    );
+}
+
+/// Install launcher symlinks onto the user PATH. Returns the bin directory used.
+pub fn install_cli_to_path() -> Result<std::path::PathBuf, String> {
+    let bin_dir = std::env::var("SIDEX_CLI_BIN_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from("."))
+                .join(".local")
+                .join("bin")
+        });
+    std::fs::create_dir_all(&bin_dir).map_err(|e| format!("mkdir {}: {e}", bin_dir.display()))?;
+
+    let exe = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
+    let exe = exe
+        .canonicalize()
+        .unwrap_or(exe);
+
+    // Prefer linking as `sidex` (lowercase, VS Code `code` feel) and also `SideX`.
+    let sidex_link = bin_dir.join("sidex");
+    let sidex_cap = bin_dir.join("SideX");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        for link in [&sidex_link, &sidex_cap] {
+            if link.exists() || link.symlink_metadata().is_ok() {
+                let _ = std::fs::remove_file(link);
+            }
+            symlink(&exe, link).map_err(|e| format!("symlink {}: {e}", link.display()))?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        // Windows: copy the exe as sidex.exe / SideX.exe next to PATH entry.
+        for name in ["sidex.exe", "SideX.exe"] {
+            let dest = bin_dir.join(name);
+            std::fs::copy(&exe, &dest).map_err(|e| format!("copy {}: {e}", dest.display()))?;
+        }
+    }
+
+    Ok(bin_dir)
+}
+
+/// Returns `true` when argv was fully handled and the GUI must not start.
+pub fn handle_early_cli(args: &[String]) -> bool {
+    if args.is_empty() {
+        return false;
+    }
+    match args[0].as_str() {
+        "-h" | "--help" | "help" => {
+            print_help();
+            true
+        }
+        "-v" | "--version" | "version" => {
+            println!("{}", version_string());
+            true
+        }
+        "--install-cli" => {
+            match install_cli_to_path() {
+                Ok(dir) => {
+                    println!("Installed SideX CLI into {}", dir.display());
+                    println!("  {}/sidex", dir.display());
+                    println!("  {}/SideX", dir.display());
+                    let path = std::env::var("PATH").unwrap_or_default();
+                    let marker = format!("{}:", dir.display());
+                    let marker2 = format!(":{}", dir.display());
+                    if !(path.split(':').any(|p| p == dir.to_string_lossy())
+                        || path.contains(&marker)
+                        || path.ends_with(&dir.to_string_lossy().as_ref())
+                        || path.contains(&marker2))
+                    {
+                        println!();
+                        println!("Add to your shell profile if needed:");
+                        println!("  export PATH=\"{}:$PATH\"", dir.display());
+                    }
+                }
+                Err(err) => {
+                    eprintln!("sidex --install-cli failed: {err}");
+                    std::process::exit(1);
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
 pub fn dispatch_own_args(app: &AppHandle) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
     let args: Vec<String> = std::env::args().skip(1).collect();

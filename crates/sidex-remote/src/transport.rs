@@ -84,7 +84,7 @@ impl RemotePty {
     }
 
     /// Resize the remote PTY window.
-    pub async fn resize(&self, cols: u16, rows: u16) -> Result<()> {
+    pub async fn resize(&mut self, cols: u16, rows: u16) -> Result<()> {
         self.resize_tx.send((cols, rows)).await?;
         Ok(())
     }

@@ -512,6 +512,20 @@ export class ExtensionManagementService
 					this.userDataProfileService.currentProfile.extensionsResource
 				);
 			}
+			// SideX (Tauri): there is no Electron "local" extension management
+			// server. Still register file:// extensions (Open VSX installs land
+			// under ~/.local/share/SideX/extensions) through the web server so
+			// contributes.iconThemes / themes reach the workbench — icon CSS then
+			// loads via the sidex-asset protocol.
+			if (
+				(globalThis as any).__SIDEX_TAURI__ === true &&
+				this.extensionManagementServerService.webExtensionManagementServer
+			) {
+				return this.extensionManagementServerService.webExtensionManagementServer.extensionManagementService.installFromLocation(
+					location,
+					this.userDataProfileService.currentProfile.extensionsResource
+				);
+			}
 			throw new Error('Local extension management server is not found');
 		}
 		if (location.scheme === Schemas.vscodeRemote) {

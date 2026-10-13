@@ -20,6 +20,7 @@ import type { ImageAddon as ImageAddonType } from '@xterm/addon-image';
 import type { ClipboardAddon as ClipboardAddonType, ClipboardSelectionType } from '@xterm/addon-clipboard';
 import * as dom from '../../../../../base/browser/dom.js';
 import { IXtermCore } from '../xterm-private.js';
+import { updateTerminalFontRendering } from './terminalFontRendering.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { Disposable, DisposableStore, MutableDisposable } from '../../../../../base/common/lifecycle.js';
 import { IEditorOptions } from '../../../../../editor/common/config/editorOptions.js';
@@ -621,6 +622,7 @@ export class XtermTerminal
 		);
 
 		this._refreshLigaturesAddon();
+		updateTerminalFontRendering(this.raw, this._terminalConfigurationService.config.fontRendering);
 
 		this._attached = { container, options };
 		// Screen must be created at this point as xterm.open is called
@@ -681,6 +683,7 @@ export class XtermTerminal
 				}
 			}
 			this._refreshLigaturesAddon();
+			updateTerminalFontRendering(this.raw, config.fontRendering);
 		}
 	}
 

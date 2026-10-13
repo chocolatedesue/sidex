@@ -7,5 +7,11 @@ fn main() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
+    // `sidex --help` / `--version` / `--install-cli` must not open a window.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if sidex_lib::cli::handle_early_cli(&args) {
+        return;
+    }
+
     sidex_lib::run();
 }

@@ -86,6 +86,7 @@ registerWorkbenchContribution2(
 
 // Tauri terminal backend — register it so VSCode's built-in terminal panel uses our PTY
 import './tauriTerminalBackend.js';
+import './tauriRemoteTerminalBackend.js';
 
 // Register configurations
 registerTerminalPlatformConfiguration();

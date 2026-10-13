@@ -6,7 +6,7 @@ Two clouds can build this tree. Neither needs a local toolchain.
 |---|---|---|
 | GitHub Actions — `build.yml` (upstream) | `cargo check` on Linux / macOS / Windows | push to `main`, PR (paths-filtered) |
 | GitHub Actions — `release.yml` (upstream) | the real release: `tauri build` × 6 targets, signing, Cloudflare R2 + updater manifest | tag `v*` or manual dispatch |
-| GitHub Actions — `cloud-build.yml` (added here) | unsigned Linux x86_64 + Windows x86_64 release binaries and an unsigned macOS `SideX.app` (Apple Silicon), as **workflow artifacts** | manual dispatch, or tag `v*` |
+| GitHub Actions — `cloud-build.yml` (added here) | unsigned Linux x86_64 + Windows x86_64 release binaries and an unsigned macOS **`.dmg`** (Apple Silicon), as **workflow artifacts** | manual dispatch, or tag `v*` |
 | CNB — `.cnb.yml` (added here) | `check` on push/PR; `linux-x86_64` release tarball published to the `dist/linux-x86_64` branch | push to `main`, PR |
 
 ## Getting a binary without any secrets
@@ -20,8 +20,7 @@ to R2 (`siden-assets`), so on a mirror without those secrets it will fail.
    to a GitHub Release.
 
 Artifacts land under the run’s **Artifacts** section: `sidex-linux-x86_64`
-(`.tar.gz`), `sidex-windows-x86_64` (`.zip`), and `sidex-macos-arm64` (zipped
-`SideX.app`).
+(`.tar.gz`), `sidex-windows-x86_64` (`.zip`), and `sidex-macos-arm64` (`.dmg`).
 
 Only the common architectures are built (x86_64 for Linux/Windows, Apple
 Silicon for macOS). Intel macOS is a one-line addition to the `macos` matrix in
@@ -34,13 +33,13 @@ codegen and dominates the build time. Same optimisation level, faster build,
 marginally slower binary: fine for testing, not what you would publish. Drop
 those two env vars to get the shipping profile, or use upstream’s `release.yml`.
 
-The macOS bundle is **unsigned** (no Apple certificate in this mirror), so
-Gatekeeper will refuse it on first open. Download, unzip, then either
-right-click → *Open*, or clear the quarantine flag:
+The macOS **`.dmg`** is **unsigned** (no Apple certificate in this mirror), so
+Gatekeeper will refuse it on first open. Download, open the DMG, drag SideX to
+Applications, then either right-click → *Open*, or clear the quarantine flag:
 
 ```bash
-xattr -dr com.apple.quarantine SideX.app
-open SideX.app
+xattr -dr com.apple.quarantine /Applications/SideX.app
+open /Applications/SideX.app
 ```
 
 The tarball/zip contains the release binary (the workbench frontend is embedded
@@ -53,6 +52,11 @@ Running the Linux build needs GTK 3 and WebKit 2:
 ```bash
 sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0
 ./SideX /path/to/a/folder      # or: ./SideX file.md
+
+# Optional: put `sidex` on your PATH (like VS Code's `code`)
+./install-cli.sh               # or: ./SideX --install-cli
+sidex .
+sidex --version
 ```
 
 The AI panel is off unless you turn it on (`sidex.chat.enabled`), so a plain

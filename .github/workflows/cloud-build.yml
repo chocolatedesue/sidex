@@ -62,6 +62,7 @@ jobs:
       - name: Frontend
         run: |
           npm ci --no-audit --no-fund
+          bash scripts/ensure-file-icon-theme.sh
           npm run build
 
       - uses: swatinem/rust-cache@v2
@@ -88,8 +89,14 @@ jobs:
             find . -maxdepth 4 -type f -name 'SideX' | head
             exit 1
           fi
-          mkdir -p "dist-pkg/${NAME}"
+          mkdir -p "dist-pkg/${NAME}/bin"
           cp "$BIN" "dist-pkg/${NAME}/SideX"
+          # CLI: `sidex` on PATH after `./bin/sidex --install-cli` or copying bin/
+          cp scripts/sidex "dist-pkg/${NAME}/bin/sidex"
+          chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/SideX"
+          ln -sfn ../SideX "dist-pkg/${NAME}/bin/SideX"
+          cp scripts/install-cli.sh "dist-pkg/${NAME}/install-cli.sh"
+          chmod +x "dist-pkg/${NAME}/install-cli.sh"
           cp -a src-tauri/extension-host "dist-pkg/${NAME}/" 2>/dev/null || true
           cp -a src-tauri/shell-integration "dist-pkg/${NAME}/" 2>/dev/null || true
           cp -a dist "dist-pkg/${NAME}/dist"
@@ -139,6 +146,9 @@ jobs:
           if (-not $bin) { throw "release binary not found (target/release or src-tauri/target/release)" }
           New-Item -ItemType Directory -Force -Path "dist-pkg/$name" | Out-Null
           Copy-Item $bin "dist-pkg/$name/SideX.exe"
+          New-Item -ItemType Directory -Force -Path "dist-pkg/$name/bin" | Out-Null
+          Copy-Item $bin "dist-pkg/$name/bin/sidex.exe"
+          Copy-Item $bin "dist-pkg/$name/bin/SideX.exe"
           foreach ($dir in @("extension-host", "shell-integration")) {
             if (Test-Path "src-tauri/$dir") { Copy-Item -Recurse "src-tauri/$dir" "dist-pkg/$name/" }
           }
@@ -186,41 +196,68 @@ jobs:
           workspaces: './src-tauri -> target'
           key: fast-release-${{ matrix.target }}
 
-      - name: Build the app bundle
-        # No signing identity and no updater key here, so the bundle is
-        # unsigned; `--bundles app` skips the dmg (all it would need is
-        # create-dmg and a mounted image).
-        run: npx tauri build --target ${{ matrix.target }} --bundles app
+      - name: Install create-dmg
+        run: |
+          brew install create-dmg
+          sudo ln -sf "$(which create-dmg)" /usr/local/bin/create-dmg
+
+      - name: Ensure built-in file icons
+        run: bash scripts/ensure-file-icon-theme.sh
+
+      - name: Build the macOS DMG
+        # Default mac artifact is .dmg (VS Code / typical desktop feel).
+        # Unsigned: no Apple certificate in this mirror. create-dmg is required.
+        run: npx tauri build --target ${{ matrix.target }} --bundles dmg
 
       - name: Package
         run: |
           set -e
           VERSION=$(node -p "require('./package.json').version")
           NAME="sidex-${VERSION}-macos-${{ matrix.arch }}"
-          APP=""
+          DMG=""
+          for candidate in \
+            "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg \
+            "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg; do
+            if [ -f "$candidate" ]; then DMG="$candidate"; break; fi
+          done
+          if [ -z "$DMG" ]; then
+            echo "no .dmg found for ${{ matrix.target }}; falling back to .app zip"
+            APP=""
+            for candidate in \
+              "target/${{ matrix.target }}/release/bundle/macos/SideX.app" \
+              "src-tauri/target/${{ matrix.target }}/release/bundle/macos/SideX.app"; do
+              if [ -d "$candidate" ]; then APP="$candidate"; break; fi
+            done
+            if [ -z "$APP" ]; then
+              echo "no app bundle either"
+              find . -maxdepth 8 \( -name '*.dmg' -o -name 'SideX.app' \) | head
+              exit 1
+            fi
+            codesign --force --deep --sign - "$APP" || true
+            ditto -c -k --sequesterRsrc --keepParent "$APP" "${NAME}.zip"
+            ls -lh "${NAME}.zip"
+            exit 0
+          fi
+          # Ad-hoc sign the .app inside the dmg volume is not practical here;
+          # sign the .app before bundling when present, then copy the dmg.
+          APP_DIR=""
           for candidate in \
             "target/${{ matrix.target }}/release/bundle/macos/SideX.app" \
             "src-tauri/target/${{ matrix.target }}/release/bundle/macos/SideX.app"; do
-            if [ -d "$candidate" ]; then APP="$candidate"; break; fi
+            if [ -d "$candidate" ]; then APP_DIR="$candidate"; break; fi
           done
-          if [ -z "$APP" ]; then
-            echo "no app bundle found for ${{ matrix.target }}"
-            find . -maxdepth 6 -type d -name 'SideX.app' | head
-            exit 1
+          if [ -n "$APP_DIR" ]; then
+            codesign --force --deep --sign - "$APP_DIR" || true
           fi
-          # No Apple certificate here, but an ad-hoc signature at least gives the
-          # bundle a stable identity: users then only need to clear the download
-          # quarantine, instead of hitting "damaged" on first launch.
-          codesign --force --deep --sign - "$APP"
-          codesign --verify --deep --verbose=1 "$APP" || true
-          # ditto keeps the bundle's symlinks and resource forks intact.
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "${NAME}.zip"
-          ls -lh "${NAME}.zip"
+          cp "$DMG" "${NAME}.dmg"
+          ls -lh "${NAME}.dmg"
 
       - uses: actions/upload-artifact@v7
         with:
           name: sidex-macos-${{ matrix.arch }}
-          path: sidex-*.zip
+          path: |
+            sidex-*.dmg
+            sidex-*.zip
 
   release:
     name: attach to release

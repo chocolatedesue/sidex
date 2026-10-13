@@ -5160,7 +5160,7 @@ function createVscodeShim() {
     comments,
     authentication,
     tests,
-    version: '1.110.0',
+    version: '1.141.0',
     l10n: {
       t: (message, ...args) => {
         let str = typeof message === 'string' ? message : message.message || '';
@@ -5266,7 +5266,7 @@ function installVscodeShim() {
     fs.mkdirSync(vscDir, { recursive: true });
     fs.writeFileSync(path.join(vscDir, 'package.json'), JSON.stringify({
       name: 'vscode',
-      version: '1.110.0',
+      version: '1.141.0',
       main: 'index.cjs',
     }));
     fs.writeFileSync(path.join(vscDir, 'index.cjs'), "module.exports = globalThis.__sidex_vscode_shim__ || require('__sidex_vscode_shim__');");

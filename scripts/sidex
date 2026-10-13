@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# SideX CLI — VS Code `code`-like launcher. Resolves the SideX binary and
+# forwards argv (`sidex .`, `sidex file.md`, `--help`, `--version`, …).
+set -euo pipefail
+
+resolve_self() {
+  local src="${BASH_SOURCE[0]}"
+  while [[ -L "$src" ]]; do
+    local dir
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    [[ "$src" != /* ]] && src="$dir/$src"
+  done
+  cd -P "$(dirname "$src")" && pwd
+}
+
+SCRIPT_DIR="$(resolve_self)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd || true)"
+
+find_binary() {
+  local candidates=()
+  # Next to this script (packaged: <pkg>/bin/sidex → <pkg>/SideX)
+  candidates+=("$SCRIPT_DIR/SideX" "$SCRIPT_DIR/SideX.exe")
+  candidates+=("$(dirname "$SCRIPT_DIR")/SideX" "$(dirname "$SCRIPT_DIR")/SideX.exe")
+  # Dev / release build outputs
+  if [[ -n "${REPO_ROOT:-}" ]]; then
+    candidates+=(
+      "$REPO_ROOT/target/release/SideX"
+      "$REPO_ROOT/target/debug/SideX"
+      "$REPO_ROOT/src-tauri/target/release/SideX"
+      "$REPO_ROOT/src-tauri/target/debug/SideX"
+    )
+  fi
+  # macOS .app bundle next to us or in /Applications
+  candidates+=(
+    "$SCRIPT_DIR/../MacOS/SideX"
+    "/Applications/SideX.app/Contents/MacOS/SideX"
+    "$HOME/Applications/SideX.app/Contents/MacOS/SideX"
+  )
+  # Explicit override
+  if [[ -n "${SIDEX_BINARY:-}" ]]; then
+    candidates=("$SIDEX_BINARY" "${candidates[@]}")
+  fi
+
+  local c
+  for c in "${candidates[@]}"; do
+    if [[ -x "$c" ]]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+print_cli_help() {
+  cat <<'HELP'
+SideX — open files and folders from the terminal.
+
+Usage:
+  sidex [options] [path…]
+  sidex --install-cli          Install `sidex` / `SideX` onto your PATH
+  sidex --version              Print version
+  sidex --help                 Show this help
+
+Options (aligned with VS Code `code` where useful):
+  -n, --new-window             Open in a new window
+  -r, --reuse-window           Force reuse the running window
+  -a, --add                    Add folder(s) to the last active window
+  -g, --goto <file:line[:col]> Open file at line (and column)
+  -d, --diff <file> <file>     Open a diff editor
+  -w, --wait                   Wait for the window to close
+  --folder-uri <uri>           Open a folder by URI
+  --file-uri <uri>             Open a file by URI
+
+Examples:
+  sidex .
+  sidex README.md
+  sidex -g src/main.ts:42
+HELP
+}
+
+# Fast path for help without needing the binary (packaging / PATH checks).
+case "${1:-}" in
+  -h|--help|help)
+    print_cli_help
+    exit 0
+    ;;
+esac
+
+BIN="$(find_binary)" || {
+  echo "sidex: could not find the SideX binary." >&2
+  echo "Build it (cargo build --release -p sidex) or set SIDEX_BINARY." >&2
+  exit 127
+}
+
+# --install-cli / --version are handled inside the binary when present; the
+# shell still implements --install-cli as a fallback for script-only installs.
+if [[ "${1:-}" == "--install-cli" ]]; then
+  exec "$BIN" --install-cli "${@:2}"
+fi
+
+exec "$BIN" "$@"
