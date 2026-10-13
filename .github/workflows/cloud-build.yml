@@ -95,22 +95,12 @@ jobs:
           # CLI: `sidex` on PATH after `./bin/sidex --install-cli` or copying bin/
           cp scripts/sidex "dist-pkg/${NAME}/bin/sidex"
           cp scripts/ensure-frontend-server.sh "dist-pkg/${NAME}/bin/ensure-frontend-server.sh"
-          chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/bin/ensure-frontend-server.sh" "dist-pkg/${NAME}/SideX"
-          ln -sfn ../SideX "dist-pkg/${NAME}/bin/SideX"
+          chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/bin/ensure-frontend-server.sh"
           # Wrapper: cargo-built SideX still hits Vite :1420 — serve packaged dist/ first.
           mv "dist-pkg/${NAME}/SideX" "dist-pkg/${NAME}/SideX.bin"
-          cat > "dist-pkg/${NAME}/SideX" <<'WRAP'
-#!/usr/bin/env bash
-set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-export SIDEX_BINARY="${SIDEX_BINARY:-$HERE/SideX.bin}"
-export SIDEX_FRONTEND_DIST="${SIDEX_FRONTEND_DIST:-$HERE/dist}"
-if [[ -x "$HERE/bin/ensure-frontend-server.sh" ]]; then
-  "$HERE/bin/ensure-frontend-server.sh" || true
-fi
-exec "$HERE/SideX.bin" "$@"
-WRAP
-          chmod +x "dist-pkg/${NAME}/SideX"
+          cp scripts/SideX-wrapper.sh "dist-pkg/${NAME}/SideX"
+          chmod +x "dist-pkg/${NAME}/SideX" "dist-pkg/${NAME}/SideX.bin"
+          ln -sfn ../SideX "dist-pkg/${NAME}/bin/SideX"
           cp scripts/install-cli.sh "dist-pkg/${NAME}/install-cli.sh"
           chmod +x "dist-pkg/${NAME}/install-cli.sh"
           cp -a src-tauri/extension-host "dist-pkg/${NAME}/" 2>/dev/null || true
