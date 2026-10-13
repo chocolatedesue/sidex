@@ -1111,4 +1111,64 @@ Host *.example.com
         let pool = SshConnectionPool::new(300);
         assert_eq!(pool.max_idle, Duration::from_secs(300));
     }
+
+    /// Live SSH against SIDEX_SMOKE_SSH=user@host:port (default skipped).
+    #[tokio::test]
+    async fn live_ssh_connect_and_homedir() {
+        let Some(raw) = std::env::var_os("SIDEX_SMOKE_SSH") else {
+            eprintln!("skip live_ssh_connect_and_homedir (set SIDEX_SMOKE_SSH)");
+            return;
+        };
+        let raw = raw.to_string_lossy();
+        let (user_host, port_override) = if let Some((a, b)) = raw.split_once(',') {
+            (a.to_string(), b.parse::<u16>().ok())
+        } else {
+            (raw.to_string(), None)
+        };
+        let (user, host, port_in_host) = {
+            let (user, rest) = match user_host.split_once('@') {
+                Some((u, h)) => (u.to_string(), h.to_string()),
+                None => ("box".to_string(), user_host),
+            };
+            if let Some((h, p)) = rest.rsplit_once(':') {
+                if let Ok(port) = p.parse::<u16>() {
+                    (user, h.to_string(), Some(port))
+                } else {
+                    (user, rest, None)
+                }
+            } else {
+                (user, rest, None)
+            }
+        };
+        let port = port_override.or(port_in_host).unwrap_or(22);
+        let auth = SshAuth::KeyFile {
+            path: dirs::home_dir().unwrap().join(".ssh/id_ed25519"),
+            passphrase: None,
+        };
+        let transport = SshTransport::connect_as(&user, &host, port, auth, Some(10))
+            .await
+            .expect("ssh connect");
+        let home_cmd = "printf %s \"$HOME\"";
+        let home = transport.exec(home_cmd).await.expect("exec home");
+        assert_eq!(home.exit_code, 0, "stderr={}", home.stderr);
+        assert!(!home.stdout.trim().is_empty());
+        let entries = transport
+            .read_dir(home.stdout.trim())
+            .await
+            .expect("read_dir home");
+        assert!(
+            !entries.is_empty(),
+            "expected entries in {}",
+            home.stdout.trim()
+        );
+        eprintln!(
+            "live SSH OK: {}@{}:{} home={} entries={}",
+            user,
+            host,
+            port,
+            home.stdout.trim(),
+            entries.len()
+        );
+        let _ = transport.disconnect().await;
+    }
 }
