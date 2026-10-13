@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12 — 2026-10-13
+
+### Fixed
+- **CI / cloud-build:** sync workspace `Cargo.lock` after the 0.1.11 package version bump so Linux/Windows `cargo build --locked` succeeds again.
+- **CI / attach to release:** `gh release` commands now pass `-R $GITHUB_REPOSITORY` because the attach job has no git checkout (was: `fatal: not a git repository`).
+
 ## 0.1.11
 
 ### Fixed

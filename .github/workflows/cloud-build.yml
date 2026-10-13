@@ -281,10 +281,20 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      # No checkout on this job — pass -R so `gh` does not look for a .git dir.
       - name: Attach to the tag's release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "Cloud build ${GITHUB_REF_NAME}"
-          gh release upload "${GITHUB_REF_NAME}" artifacts/* --clobber
+          REPO="${GITHUB_REPOSITORY}"
+          gh release view "${GITHUB_REF_NAME}" -R "$REPO" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" -R "$REPO" \
+              --title "${GITHUB_REF_NAME}" --notes "Cloud build ${GITHUB_REF_NAME}"
+          # Upload only files (skip empty dirs from merge-multiple)
+          shopt -s nullglob
+          files=(artifacts/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no artifacts to upload" >&2
+            exit 1
+          fi
+          gh release upload "${GITHUB_REF_NAME}" -R "$REPO" "${files[@]}" --clobber
