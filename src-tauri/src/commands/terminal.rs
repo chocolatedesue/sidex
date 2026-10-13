@@ -223,8 +223,9 @@ pub fn terminal_spawn(
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("");
+        // Fish: VS Code default profile has no -l; login fish breaks some configs + SI inject.
         match shell_basename {
-            "zsh" | "bash" | "sh" | "fish" => {
+            "zsh" | "bash" | "sh" | "zsh.exe" | "bash.exe" | "sh.exe" => {
                 cmd.arg("-l");
             }
             _ => {}

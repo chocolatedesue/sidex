@@ -284,8 +284,7 @@ async function boot() {
 			'editor.inlineSuggest.enabled': true,
 			'editor.stickyScroll.enabled': true,
 			'editor.minimap.enabled': false,
-			'terminal.integrated.defaultProfile.osx': 'zsh',
-			'terminal.integrated.defaultProfile.linux': 'bash',
+			// defaultProfile.* left unset so Tauri backend can pick $SHELL / pwsh (VS Code null default).
 			'terminal.integrated.profiles.osx': {
 				zsh: { path: 'zsh', args: ['-l'] },
 				bash: { path: 'bash', args: ['-l'], icon: 'terminal-bash' },
@@ -299,6 +298,12 @@ async function boot() {
 				fish: { path: 'fish' },
 				tmux: { path: 'tmux', icon: 'terminal-tmux' },
 				pwsh: { path: 'pwsh', icon: 'terminal-powershell' }
+			},
+			'terminal.integrated.profiles.windows': {
+				'PowerShell': { path: 'powershell.exe', icon: 'terminal-powershell' },
+				'PowerShell Core': { path: 'pwsh.exe', icon: 'terminal-powershell' },
+				'Command Prompt': { path: 'cmd.exe', icon: 'terminal-cmd' },
+				'Git Bash': { source: 'Git Bash', icon: 'terminal-bash' }
 			},
 			'terminal.integrated.enablePersistentSessions': false,
 			// VS Code–aligned operator defaults for the integrated terminal.
@@ -330,6 +335,7 @@ async function boot() {
 			'terminal.integrated.cwd': '',
 			'terminal.integrated.env.linux': {},
 			'terminal.integrated.env.osx': {},
+			'terminal.integrated.env.windows': {},
 			'editor.formatOnPaste': false,
 			'editor.renderWhitespace': 'selection',
 			'editor.smoothScrolling': false,

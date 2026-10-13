@@ -49,6 +49,10 @@ check('terminal_ack_data implemented', /pub fn terminal_ack_data/.test(termRs));
 check('terminal_ack_data registered', /commands::terminal_ack_data/.test(libRs));
 check('fish shellIntegration inject', /shellIntegration\.fish/.test(termRs) && /--init-command/.test(termRs));
 check('PATH which() merge for shells', /which::which\(bin\)/.test(termRs) && /"fish"/.test(termRs));
+check(
+	'Rust does not force -l for fish basename',
+	!/"zsh" \| "bash" \| "sh" \| "fish"/.test(termRs)
+);
 check('frontend rAF coalesce', /requestAnimationFrame/.test(backend) && /rafPending/.test(backend));
 check('frontend ack still wired', /terminal_ack_data/.test(backend));
 check(

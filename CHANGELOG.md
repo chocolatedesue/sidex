@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.15 — 2026-10-13
+
+### Fixed
+- **Cross-platform terminal:** Windows `profiles`/`env`, drop hardcoded defaultProfile so `$SHELL`/pwsh detection wins; path basename works on `\\` paths.
+- **Fish:** Rust no longer forces `-l` when args are unset (VS Code profile align + SI inject).
+- **CLI `--install-cli`:** Windows uses `%LOCALAPPDATA%\\SideX\\bin` and `;` PATH checks.
+- **Keybinding sensing:** chord timeout **5s** (was 3); `cmdorctrl`/`option` aliases; META labels Cmd/Win; Win/Linux **Ctrl+Y** redo.
+
+### Verification
+- `smoke:compat` 18/18, `smoke:terminal` 13/13, `smoke:ux` 30/30
+- `sidex-keymap` 88 tests; terminal 4; cli 9
+
+
 ## 0.1.13 — 2026-10-13
 
 ### Added

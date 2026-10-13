@@ -3729,7 +3729,7 @@ dependencies = [
 
 [[package]]
 name = "nodrop"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 
@@ -6044,7 +6044,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "sidex"
-version = "0.1.5"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "arboard",

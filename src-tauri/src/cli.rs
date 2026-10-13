@@ -384,7 +384,7 @@ Usage:
 Options:
   -h, --help                 Show this help and exit
   -v, --version              Print version and exit
-  --install-cli              Install `sidex` / `SideX` onto ~/.local/bin (or $SIDEX_CLI_BIN_DIR)
+  --install-cli              Install `sidex` / `SideX` onto PATH (~/.local/bin or %LOCALAPPDATA%\\SideX\\bin)
   -n, --new-window           Open in a new window
   -r, --reuse-window         Force reuse the running window
   -a, --add                  Add folder(s) to the last active window
@@ -403,16 +403,34 @@ Examples:
     );
 }
 
+fn default_cli_bin_dir() -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("SIDEX_CLI_BIN_DIR") {
+        return std::path::PathBuf::from(dir);
+    }
+    #[cfg(windows)]
+    {
+        // Prefer LocalAppData\SideX\bin (on PATH more often than ~/.local/bin on Windows).
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            return std::path::PathBuf::from(local).join("SideX").join("bin");
+        }
+    }
+    dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".local")
+        .join("bin")
+}
+
+fn path_contains_dir(path_env: &str, dir: &std::path::Path) -> bool {
+    let dir_s = dir.to_string_lossy();
+    let sep = if cfg!(windows) { ';' } else { ':' };
+    path_env
+        .split(sep)
+        .any(|p| p.eq_ignore_ascii_case(dir_s.as_ref()))
+}
+
 /// Install launcher symlinks onto the user PATH. Returns the bin directory used.
 pub fn install_cli_to_path() -> Result<std::path::PathBuf, String> {
-    let bin_dir = std::env::var("SIDEX_CLI_BIN_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .unwrap_or_else(|| std::path::PathBuf::from("."))
-                .join(".local")
-                .join("bin")
-        });
+    let bin_dir = default_cli_bin_dir();
     std::fs::create_dir_all(&bin_dir).map_err(|e| format!("mkdir {}: {e}", bin_dir.display()))?;
 
     let exe = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
@@ -464,19 +482,31 @@ pub fn handle_early_cli(args: &[String]) -> bool {
             match install_cli_to_path() {
                 Ok(dir) => {
                     println!("Installed SideX CLI into {}", dir.display());
-                    println!("  {}/sidex", dir.display());
-                    println!("  {}/SideX", dir.display());
-                    let path = std::env::var("PATH").unwrap_or_default();
-                    let marker = format!("{}:", dir.display());
-                    let marker2 = format!(":{}", dir.display());
-                    if !(path.split(':').any(|p| p == dir.to_string_lossy())
-                        || path.contains(&marker)
-                        || path.ends_with(&dir.to_string_lossy().as_ref())
-                        || path.contains(&marker2))
+                    #[cfg(windows)]
                     {
+                        println!("  {}\\sidex.exe", dir.display());
+                        println!("  {}\\SideX.exe", dir.display());
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        println!("  {}/sidex", dir.display());
+                        println!("  {}/SideX", dir.display());
+                    }
+                    let path = std::env::var("PATH").unwrap_or_default();
+                    if !path_contains_dir(&path, &dir) {
                         println!();
-                        println!("Add to your shell profile if needed:");
-                        println!("  export PATH=\"{}:$PATH\"", dir.display());
+                        println!("Add to your PATH if needed:");
+                        #[cfg(windows)]
+                        {
+                            println!(
+                                "  PowerShell: $env:Path = \"{};$env:Path\"",
+                                dir.display()
+                            );
+                        }
+                        #[cfg(not(windows))]
+                        {
+                            println!("  export PATH=\"{}:$PATH\"", dir.display());
+                        }
                     }
                 }
                 Err(err) => {

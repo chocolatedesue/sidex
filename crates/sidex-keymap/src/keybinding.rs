@@ -68,6 +68,12 @@ impl fmt::Display for Modifiers {
             write_mod("Alt")?;
         }
         if self.contains(Self::META) {
+            // VS Code-style labels: Cmd on macOS, Win on Windows, Meta elsewhere.
+            #[cfg(target_os = "macos")]
+            write_mod("Cmd")?;
+            #[cfg(target_os = "windows")]
+            write_mod("Win")?;
+            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             write_mod("Meta")?;
         }
         Ok(())
@@ -370,6 +376,14 @@ impl KeyCombo {
                 "shift" => modifiers |= Modifiers::SHIFT,
                 "alt" | "option" => modifiers |= Modifiers::ALT,
                 "meta" | "cmd" | "command" | "win" | "super" => modifiers |= Modifiers::META,
+                // Tauri / Electron accelerator alias → platform primary (Cmd on macOS, Ctrl elsewhere).
+                "cmdorctrl" | "cmdorcontrol" => {
+                    if cfg!(target_os = "macos") {
+                        modifiers |= Modifiers::META;
+                    } else {
+                        modifiers |= Modifiers::CTRL;
+                    }
+                }
                 _ => key_part = Some(*part),
             }
         }
@@ -549,15 +563,16 @@ impl ResolvedKeybinding {
 // ── ChordState ──────────────────────────────────────────────────────────────
 
 /// Tracks partial chord state — after the first combo of a multi-key chord
-/// is pressed, we wait up to 3 seconds for the second combo.
+/// is pressed, we wait up to 5 seconds for the second combo (VS Code align).
+#[derive(Clone, Debug)]
 pub struct ChordState {
     pub first_combo: KeyCombo,
     pub timeout: Instant,
 }
 
 impl ChordState {
-    /// Default chord timeout (3 seconds).
-    pub const TIMEOUT_SECS: u64 = 3;
+    /// Default chord timeout (5 seconds) — matches VS Code abstractKeybindingService.
+    pub const TIMEOUT_SECS: u64 = 5;
 
     pub fn new(first_combo: KeyCombo) -> Self {
         Self {
@@ -709,4 +724,22 @@ mod tests {
         assert!(resolved.is_default);
         assert_eq!(resolved.command, "editor.action.addCommentLine");
     }
+
+    #[test]
+    fn parse_cmdorctrl_is_platform_primary() {
+        let combo = KeyCombo::parse("cmdorctrl+S").unwrap();
+        #[cfg(target_os = "macos")]
+        assert!(combo.modifiers.contains(Modifiers::META));
+        #[cfg(not(target_os = "macos"))]
+        assert!(combo.modifiers.contains(Modifiers::CTRL));
+        assert_eq!(combo.key, Key::S);
+    }
+
+    #[test]
+    fn chord_timeout_matches_vscode_five_seconds() {
+        assert_eq!(ChordState::TIMEOUT_SECS, 5);
+        let state = ChordState::new(KeyCombo::new(Key::K, Modifiers::CTRL));
+        assert!(!state.is_expired());
+    }
+
 }

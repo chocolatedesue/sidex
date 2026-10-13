@@ -451,7 +451,10 @@ class TauriTerminalBackend extends Disposable implements ITerminalBackend {
 				}
 			} catch {}
 		}
-		return '/bin/zsh';
+		if (isWindows) {
+			return 'powershell.exe';
+		}
+		return isMacintosh ? '/bin/zsh' : '/bin/bash';
 	}
 
 	async getProfiles(
@@ -470,7 +473,9 @@ class TauriTerminalBackend extends Disposable implements ITerminalBackend {
 			fish: Codicon.terminal,
 			sh: Codicon.terminalLinux,
 			pwsh: Codicon.terminalPowershell,
-			powershell: Codicon.terminalPowershell
+			powershell: Codicon.terminalPowershell,
+			cmd: Codicon.terminalCmd,
+			wsl: Codicon.terminalUbuntu
 		};
 
 		interface ShellInfoResult {
@@ -524,14 +529,21 @@ class TauriTerminalBackend extends Disposable implements ITerminalBackend {
 		}
 
 		// Fallback: check each shell path individually via Rust
-		const knownShells: { path: string; profileName: string }[] = [
-			{ path: '/bin/zsh', profileName: 'zsh' },
-			{ path: '/bin/bash', profileName: 'bash' },
-			{ path: '/usr/bin/fish', profileName: 'fish' },
-			{ path: '/usr/local/bin/fish', profileName: 'fish' },
-			{ path: '/opt/homebrew/bin/fish', profileName: 'fish' },
-			{ path: '/bin/sh', profileName: 'sh' }
-		];
+		const knownShells: { path: string; profileName: string }[] = isWindows
+			? [
+					{ path: 'pwsh.exe', profileName: 'PowerShell Core' },
+					{ path: 'powershell.exe', profileName: 'PowerShell' },
+					{ path: 'cmd.exe', profileName: 'Command Prompt' },
+					{ path: 'wsl.exe', profileName: 'WSL' }
+				]
+			: [
+					{ path: '/bin/zsh', profileName: 'zsh' },
+					{ path: '/bin/bash', profileName: 'bash' },
+					{ path: '/usr/bin/fish', profileName: 'fish' },
+					{ path: '/usr/local/bin/fish', profileName: 'fish' },
+					{ path: '/opt/homebrew/bin/fish', profileName: 'fish' },
+					{ path: '/bin/sh', profileName: 'sh' }
+				];
 
 		const profiles: ITerminalProfile[] = [];
 		const seen = new Set<string>();
@@ -649,8 +661,19 @@ export class TauriTerminalBackendContribution implements IWorkbenchContribution 
 		const configKey = `terminal.integrated.defaultProfile.${platformKey}`;
 		const current = configurationService.getValue<string>(configKey);
 		if (!current) {
+			// Prefer detected profile display name (e.g. "PowerShell") over path basename.
+			try {
+				const profiles = await backend.getProfiles(undefined, undefined, true);
+				const def = profiles.find(p => p.isDefault) || profiles[0];
+				if (def?.profileName) {
+					configurationService.updateValue(configKey, def.profileName);
+					return;
+				}
+			} catch {
+				// fall through
+			}
 			const shell = await backend.getDefaultSystemShell();
-			const name = shell.split('/').pop() || 'zsh';
+			const name = getShellBasename(shell) || (isWindows ? 'PowerShell' : isMacintosh ? 'zsh' : 'bash');
 			configurationService.updateValue(configKey, name);
 		}
 	}

@@ -21,13 +21,13 @@ use crate::keybinding::{
 /// - Single-key bindings and two-key chords (`Ctrl+K Ctrl+C`)
 /// - "when" clause context evaluation
 /// - Negative bindings (command starting with `-`) to remove earlier bindings
-/// - Chord timeout (3 seconds between first and second key)
+/// - Chord timeout (5 seconds between first and second key, VS Code align)
 /// - Source-based priority: User > Extension > Default
 #[derive(Clone, Debug)]
 pub struct KeybindingResolver {
     bindings: Vec<KeyBinding>,
     sources: Vec<KeybindingSource>,
-    chord_first: Option<KeyCombo>,
+    chord: Option<ChordState>,
 }
 
 impl Default for KeybindingResolver {
@@ -42,7 +42,7 @@ impl KeybindingResolver {
         let mut resolver = Self {
             bindings: Vec::new(),
             sources: Vec::new(),
-            chord_first: None,
+            chord: None,
         };
         resolver.load_defaults();
         resolver
@@ -111,18 +111,22 @@ impl KeybindingResolver {
     /// Process a key press through the chord state machine.
     /// Returns a `KeybindingMatch` indicating whether the key was consumed.
     pub fn process_key(&mut self, combo: &KeyCombo, context: &ContextKeys) -> KeybindingMatch {
-        if let Some(first) = self.chord_first.take() {
-            if let Some((cmd, args)) = self.resolve_chord_full(&first, combo, context) {
+        if let Some(state) = self.chord.take() {
+            if state.is_expired() {
+                // Timed out — treat this press as a fresh key (VS Code leaves chord mode).
+            } else if let Some((cmd, args)) = self.resolve_chord_full(&state.first_combo, combo, context)
+            {
                 return KeybindingMatch::Full {
                     command: cmd.to_owned(),
                     args: args.cloned(),
                 };
+            } else {
+                return KeybindingMatch::None;
             }
-            return KeybindingMatch::None;
         }
 
         if self.is_chord_prefix(combo, context) {
-            self.chord_first = Some(combo.clone());
+            self.chord = Some(ChordState::new(combo.clone()));
             return KeybindingMatch::PartialChord;
         }
 
@@ -137,19 +141,17 @@ impl KeybindingResolver {
 
     /// Reset the chord state (e.g. on timeout or Escape).
     pub fn reset_chord(&mut self) {
-        self.chord_first = None;
+        self.chord = None;
     }
 
     /// Check if we're currently waiting for the second key of a chord.
     pub fn in_chord(&self) -> bool {
-        self.chord_first.is_some()
+        self.chord.as_ref().is_some_and(|c| !c.is_expired())
     }
 
     /// Create a `ChordState` snapshot if we're in a chord.
     pub fn chord_state(&self) -> Option<ChordState> {
-        self.chord_first
-            .as_ref()
-            .map(|c| ChordState::new(c.clone()))
+        self.chord.clone()
     }
 
     // ── Resolution with negative binding support ────────────────────────
