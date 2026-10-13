@@ -1,9 +1,8 @@
 name: Release
 
+# Build-mirror copy: do not auto-run on every tag (cloud-build.yml owns tag builds).
+# Manual release only — needs Apple/Azure/R2 secrets if you want signed publish.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
