@@ -125,3 +125,26 @@ Live suite: **44/44** with `SIDEX_SSH_LAB` (`cargo test -p sidex-remote --test l
 - Remote file watching
 - Recent-hosts persistence
 - Full jeanp413 / MS remote-ssh server install path
+
+## Extra live suite: `tests/live_ssh_matrix.rs` (45 tests, all pass)
+
+A second, independent live suite against `scripts/remote-ssh-lab.sh`
+(`SIDEX_SSH_LAB=/tmp/sidex-ssh-lab cargo test -p sidex-remote --tests`):
+ed25519/RSA/encrypted key (missing / right / wrong passphrase), agent and
+IdentityFile fallback, password, PAM keyboard-interactive, wrong creds,
+host key learned→trusted / changed / strict-unknown, refused / blackhole
+timeout / bad DNS (bounded), parallel multi-host, cancel during connect,
+kill-session-mid-command → `SIDEX_CONNECTION_LOST` (no hang) + backoff
+reconnect while the host restarts, no retry on auth failure, ssh_config
+alias / multi-alias / Include glob / wildcard / user@alias + overrides /
+ProxyJump (verified via jump sshd `direct-tcpip` log) / loop rejected /
+ProxyCommand ok + broken, exit codes / stderr / env quoting / SIGKILL=137,
+fish login shell bypass, concurrent + 5 MB output, PTY `stty size` after
+resize, `-L` port 0, reverse forward → `SIDEX_UNSUPPORTED`, FS CRUD /
+EEXIST / rename overwrite / 8 MB binary / weird names (newline, tab,
+quotes, `$`, backtick, CJK, emoji, leading dash) / symlinks (dir, file,
+broken) / EACCES / EISDIR / ENOTDIR / ENOENT / external change, platform
+detect (bash + fish).
+
+The lab also authorizes `~/.ssh/id_*.pub` on :2222 so the default
+`smoke:remote-ssh` (no env) stays 39/39.

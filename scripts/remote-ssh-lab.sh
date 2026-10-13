@@ -78,6 +78,8 @@ up() {
   [ -f "$LAB/id_lab_rsa" ] || ssh-keygen -q -t rsa -b 2048 -N '' -C sidex-lab-rsa -f "$LAB/id_lab_rsa"
   [ -f "$LAB/id_unauthorized" ] || ssh-keygen -q -t ed25519 -N '' -f "$LAB/id_unauthorized"
   cat "$LAB"/id_lab.pub "$LAB"/id_lab_enc.pub "$LAB"/id_lab_agent.pub "$LAB"/id_lab_rsa.pub > "$LAB/authorized_keys"
+  # keep the default smoke (~/.ssh/id_* on :2222) working
+  for k in "$HOME"/.ssh/id_*.pub; do [ -f "$k" ] && cat "$k" >> "$LAB/authorized_keys"; done
   chmod 644 "$LAB/authorized_keys" "$LAB"/*.pub; chmod 600 "$LAB"/id_lab "$LAB"/id_lab_enc "$LAB"/id_lab_agent "$LAB"/id_lab_rsa "$LAB"/id_unauthorized
 
   conf 2222 "${KEYONLY[@]}"
