@@ -289,14 +289,14 @@ async function boot() {
 			'terminal.integrated.profiles.osx': {
 				zsh: { path: 'zsh', args: ['-l'] },
 				bash: { path: 'bash', args: ['-l'], icon: 'terminal-bash' },
-				fish: { path: 'fish', args: ['-l'] },
+				fish: { path: 'fish' },
 				tmux: { path: 'tmux', icon: 'terminal-tmux' },
 				pwsh: { path: 'pwsh', icon: 'terminal-powershell' }
 			},
 			'terminal.integrated.profiles.linux': {
 				bash: { path: 'bash', args: ['-l'], icon: 'terminal-bash' },
 				zsh: { path: 'zsh', args: ['-l'] },
-				fish: { path: 'fish', args: ['-l'] },
+				fish: { path: 'fish' },
 				tmux: { path: 'tmux', icon: 'terminal-tmux' },
 				pwsh: { path: 'pwsh', icon: 'terminal-powershell' }
 			},
@@ -315,10 +315,14 @@ async function boot() {
 			'terminal.integrated.defaultLocation': 'view',
 			'terminal.integrated.shellIntegration.enabled': true,
 			'terminal.integrated.shellIntegration.decorationsEnabled': 'both',
+			// VS Code default: basic terminal IntelliSense (needs shell integration).
+			'terminal.integrated.suggest.enabled': true,
+			'terminal.integrated.suggest.quickSuggestions': { commands: 'on', arguments: 'on', unknown: 'off' },
+			'terminal.integrated.suggest.suggestOnTriggerCharacters': true,
 			// VS Code 1.140+: sharper terminal text on macOS high-DPI (experimental).
 			'terminal.integrated.fontRendering': 'inherit',
 			'terminal.integrated.gpuAcceleration': 'auto',
-			'terminal.integrated.smoothScrolling': true,
+			'terminal.integrated.smoothScrolling': false, // VS Code default; animation costs frames
 			'terminal.integrated.enableImages': false,
 			// VS Code 1.140 chat terminal output reflow (kept for parity; AI surfaces stay off).
 			'chat.tools.terminal.outputReflow': true,
@@ -358,7 +362,7 @@ async function boot() {
 			'workbench.experimental.modernUIEditorTabStyle': 'default',
 			'editor.multiCursorPaste': 'spread',
 			'editor.selectedTextMatchMode': 'findOptions',
-			'workbench.list.smoothScrolling': true,
+			'workbench.list.smoothScrolling': false, // VS Code default; snappier tree/list
 			'editor.smoothScrolling': false,
 			'workbench.tree.indent': 8,
 			'workbench.editor.wrapTabs': false,

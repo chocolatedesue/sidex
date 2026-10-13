@@ -1,6 +1,6 @@
 {
   "name": "sidex",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "type": "module",
   "scripts": {
     "setup": "bash scripts/ensure-file-icon-theme.sh && bash scripts/ensure-pdfium-wasm.sh && node scripts/generate-extension-meta.js",
@@ -25,7 +25,8 @@
     "cli:install": "bash scripts/install-cli.sh",
     "smoke:cli-icons": "node scripts/smoke-cli-and-icons.mjs",
     "smoke:ux": "node scripts/smoke-ux-polish.mjs",
-    "smoke:pdf": "bash scripts/ensure-pdfium-wasm.sh && node scripts/smoke-marketplace-pdf.mjs"
+    "smoke:pdf": "bash scripts/ensure-pdfium-wasm.sh && node scripts/smoke-marketplace-pdf.mjs",
+    "smoke:terminal": "node scripts/smoke-terminal-ux-perf.mjs"
   },
   "dependencies": {
     "@embedpdf/snippet": "^2.15.1",

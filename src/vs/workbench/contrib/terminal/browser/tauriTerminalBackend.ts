@@ -199,12 +199,27 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 			const dataBuffer: string[] = [];
 			let attached = false;
 
+			// rAF-coalesce IPC chunks so xterm.write sees fewer, larger bursts (cross-checked vs emit coalesce).
+			let rafPending: string[] = [];
+			let rafHandle = 0;
+			const flushRaf = () => {
+				rafHandle = 0;
+				if (rafPending.length === 0) {
+					return;
+				}
+				const merged = rafPending.join('');
+				rafPending = [];
+				this._onProcessData.fire(merged);
+			};
 			this._unlisten = await _listen('terminal-data', event => {
 				const payload = event.payload as { terminal_id: number; data: string };
 				if (this._backendId !== undefined && payload.terminal_id === this._backendId) {
 					this._consumeOsc7(payload.data);
 					if (attached) {
-						this._onProcessData.fire(payload.data);
+						rafPending.push(payload.data);
+						if (!rafHandle) {
+							rafHandle = (globalThis.requestAnimationFrame || ((cb: FrameRequestCallback) => setTimeout(cb, 16) as unknown as number))(flushRaf);
+						}
 					} else {
 						dataBuffer.push(payload.data);
 					}
@@ -213,6 +228,7 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 					ackTerminalData(payload.terminal_id, payload.data);
 				}
 			});
+			this._register({ dispose: () => { if (rafHandle) { (globalThis.cancelAnimationFrame || clearTimeout)(rafHandle); rafHandle = 0; } if (rafPending.length) flushRaf(); } });
 
 			this._unlistenExit = await _listen('terminal-exit', event => {
 				const payload = event.payload as { terminal_id: number; exit_code: number };
