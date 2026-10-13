@@ -223,6 +223,9 @@ import './contrib/searchEditor/browser/searchEditor.contribution.js';
 // Sash
 import './contrib/sash/browser/sash.contribution.js';
 
+// SideX UX polish (VS Code 1.141 density + frosted glass)
+import './contrib/sidexUx/browser/sidexUx.contribution.js';
+
 // SCM
 import './contrib/scm/browser/scm.contribution.js';
 import './contrib/scm/browser/git.contribution.js';

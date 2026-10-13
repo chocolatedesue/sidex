@@ -349,7 +349,19 @@ async function boot() {
 			'workbench.tree.renderIndentGuides': 'always',
 			'security.workspace.trust.startupPrompt': 'never',
 			'security.workspace.trust.banner': 'never',
-			'security.workspace.trust.enabled': false
+			'security.workspace.trust.enabled': false,
+			// VS Code 1.141 UX defaults
+			'window.density.layout': 'default',
+			'window.density.editorTabHeight': 'default',
+			'workbench.modernUIFrostedGlass': true,
+			'workbench.modernUIFrostedGlassOpacity': 0.72,
+			'editor.multiCursorPaste': 'spread',
+			'editor.selectedTextMatchMode': 'findOptions',
+			'workbench.list.smoothScrolling': true,
+			'editor.smoothScrolling': false,
+			'workbench.tree.indent': 8,
+			'workbench.editor.wrapTabs': false,
+			'window.autoDetectHighContrast': true
 		}
 	};
 
