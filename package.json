@@ -1,6 +1,6 @@
 {
   "name": "sidex",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "type": "module",
   "scripts": {
     "setup": "bash scripts/ensure-file-icon-theme.sh && node scripts/generate-extension-meta.js",
@@ -23,7 +23,8 @@
     "smoke:preview-md-diff": "node scripts/smoke-preview-and-md-diff.mjs",
     "smoke:remote-ssh": "node scripts/smoke-remote-ssh.mjs",
     "cli:install": "bash scripts/install-cli.sh",
-    "smoke:cli-icons": "node scripts/smoke-cli-and-icons.mjs"
+    "smoke:cli-icons": "node scripts/smoke-cli-and-icons.mjs",
+    "smoke:ux": "node scripts/smoke-ux-polish.mjs"
   },
   "dependencies": {
     "@embedpdf/snippet": "^2.15.1",

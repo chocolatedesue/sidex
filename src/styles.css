@@ -893,3 +893,111 @@ html, body {
 .hidden {
   display: none !important;
 }
+
+/* ==================== SIDEX UX POLISH — VS Code 1.141 ==================== */
+
+/* Compact layout density (window.density.layout = compact) */
+.monaco-workbench.density-compact .part.titlebar {
+  --titlebar-height: 30px;
+}
+.monaco-workbench.density-compact .part.titlebar > .titlebar-container {
+  height: 30px;
+  line-height: 30px;
+}
+.monaco-workbench.density-compact .part.statusbar {
+  height: 20px;
+  min-height: 20px;
+  font-size: 11px;
+}
+.monaco-workbench.density-compact .part.sidebar > .title,
+.monaco-workbench.density-compact .part.auxiliarybar > .title {
+  height: 28px;
+  line-height: 28px;
+}
+.monaco-workbench.density-compact .split-view-view:not(:first-child) {
+  /* Tighter gaps between workbench parts */
+}
+.monaco-workbench.density-compact .monaco-sash.vertical {
+  width: 3px !important;
+}
+.monaco-workbench.density-compact .monaco-sash.horizontal {
+  height: 3px !important;
+}
+.monaco-workbench.density-compact .part.editor > .content .editor-group-container > .title .tabs-container > .tab {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.monaco-workbench.density-compact .activitybar.compact,
+.monaco-workbench.density-compact .part.activitybar {
+  /* Activity bar already has its own compact size setting; keep chrome tight */
+}
+
+/* Frosted glass overlays (workbench.modernUIFrostedGlass) */
+.monaco-workbench.frosted-glass .quick-input-widget,
+.monaco-workbench.frosted-glass .monaco-menu-container .monaco-menu,
+.monaco-workbench.frosted-glass .context-view .monaco-menu,
+.monaco-workbench.frosted-glass .monaco-editor .suggest-widget,
+.monaco-workbench.frosted-glass .monaco-editor .monaco-hover,
+.monaco-workbench.frosted-glass .notifications-center,
+.monaco-workbench.frosted-glass .notification-toast-container .notification-toast {
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  background-color: color-mix(
+    in srgb,
+    var(--vscode-quickInput-background, var(--vscode-editorWidget-background, #1a1a1a))
+      calc(var(--sidex-frosted-opacity, 0.72) * 100%),
+    transparent
+  ) !important;
+}
+
+.monaco-workbench.no-frosted-glass .quick-input-widget,
+.monaco-workbench.no-frosted-glass .monaco-menu-container .monaco-menu,
+.monaco-workbench.no-frosted-glass .context-view .monaco-menu {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .monaco-workbench.frosted-glass .quick-input-widget,
+  .monaco-workbench.frosted-glass .monaco-menu-container .monaco-menu,
+  .monaco-workbench.frosted-glass .context-view .monaco-menu,
+  .monaco-workbench.frosted-glass .monaco-editor .suggest-widget,
+  .monaco-workbench.frosted-glass .monaco-editor .monaco-hover,
+  .monaco-workbench.frosted-glass .notifications-center,
+  .monaco-workbench.frosted-glass .notification-toast-container .notification-toast {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Empty explorer / welcome empty-state polish */
+.monaco-workbench .explorer-viewlet .monaco-list-rows:empty::after,
+.monaco-workbench .pane-body.explorer-folders-view .monaco-list:empty::after {
+  content: none;
+}
+.monaco-workbench .explorer-folders-view .pane-body .monaco-tl-row {
+  /* keep default tree look */
+}
+.monaco-workbench .welcomePage,
+.monaco-workbench .gettingStartedContainer {
+  letter-spacing: 0.01em;
+}
+.monaco-workbench .gettingStartedContainer .gettingStartedCategoriesContainer .category-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Titlebar command-center: slightly tighter hit targets (VS Code feel) */
+.monaco-workbench .part.titlebar .command-center .action-item .action-label {
+  border-radius: var(--sidex-radius-sm);
+}
+.monaco-workbench .part.titlebar .window-title {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Overlay-style scrollbars already thin; keep corner clean on editor */
+.monaco-workbench .monaco-scrollable-element > .scrollbar > .slider {
+  border-radius: 6px;
+}
+

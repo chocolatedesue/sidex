@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "SideX",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "identifier": "dev.sidex.app",
   "build": {
     "frontendDist": "../dist",
@@ -23,7 +23,8 @@
         "shadow": true,
         "visible": false,
         "dragDropEnabled": true,
-        "useHttpsScheme": true
+        "useHttpsScheme": true,
+        "backgroundColor": "#111111"
       }
     ],
     "security": {
@@ -45,7 +46,9 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["sidex"]
+        "schemes": [
+          "sidex"
+        ]
       }
     }
   },
@@ -62,7 +65,10 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["md", "markdown"],
+        "ext": [
+          "md",
+          "markdown"
+        ],
         "name": "Markdown",
         "description": "Markdown document",
         "role": "Editor",

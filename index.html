@@ -37,14 +37,14 @@
 			} catch (_) {
 				globalThis.__SIDEX_ARCH__ = 'x64';
 			}
-			globalThis._VSCODE_PACKAGE_JSON = { version: '1.110.0', name: 'sidex' };
+			globalThis._VSCODE_PACKAGE_JSON = { version: '1.141.0', name: 'sidex' };
 			globalThis._VSCODE_PRODUCT_JSON = {
 				nameShort: 'SideX',
 				nameLong: 'SideX',
 				applicationName: 'sidex',
 				dataFolderName: '.sidex',
 				urlProtocol: 'sidex',
-				version: '1.110.0',
+				version: '1.141.0',
 				commit: '',
 				date: new Date().toISOString(),
 				quality: 'stable',
@@ -82,5 +82,57 @@
 			}
 		</style>
 	</head>
-	<body aria-label=""></body>
+	<body aria-label="">
+		<div id="sidex-splash" aria-hidden="true">
+			<div class="sidex-splash-mark">SideX</div>
+			<div class="sidex-splash-sub">Loading workbench…</div>
+		</div>
+		<style>
+			#sidex-splash {
+				position: fixed;
+				inset: 0;
+				z-index: 100000;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				gap: 10px;
+				background: #111111;
+				color: #c8c8c8;
+				pointer-events: none;
+				transition: opacity 180ms ease;
+			}
+			#sidex-splash.hidden {
+				opacity: 0;
+			}
+			#sidex-splash .sidex-splash-mark {
+				font-size: 28px;
+				font-weight: 200;
+				letter-spacing: -0.5px;
+			}
+			#sidex-splash .sidex-splash-sub {
+				font-size: 12px;
+				color: #606060;
+				letter-spacing: 0.04em;
+			}
+		</style>
+		<script>
+			// Hide splash once the workbench root mounts (or after a safety timeout).
+			(function () {
+				const splash = document.getElementById('sidex-splash');
+				if (!splash) return;
+				const hide = () => {
+					splash.classList.add('hidden');
+					setTimeout(() => splash.remove(), 220);
+				};
+				const ready = () => !!document.querySelector('.monaco-workbench');
+				if (ready()) { hide(); return; }
+				const obs = new MutationObserver(() => {
+					if (ready()) { obs.disconnect(); hide(); }
+				});
+				obs.observe(document.documentElement, { childList: true, subtree: true });
+				setTimeout(() => { obs.disconnect(); hide(); }, 8000);
+			})();
+		</script>
+	</body>
 </html>
