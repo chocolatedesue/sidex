@@ -52,7 +52,11 @@ for (const cmd of [
   'remote_home',
   'remote_mkdir',
   'remote_delete',
-  'remote_rename'
+  'remote_rename',
+  'remote_cancel_connect',
+  'remote_reconnect',
+  'remote_detect_platform',
+  'remote_forward_port'
 ]) {
   step(`tauri.cmd.${cmd}`, remoteRs.includes(`pub async fn ${cmd}`) || remoteRs.includes(`pub fn ${cmd}`));
 }
@@ -60,7 +64,7 @@ for (const cmd of [
 const libRs = read('src-tauri/src/lib.rs');
 step(
   'tauri.handlers.remoteFs',
-  libRs.includes('commands::remote_read_dir') && libRs.includes('commands::remote_home')
+  libRs.includes('commands::remote_read_dir') && libRs.includes('commands::remote_home') && libRs.includes('commands::remote_cancel_connect')
 );
 
 const svc = read('src/vs/platform/sidex/browser/sidexRemoteService.ts');
@@ -79,6 +83,8 @@ step('contrib.managedConnection', sshContrib.includes('ManagedRemoteConnection')
 
 const remoteContrib = read('src/vs/workbench/contrib/remote/browser/remote.contribution.ts');
 step('contrib.authFallback', remoteContrib.includes('connectSshWithAuthFallback'));
+step('contrib.closeRemote', remoteContrib.includes('sidex.remote.close'));
+step('contrib.friendlyErrors', remoteContrib.includes('SIDEX_HOSTKEY_CHANGED') || remoteContrib.includes('friendlySshError'));
 step('contrib.afterConnectWired', remoteContrib.includes('afterSshConnected'));
 step('contrib.statusListener', remoteContrib.includes('onDidChangeConnections'));
 
@@ -87,6 +93,11 @@ step('main.imports.remoteSsh', main.includes("remoteSsh.contribution.js"));
 
 const apiImpl = read('src/vs/workbench/api/common/extHost.api.impl.ts');
 step('api.registerRemoteAuthorityResolver', apiImpl.includes('registerRemoteAuthorityResolver'));
+const hostCjs = read('src-tauri/extension-host/host.cjs');
+step('hostcjs.resolverStore', hostCjs.includes('_remoteAuthorityResolvers') && !hostCjs.includes('registerRemoteAuthorityResolver: (authorityPrefix, resolver) => noopDisposable'));
+step('hostcjs.openAuthorityRoute', hostCjs.includes('sidex.remote.openAuthority'));
+step('crate.ssh_config', read('crates/sidex-remote/src/ssh_config.rs').includes('resolve_proxy_jumps'));
+step('crate.errors', read('crates/sidex-remote/src/errors.rs').includes('HOSTKEY_CHANGED'));
 
 // Crate unit tests (no live SSH required)
 const cargo = spawnSync(

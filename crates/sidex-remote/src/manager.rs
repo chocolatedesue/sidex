@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
@@ -44,6 +45,13 @@ pub struct ConnectionInfo {
     pub label: String,
     /// Seconds since the connection was established.
     pub connected_secs: u64,
+    /// `false` when the transport noticed the link dropped.
+    #[serde(default = "yes")]
+    pub alive: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +59,7 @@ pub struct ConnectionInfo {
 // ---------------------------------------------------------------------------
 
 struct Entry {
-    transport: Box<dyn RemoteTransport>,
+    transport: Arc<dyn RemoteTransport>,
     kind: ConnectionKind,
     label: String,
     connected_at: Instant,
@@ -82,9 +90,29 @@ impl RemoteManager {
         }
     }
 
+    /// Register an already-connected transport (lets callers connect
+    /// without holding the manager lock).
+    pub fn insert_transport(
+        &mut self,
+        transport: Arc<dyn RemoteTransport>,
+        kind: ConnectionKind,
+        label: String,
+    ) -> ConnectionId {
+        self.insert_arc(transport, kind, label)
+    }
+
     fn insert(
         &mut self,
         transport: Box<dyn RemoteTransport>,
+        kind: ConnectionKind,
+        label: String,
+    ) -> ConnectionId {
+        self.insert_arc(Arc::from(transport), kind, label)
+    }
+
+    fn insert_arc(
+        &mut self,
+        transport: Arc<dyn RemoteTransport>,
         kind: ConnectionKind,
         label: String,
     ) -> ConnectionId {
@@ -182,6 +210,21 @@ impl RemoteManager {
         Ok(())
     }
 
+    /// Remove a connection without disconnecting it.
+    pub fn take(&mut self, id: ConnectionId) -> Option<Arc<dyn RemoteTransport>> {
+        self.connections.remove(&id).map(|e| e.transport)
+    }
+
+    /// Shared handle to a transport, usable after the manager lock is dropped.
+    pub fn get_arc(&self, id: ConnectionId) -> Option<Arc<dyn RemoteTransport>> {
+        self.connections.get(&id).map(|e| Arc::clone(&e.transport))
+    }
+
+    /// Label of a connection.
+    pub fn label(&self, id: ConnectionId) -> Option<String> {
+        self.connections.get(&id).map(|e| e.label.clone())
+    }
+
     /// Retrieve a reference to the transport behind a connection.
     pub fn get(&self, id: ConnectionId) -> Option<&dyn RemoteTransport> {
         self.connections.get(&id).map(|e| &*e.transport)
@@ -196,6 +239,7 @@ impl RemoteManager {
                 kind: entry.kind,
                 label: entry.label.clone(),
                 connected_secs: entry.connected_at.elapsed().as_secs(),
+                alive: entry.transport.is_alive(),
             })
             .collect()
     }

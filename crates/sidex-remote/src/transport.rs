@@ -29,6 +29,8 @@ pub struct DirEntry {
     pub name: String,
     pub path: String,
     pub is_dir: bool,
+    #[serde(default)]
+    pub is_symlink: bool,
     pub size: u64,
     pub modified: Option<SystemTime>,
 }
@@ -124,4 +126,41 @@ pub trait RemoteTransport: Send + Sync {
 
     /// Gracefully close the remote connection.
     async fn disconnect(&self) -> Result<()>;
+
+    /// Remote `$HOME`.
+    async fn home(&self) -> Result<String> {
+        let o = self.exec("printf '%s' \"$HOME\"").await?;
+        Ok(o.stdout.trim().to_string())
+    }
+
+    /// Create one directory (parent must exist).
+    async fn mkdir(&self, path: &str) -> Result<()> {
+        self.checked(&format!("mkdir -p -- {}", crate::shell::sh_quote(path))).await
+    }
+
+    /// Delete a file or directory.
+    async fn remove(&self, path: &str, recursive: bool) -> Result<()> {
+        let flag = if recursive { "-rf" } else { "-f" };
+        self.checked(&format!("rm {flag} -- {}", crate::shell::sh_quote(path))).await
+    }
+
+    /// Rename / move.
+    async fn rename(&self, from: &str, to: &str, _overwrite: bool) -> Result<()> {
+        let q = crate::shell::sh_quote;
+        self.checked(&format!("mv -f -- {} {}", q(from), q(to))).await
+    }
+
+    /// `false` once the underlying connection is known to be gone.
+    fn is_alive(&self) -> bool {
+        true
+    }
+
+    #[doc(hidden)]
+    async fn checked(&self, cmd: &str) -> Result<()> {
+        let o = self.exec(cmd).await?;
+        if o.exit_code != 0 {
+            anyhow::bail!("`{cmd}` failed ({}): {}", o.exit_code, o.stderr.trim());
+        }
+        Ok(())
+    }
 }

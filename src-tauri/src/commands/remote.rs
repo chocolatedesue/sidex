@@ -1,11 +1,17 @@
 //! Tauri commands that expose the `sidex-remote` crate to the frontend.
 //!
-//! A single [`RemoteManagerStore`] is held as Tauri state and wraps the
-//! `RemoteManager` in a `tokio::Mutex` so connections can be shared across
-//! async command invocations.
+//! The [`RemoteManager`] lives behind a `tokio::Mutex`, but the lock is only
+//! held for map lookups: connects and FS calls run on a cloned
+//! `Arc<dyn RemoteTransport>` so several hosts can connect / work in
+//! parallel and a slow host never blocks the others.
+//!
+//! Errors keep the `[SIDEX_<CODE>]` prefix from `sidex_remote::errors` so
+//! the frontend can map them precisely.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -13,21 +19,49 @@ use tokio::sync::Mutex;
 
 use sidex_remote::{
     codespaces::list_codespace_info,
-    ssh::{parse_ssh_config, SshAuth},
+    errors,
+    ssh::{HostKeyPolicy, SshAuth, SshConnectOptions, SshTransport},
+    ssh_config::SshConfig,
+    transport::RemoteTransport,
     ConnectionId, ConnectionInfo, ConnectionKind, RemoteManager,
 };
 
 // ── State ───────────────────────────────────────────────────────────
 
+#[derive(Clone)]
+struct SshParams {
+    host: String,
+    user: Option<String>,
+    port: Option<u16>,
+    auth: SshAuth,
+    opts: SshConnectOptions,
+}
+
+type SshMap = HashMap<u64, (Arc<SshTransport>, SshParams)>;
+
 pub struct RemoteManagerStore {
     inner: Arc<Mutex<RemoteManager>>,
+    ssh: Arc<Mutex<SshMap>>,
+    pending: Arc<std::sync::Mutex<HashMap<String, tokio::task::AbortHandle>>>,
 }
 
 impl RemoteManagerStore {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(RemoteManager::new())),
+            ssh: Arc::new(Mutex::new(HashMap::new())),
+            pending: Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
+    }
+
+    async fn transport(&self, id: u64) -> Result<Arc<dyn RemoteTransport>, String> {
+        self.inner
+            .lock()
+            .await
+            .get_arc(ConnectionId(id))
+            .ok_or_else(|| {
+                format!("[{}] no remote connection with id {id} (closed?)", errors::CONNECTION_LOST)
+            })
     }
 }
 
@@ -46,6 +80,8 @@ pub struct SshHostInfo {
     pub port: Option<u16>,
     pub user: Option<String>,
     pub identity_file: Option<String>,
+    pub proxy_jump: Option<String>,
+    pub proxy_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -83,6 +119,18 @@ pub struct RemoteConnectionEntry {
     pub kind: String,
     pub label: String,
     pub connected_secs: u64,
+    pub alive: bool,
+    /// SSH only: `trusted` | `learned` | `unchecked`.
+    pub host_key: Option<String>,
+    pub host_key_fingerprint: Option<String>,
+    pub jumps: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RemotePlatformResult {
+    pub platform: String,
+    pub arch: String,
+    pub shell: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -136,59 +184,215 @@ fn to_entry(info: ConnectionInfo) -> RemoteConnectionEntry {
         kind: kind_as_str(info.kind).to_string(),
         label: info.label,
         connected_secs: info.connected_secs,
+        alive: info.alive,
+        host_key: None,
+        host_key_fingerprint: None,
+        jumps: 0,
     }
 }
 
 // ── Commands ────────────────────────────────────────────────────────
 
+fn load_ssh_config() -> SshConfig {
+    SshConfig::load_default().unwrap_or_else(|e| {
+        log::warn!("ignoring unreadable SSH config: {e}");
+        SshConfig::default()
+    })
+}
+
+/// Concrete (non-wildcard) hosts from `~/.ssh/config` (Include honoured).
 #[tauri::command]
 pub fn remote_list_ssh_hosts() -> Result<Vec<SshHostInfo>, String> {
-    let config_path =
-        dirs::home_dir().map_or_else(|| PathBuf::from("~/.ssh/config"), |h| h.join(".ssh/config"));
-
-    if !config_path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let hosts =
-        parse_ssh_config(&config_path).map_err(|e| format!("failed to parse SSH config: {e}"))?;
-
-    Ok(hosts
+    let cfg = SshConfig::load_default().map_err(|e| format!("failed to parse SSH config: {e}"))?;
+    Ok(cfg
+        .hosts()
         .into_iter()
-        .filter(|h| !h.host_pattern.contains('*'))
-        .map(|h| SshHostInfo {
-            host: h.host_pattern,
-            hostname: h.hostname,
-            port: h.port,
-            user: h.user,
-            identity_file: h.identity_file.map(|p| p.to_string_lossy().into_owned()),
+        .map(|alias| {
+            let r = cfg.resolve(&alias);
+            SshHostInfo {
+                host: alias,
+                hostname: Some(r.hostname),
+                port: Some(r.port),
+                user: r.user,
+                identity_file: r
+                    .identity_files
+                    .first()
+                    .map(|p| p.to_string_lossy().into_owned()),
+                proxy_jump: r.proxy_jump,
+                proxy_command: r.proxy_command,
+            }
         })
         .collect())
 }
 
+fn ssh_entry(info: ConnectionInfo, t: &SshTransport) -> RemoteConnectionEntry {
+    use sidex_remote::ssh::HostKeyOutcome as H;
+    let mut e = to_entry(info);
+    let (kind, fp) = match &t.host_key {
+        H::Trusted { fingerprint } => ("trusted", fingerprint),
+        H::Learned { fingerprint } => ("learned", fingerprint),
+        H::Unchecked { fingerprint } | H::Changed { fingerprint, .. } | H::Rejected { fingerprint } => {
+            ("unchecked", fingerprint)
+        }
+    };
+    e.host_key = Some(kind.into());
+    e.host_key_fingerprint = Some(fp.clone());
+    e.jumps = t.jump_count();
+    e
+}
+
+async fn do_connect_ssh(
+    store: &RemoteManagerStore,
+    params: SshParams,
+    request_id: Option<String>,
+) -> Result<RemoteConnectionEntry, String> {
+    let p = params.clone();
+    let task = tokio::spawn(async move {
+        let cfg = load_ssh_config();
+        SshTransport::connect_destination(&p.host, p.user.as_deref(), p.port, p.auth, p.opts, &cfg).await
+    });
+    if let Some(id) = &request_id {
+        store.pending.lock().unwrap().insert(id.clone(), task.abort_handle());
+    }
+    let res = task.await;
+    if let Some(id) = &request_id {
+        store.pending.lock().unwrap().remove(id);
+    }
+    let transport = match res {
+        Ok(Ok(t)) => Arc::new(t),
+        Ok(Err(e)) => return Err(format!("SSH connect failed: {e:#}")),
+        Err(j) if j.is_cancelled() => {
+            return Err(format!("[{}] connection to {} was cancelled", errors::CANCELLED, params.host))
+        }
+        Err(j) => return Err(format!("SSH connect task failed: {j}")),
+    };
+    let ep = transport.endpoint();
+    let label = if params.host.contains('@') || params.host == ep.host {
+        format!("{}@{}:{}", ep.user, ep.host, ep.port)
+    } else {
+        format!("{} ({}@{}:{})", params.host, ep.user, ep.host, ep.port)
+    };
+    let dyn_t: Arc<dyn RemoteTransport> = transport.clone();
+    let (id, info) = {
+        let mut mgr = store.inner.lock().await;
+        let id = mgr.insert_transport(dyn_t, ConnectionKind::Ssh, label);
+        let info = mgr
+            .active_connections()
+            .into_iter()
+            .find(|c| c.id == id)
+            .ok_or_else(|| "connection disappeared immediately".to_string())?;
+        (id, info)
+    };
+    let entry = ssh_entry(info, &transport);
+    store.ssh.lock().await.insert(id.0, (transport, params));
+    Ok(entry)
+}
+
+/// Connect to `host` — an ssh_config alias, `user@host[:port]` or
+/// `ssh://…`. `request_id` makes the attempt cancellable via
+/// [`remote_cancel_connect`].
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn remote_connect_ssh(
     host: String,
     user: String,
     port: Option<u16>,
     auth: SshAuthPayload,
+    request_id: Option<String>,
+    timeout_secs: Option<u64>,
+    strict_host_key: Option<bool>,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<RemoteConnectionEntry, String> {
-    let port = port.unwrap_or(22);
-    let auth: SshAuth = auth.into();
+    let mut opts = SshConnectOptions::default();
+    if let Some(t) = timeout_secs {
+        opts.connect_timeout = Duration::from_secs(t.clamp(1, 600));
+    }
+    if strict_host_key == Some(true) {
+        opts.host_key_policy = HostKeyPolicy::Strict;
+    }
+    let params = SshParams {
+        host,
+        user: Some(user).filter(|u| !u.is_empty()),
+        port,
+        auth: auth.into(),
+        opts,
+    };
+    do_connect_ssh(&store, params, request_id).await
+}
 
-    let mut mgr = store.inner.lock().await;
-    let id = mgr
-        .connect_ssh_as(&user, &host, port, auth, Some(30))
+/// Abort an in-flight [`remote_connect_ssh`].
+#[tauri::command]
+pub fn remote_cancel_connect(request_id: String, store: State<'_, RemoteManagerStore>) -> bool {
+    store
+        .pending
+        .lock()
+        .unwrap()
+        .remove(&request_id)
+        .map(|h| h.abort())
+        .is_some()
+}
+
+/// Re-establish a dropped SSH connection with the original parameters.
+/// Returns a **new** connection id.
+#[tauri::command]
+pub async fn remote_reconnect(
+    connection_id: u64,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<RemoteConnectionEntry, String> {
+    let (old, params) = store
+        .ssh
+        .lock()
         .await
-        .map_err(|e| format!("SSH connect failed: {e}"))?;
+        .remove(&connection_id)
+        .ok_or_else(|| format!("no SSH connection with id {connection_id}"))?;
+    store.inner.lock().await.take(ConnectionId(connection_id));
+    let _ = old.disconnect().await;
+    do_connect_ssh(&store, params, None).await
+}
 
-    let info = mgr
-        .active_connections()
-        .into_iter()
-        .find(|c| c.id == id)
-        .ok_or_else(|| "connection disappeared immediately".to_string())?;
-    Ok(to_entry(info))
+/// open-remote-ssh style OS / arch detection.
+#[tauri::command]
+pub async fn remote_detect_platform(
+    connection_id: u64,
+    override_platform: Option<String>,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<RemotePlatformResult, String> {
+    let t = store
+        .ssh
+        .lock()
+        .await
+        .get(&connection_id)
+        .map(|(t, _)| Arc::clone(t))
+        .ok_or_else(|| format!("no SSH connection with id {connection_id}"))?;
+    let p = sidex_remote::ssh::detect_platform(&t, override_platform.as_deref())
+        .await
+        .map_err(|e| format!("platform detection failed: {e}"))?;
+    Ok(RemotePlatformResult {
+        platform: p.platform,
+        arch: p.arch,
+        shell: p.shell,
+    })
+}
+
+/// Local port forward; `local_port` 0 picks a free port. Returns the bound port.
+#[tauri::command]
+pub async fn remote_forward_port(
+    connection_id: u64,
+    local_port: u16,
+    remote_host: Option<String>,
+    remote_port: u16,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<u16, String> {
+    let t = store
+        .ssh
+        .lock()
+        .await
+        .get(&connection_id)
+        .map(|(t, _)| Arc::clone(t))
+        .ok_or_else(|| format!("no SSH connection with id {connection_id}"))?;
+    t.forward_port(local_port, remote_host.as_deref().unwrap_or("127.0.0.1"), remote_port)
+        .await
+        .map_err(|e| format!("port forward failed: {e}"))
 }
 
 #[tauri::command]
@@ -197,16 +401,11 @@ pub async fn remote_exec_ssh(
     command: String,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<RemoteExecResult, String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-
+    let transport = store.transport(connection_id).await?;
     let out = transport
         .exec(&command)
         .await
         .map_err(|e| format!("remote exec failed: {e}"))?;
-
     Ok(RemoteExecResult {
         stdout: out.stdout,
         stderr: out.stderr,
@@ -365,18 +564,27 @@ pub async fn remote_disconnect(
     connection_id: u64,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<(), String> {
-    let mut mgr = store.inner.lock().await;
-    mgr.disconnect(ConnectionId(connection_id))
-        .await
-        .map_err(|e| format!("disconnect failed: {e}"))
+    store.ssh.lock().await.remove(&connection_id);
+    let t = store.inner.lock().await.take(ConnectionId(connection_id));
+    match t {
+        Some(t) => t.disconnect().await.map_err(|e| format!("disconnect failed: {e}")),
+        None => Ok(()),
+    }
 }
 
 #[tauri::command]
 pub async fn remote_active_connections(
     store: State<'_, RemoteManagerStore>,
 ) -> Result<Vec<RemoteConnectionEntry>, String> {
-    let mgr = store.inner.lock().await;
-    Ok(mgr.active_connections().into_iter().map(to_entry).collect())
+    let infos = store.inner.lock().await.active_connections();
+    let ssh = store.ssh.lock().await;
+    Ok(infos
+        .into_iter()
+        .map(|i| match ssh.get(&i.id.0) {
+            Some((t, _)) => ssh_entry(i, t),
+            None => to_entry(i),
+        })
+        .collect())
 }
 
 // ── Remote filesystem (SSH / WSL / container transport) ─────────────
@@ -386,6 +594,7 @@ pub struct RemoteDirEntryInfo {
     pub name: String,
     pub path: String,
     pub is_dir: bool,
+    pub is_symlink: bool,
     pub size: u64,
     pub modified_ms: Option<u64>,
 }
@@ -402,7 +611,7 @@ fn system_time_to_ms(t: Option<std::time::SystemTime>) -> Option<u64> {
     t.and_then(|st| {
         st.duration_since(std::time::UNIX_EPOCH)
             .ok()
-            .map(|d| d.as_millis() as u64)
+            .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
     })
 }
 
@@ -412,11 +621,9 @@ pub async fn remote_read_dir(
     path: String,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<Vec<RemoteDirEntryInfo>, String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    let entries = transport
+    let entries = store
+        .transport(connection_id)
+        .await?
         .read_dir(&path)
         .await
         .map_err(|e| format!("remote read_dir failed: {e}"))?;
@@ -426,6 +633,7 @@ pub async fn remote_read_dir(
             name: e.name,
             path: e.path,
             is_dir: e.is_dir,
+            is_symlink: e.is_symlink,
             size: e.size,
             modified_ms: system_time_to_ms(e.modified),
         })
@@ -437,15 +645,14 @@ pub async fn remote_read_file(
     connection_id: u64,
     path: String,
     store: State<'_, RemoteManagerStore>,
-) -> Result<Vec<u8>, String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    transport
+) -> Result<tauri::ipc::Response, String> {
+    let bytes = store
+        .transport(connection_id)
+        .await?
         .read_file(&path)
         .await
-        .map_err(|e| format!("remote read_file failed: {e}"))
+        .map_err(|e| format!("remote read_file failed: {e}"))?;
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[tauri::command]
@@ -455,11 +662,9 @@ pub async fn remote_write_file(
     contents: Vec<u8>,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<(), String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    transport
+    store
+        .transport(connection_id)
+        .await?
         .write_file(&path, &contents)
         .await
         .map_err(|e| format!("remote write_file failed: {e}"))
@@ -471,11 +676,9 @@ pub async fn remote_stat(
     path: String,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<RemoteStatInfo, String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    let st = transport
+    let st = store
+        .transport(connection_id)
+        .await?
         .stat(&path)
         .await
         .map_err(|e| format!("remote stat failed: {e}"))?;
@@ -492,22 +695,16 @@ pub async fn remote_home(
     connection_id: u64,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<String, String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    let out = transport
-        .exec("printf %s \"$HOME\"")
+    let home = store
+        .transport(connection_id)
+        .await?
+        .home()
         .await
         .map_err(|e| format!("remote home failed: {e}"))?;
-    if out.exit_code != 0 {
-        return Err(format!("remote home failed: {}", out.stderr));
-    }
-    let home = out.stdout.trim();
     if home.is_empty() {
         return Err("remote $HOME is empty".to_string());
     }
-    Ok(home.to_string())
+    Ok(home)
 }
 
 #[tauri::command]
@@ -516,18 +713,12 @@ pub async fn remote_mkdir(
     path: String,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<(), String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    let out = transport
-        .exec(&format!("mkdir -p {path:?}"))
+    store
+        .transport(connection_id)
+        .await?
+        .mkdir(&path)
         .await
-        .map_err(|e| format!("remote mkdir failed: {e}"))?;
-    if out.exit_code != 0 {
-        return Err(format!("remote mkdir failed: {}", out.stderr));
-    }
-    Ok(())
+        .map_err(|e| format!("remote mkdir failed: {e}"))
 }
 
 #[tauri::command]
@@ -537,23 +728,12 @@ pub async fn remote_delete(
     recursive: bool,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<(), String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    let cmd = if recursive {
-        format!("rm -rf {path:?}")
-    } else {
-        format!("rm -f {path:?}")
-    };
-    let out = transport
-        .exec(&cmd)
+    store
+        .transport(connection_id)
+        .await?
+        .remove(&path, recursive)
         .await
-        .map_err(|e| format!("remote delete failed: {e}"))?;
-    if out.exit_code != 0 {
-        return Err(format!("remote delete failed: {}", out.stderr));
-    }
-    Ok(())
+        .map_err(|e| format!("remote delete failed: {e}"))
 }
 
 #[tauri::command]
@@ -561,18 +741,13 @@ pub async fn remote_rename(
     connection_id: u64,
     from: String,
     to: String,
+    overwrite: Option<bool>,
     store: State<'_, RemoteManagerStore>,
 ) -> Result<(), String> {
-    let mgr = store.inner.lock().await;
-    let transport = mgr
-        .get(ConnectionId(connection_id))
-        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
-    let out = transport
-        .exec(&format!("mv {from:?} {to:?}"))
+    store
+        .transport(connection_id)
+        .await?
+        .rename(&from, &to, overwrite.unwrap_or(false))
         .await
-        .map_err(|e| format!("remote rename failed: {e}"))?;
-    if out.exit_code != 0 {
-        return Err(format!("remote rename failed: {}", out.stderr));
-    }
-    Ok(())
+        .map_err(|e| format!("remote rename failed: {e}"))
 }

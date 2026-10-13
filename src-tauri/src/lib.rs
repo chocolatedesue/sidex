@@ -1096,6 +1096,10 @@ pub fn run() {
             commands::remote_mkdir,
             commands::remote_delete,
             commands::remote_rename,
+            commands::remote_cancel_connect,
+            commands::remote_reconnect,
+            commands::remote_detect_platform,
+            commands::remote_forward_port,
             // Extension API introspection
             commands::ext_api_get_namespaces,
             commands::ext_api_get_commands,

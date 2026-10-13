@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.6 — 2026-10-13
+
+### Added
+- **Remote SSH behavior matrix** (`DEV_NOTES_REMOTE_SSH.md`) with pass/fixed/unsupported coverage modeled on open-remote-ssh + russh.
+- Multi-sshd lab (`scripts/remote-ssh-lab.sh`) and live suite `cargo test -p sidex-remote --test live_ssh` (44 tests).
+- SSH config parser: Include, wildcards, ProxyJump/ProxyCommand, Match, tokens.
+- Coded errors `[SIDEX_*]` (timeout, refused, host key, auth, FS errno, unsupported).
+- `remote_cancel_connect`, `remote_reconnect`, `remote_detect_platform`, `remote_forward_port`.
+- Commands: **Close Remote Connection**, **Open SSH Remote Authority**; passphrase prompt; friendly host-key errors.
+- host.cjs: real `registerRemoteAuthorityResolver`; route ssh-remote openFolder → SideX connector.
+
+### Fixed
+- Host key verification (TOFU / strict / changed).
+- Real ssh-agent auth + default identity files; encrypted keys.
+- Password → keyboard-interactive (kbd-first, empty PAM prompts).
+- ProxyJump via `direct-tcpip` + `connect_stream`; ProxyCommand via child stdio.
+- Connect timeout; parallel hosts (Arc transport, no lock across await).
+- Fish/zsh-safe remote scripts (base64 env wrap); binary/large file write via stdin `cat >`.
+- Safe path quoting; symlink-aware stat/readdir; PTY resize; local forward port 0.
+- Keepalive via russh Config (no leaking session channels).
+
+### Unchanged / still green
+- Open With ↔ VS Code UX (421fc7e), preview plugins + MD Diff WYSIWYG, Tauri 2.12 startup smokes, AI default-off, EmbedPDF path.
+
+### Unsupported (fail gracefully)
+- Reverse port forward, OTP kbd-interactive, file watching, recent hosts, jeanp413 server install/websocket.
+
+
 ## Unreleased (post-0.1.5) — Open With ↔ VS Code UX
 
 ### Fixed

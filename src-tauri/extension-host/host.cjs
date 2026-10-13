@@ -2975,6 +2975,16 @@ function createVscodeShim() {
       if (fn) return fn(...args);
       return new Promise((resolve, reject) => {
         const reqId = ++host._reqId;
+        // Route Remote-SSH open/new-window requests into SideX's built-in connector.
+        if ((id === 'vscode.openFolder' || id === 'vscode.newWindow' || id === 'opensshremotes.openEmptyWindow') && args && args.length) {
+          const uri = args[0];
+          const auth = (uri && (uri.authority || (uri._formatted || '').split('/')[2])) || '';
+          const sAuth = typeof auth === 'string' ? auth : '';
+          if (sAuth.startsWith('ssh-remote+') || (typeof uri === 'string' && uri.includes('ssh-remote+'))) {
+            host.emit('event', { type: 'executeWorkbenchCommand', reqId, command: 'sidex.remote.openAuthority', args: [uri, ...(args.slice(1) || [])] });
+            return;
+          }
+        }
         host.emit('event', { type: 'executeWorkbenchCommand', reqId, command: id, args });
         const timeout = setTimeout(() => reject(new Error(`command timed out: ${id}`)), 10000);
         const handler = (event) => {
@@ -3292,7 +3302,12 @@ function createVscodeShim() {
     },
     isTrusted: true,
     onDidGrantWorkspaceTrust: noopEvent,
-    registerRemoteAuthorityResolver: (authorityPrefix, resolver) => noopDisposable,
+    registerRemoteAuthorityResolver: (authorityPrefix, resolver) => {
+      if (!host._remoteAuthorityResolvers) host._remoteAuthorityResolvers = new Map();
+      host._remoteAuthorityResolvers.set(authorityPrefix, resolver);
+      log(`[remote] registered authority resolver for ${authorityPrefix}`);
+      return { dispose() { host._remoteAuthorityResolvers?.delete(authorityPrefix); } };
+    },
     registerTunnelProvider: (tunnelProvider, features) => noopDisposable,
   };
 

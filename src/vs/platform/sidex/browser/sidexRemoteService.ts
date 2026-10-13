@@ -23,6 +23,8 @@ export interface SshHost {
 	port: number | null;
 	user: string | null;
 	identityFile: string | null;
+	proxyJump?: string | null;
+	proxyCommand?: string | null;
 }
 
 export interface WslDistro {
@@ -70,6 +72,7 @@ export interface RemoteDirEntry {
 	name: string;
 	path: string;
 	isDir: boolean;
+	isSymlink?: boolean;
 	size: number;
 	modifiedMs: number | null;
 }
@@ -92,6 +95,8 @@ interface RawSshHost {
 	port: number | null;
 	user: string | null;
 	identity_file: string | null;
+	proxy_jump?: string | null;
+	proxy_command?: string | null;
 }
 
 interface RawWslDistro {
@@ -129,6 +134,7 @@ interface RawDirEntry {
 	name: string;
 	path: string;
 	is_dir: boolean;
+	is_symlink?: boolean;
 	size: number;
 	modified_ms: number | null;
 }
@@ -146,7 +152,9 @@ function toHost(r: RawSshHost): SshHost {
 		hostname: r.hostname,
 		port: r.port,
 		user: r.user,
-		identityFile: r.identity_file
+		identityFile: r.identity_file,
+		proxyJump: r.proxy_jump ?? null,
+		proxyCommand: r.proxy_command ?? null
 	};
 }
 
@@ -175,6 +183,12 @@ function toConnection(r: RawConnection, authority?: string): RemoteConnection {
 		connectedSecs: r.connected_secs,
 		authority
 	};
+}
+
+/** Lift `[SIDEX_CODE]` errors into Error.message for UI mapping. */
+function mapRemoteError(e: unknown): Error {
+	const msg = e instanceof Error ? e.message : String(e);
+	return new Error(msg);
 }
 
 /** Build VS Code-compatible SSH remote authority (`ssh-remote+user@host`). */
@@ -237,15 +251,45 @@ export class SideXRemoteService {
 		host: string,
 		user: string,
 		port: number | undefined,
-		auth: SshAuth
+		auth: SshAuth,
+		opts?: { requestId?: string; timeoutSecs?: number; strictHostKey?: boolean }
 	): Promise<RemoteConnection> {
-		const raw = await invoke<RawConnection>('remote_connect_ssh', {
-			host,
-			user,
-			port: port ?? null,
-			auth
-		});
-		const authority = buildSshRemoteAuthority(user, host, port);
+		if (!isTauri()) {
+			throw new Error('[SIDEX_UNSUPPORTED] Remote SSH requires the SideX desktop app');
+		}
+		try {
+			const raw = await invoke<RawConnection>('remote_connect_ssh', {
+				host,
+				user,
+				port: port ?? null,
+				auth,
+				requestId: opts?.requestId ?? null,
+				timeoutSecs: opts?.timeoutSecs ?? null,
+				strictHostKey: opts?.strictHostKey ?? null
+			});
+			const authority = buildSshRemoteAuthority(user, host, port);
+			const conn = toConnection(raw, authority);
+			this.bindAuthority(authority, conn.id);
+			return conn;
+		} catch (e) {
+			throw mapRemoteError(e);
+		}
+	}
+
+	async cancelConnect(requestId: string): Promise<boolean> {
+		if (!isTauri()) {
+			return false;
+		}
+		return !!(await invoke<boolean>('remote_cancel_connect', { requestId }));
+	}
+
+	async reconnect(connectionId: number): Promise<RemoteConnection> {
+		const raw = await invoke<RawConnection>('remote_reconnect', { connectionId });
+		const prev = this.getAuthorityForConnection(connectionId);
+		if (prev) {
+			this.unbindAuthority(prev);
+		}
+		const authority = prev ?? `ssh-remote+${raw.label}`;
 		const conn = toConnection(raw, authority);
 		this.bindAuthority(authority, conn.id);
 		return conn;
@@ -277,6 +321,7 @@ export class SideXRemoteService {
 			name: e.name,
 			path: e.path,
 			isDir: e.is_dir,
+			isSymlink: !!e.is_symlink,
 			size: e.size,
 			modifiedMs: e.modified_ms
 		}));
@@ -314,11 +359,15 @@ export class SideXRemoteService {
 	}
 
 	async delete(connectionId: number, path: string, recursive: boolean): Promise<void> {
-		await invoke('remote_delete', { connectionId, path, recursive });
+		try {
+			await invoke('remote_delete', { connectionId, path, recursive });
+		} catch (e) {
+			throw mapRemoteError(e);
+		}
 	}
 
-	async rename(connectionId: number, from: string, to: string): Promise<void> {
-		await invoke('remote_rename', { connectionId, from, to });
+	async rename(connectionId: number, from: string, to: string, overwrite?: boolean): Promise<void> {
+		await invoke('remote_rename', { connectionId, from, to, overwrite: overwrite ?? false });
 	}
 
 	async listWslDistros(): Promise<WslDistro[]> {

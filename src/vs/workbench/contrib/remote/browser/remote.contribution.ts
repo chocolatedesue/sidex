@@ -48,6 +48,7 @@ import { ICommandService } from '../../../../platform/commands/common/commands.j
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { IClipboardService } from '../../../../platform/clipboard/common/clipboardService.js';
 import { URI } from '../../../../base/common/uri.js';
+import { IHostService } from '../../../services/host/browser/host.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -331,6 +332,85 @@ registerAction2(
 );
 
 registerAction2(
+	class CloseRemoteConnection extends Action2 {
+		constructor() {
+			super({
+				id: 'sidex.remote.close',
+				title: localize2('sidex.remote.close', 'Close Remote Connection'),
+				f1: true
+			});
+		}
+		async run(accessor: ServicesAccessor): Promise<void> {
+			const remote = accessor.get(ISideXRemoteService);
+			const hostService = accessor.get(IHostService);
+			const notifications = accessor.get(INotificationService);
+			const conns = (await remote.activeConnections()).filter(c => c.kind === 'ssh');
+			for (const c of conns) {
+				try {
+					await remote.disconnect(c.id);
+				} catch (e) {
+					notifications.error(String(e));
+				}
+			}
+			await hostService.openWindow({ forceReuseWindow: true, remoteAuthority: null });
+		}
+	}
+);
+
+registerAction2(
+	class OpenRemoteAuthority extends Action2 {
+		constructor() {
+			super({
+				id: 'sidex.remote.openAuthority',
+				title: localize2('sidex.remote.openAuthority', 'Open SSH Remote Authority'),
+				f1: false
+			});
+		}
+		async run(accessor: ServicesAccessor, uri?: unknown): Promise<void> {
+			const notifications = accessor.get(INotificationService);
+			const remote = accessor.get(ISideXRemoteService);
+			const quickInput = accessor.get(IQuickInputService);
+			const authorityResolver = accessor.get(IRemoteAuthorityResolverService);
+			const workspaceEditing = accessor.get(IWorkspaceEditingService);
+			let authority = '';
+			if (typeof uri === 'string') {
+				authority = uri.includes('ssh-remote+') ? (uri.split('/').find(p => p.startsWith('ssh-remote+')) || uri) : uri;
+			} else if (uri && typeof uri === 'object' && 'authority' in (uri as object)) {
+				authority = String((uri as { authority?: string }).authority || '');
+			}
+			if (!authority.startsWith('ssh-remote+')) {
+				notifications.error(localize('remote.ssh.badAuthority', 'Not an ssh-remote authority: {0}', String(uri)));
+				return;
+			}
+			const dest = authority.slice('ssh-remote+'.length);
+			const at = dest.lastIndexOf('@');
+			const user = at >= 0 ? dest.slice(0, at) : '';
+			let hostPort = at >= 0 ? dest.slice(at + 1) : dest;
+			let port: number | undefined;
+			const m = /^(.+):(\d+)$/.exec(hostPort);
+			if (m) {
+				hostPort = m[1];
+				port = Number(m[2]);
+			}
+			const conn = await connectSshWithAuthFallback(remote, quickInput, notifications, hostPort, user || 'root', port, null);
+			if (!conn?.authority) {
+				return;
+			}
+			await afterSshConnected({
+				remote,
+				authorityResolver,
+				workspaceEditing,
+				notifications,
+				quickInput,
+				connectionId: conn.id,
+				authority: conn.authority,
+				label: conn.label
+			});
+		}
+	}
+);
+
+registerAction2(
 	class SignInTunnel extends Action2 {
 		constructor() {
 			super({
@@ -485,6 +565,39 @@ async function pickAndConnectSsh(
 	}
 }
 
+function sshErrorCode(err: unknown): string | undefined {
+	const m = String(err);
+	const i = m.indexOf('[SIDEX_');
+	if (i < 0) { return undefined; }
+	const j = m.indexOf(']', i);
+	return j > i ? m.slice(i + 1, j) : undefined;
+}
+
+function friendlySshError(err: unknown): string {
+	const code = sshErrorCode(err);
+	const raw = String(err);
+	switch (code) {
+		case 'SIDEX_HOSTKEY_CHANGED':
+			return localize('remote.ssh.hostkeyChanged', 'Remote host key changed — possible MITM. {0}', raw);
+		case 'SIDEX_HOSTKEY_UNKNOWN':
+			return localize('remote.ssh.hostkeyUnknown', 'Host key not in known_hosts (StrictHostKeyChecking). {0}', raw);
+		case 'SIDEX_TIMEOUT':
+			return localize('remote.ssh.timeout', 'Connection timed out. {0}', raw);
+		case 'SIDEX_REFUSED':
+			return localize('remote.ssh.refused', 'Connection refused. Is sshd running? {0}', raw);
+		case 'SIDEX_UNREACHABLE':
+			return localize('remote.ssh.unreachable', 'Host unreachable. {0}', raw);
+		case 'SIDEX_AUTH_FAILED':
+			return localize('remote.ssh.authFailed', 'Authentication failed. {0}', raw);
+		case 'SIDEX_CANCELLED':
+			return localize('remote.ssh.cancelled', 'Connection cancelled.');
+		case 'SIDEX_UNSUPPORTED':
+			return localize('remote.ssh.unsupported', '{0}', raw);
+		default:
+			return localize('remote.ssh.failed', 'SSH connection failed: {0}', raw);
+	}
+}
+
 async function connectSshWithAuthFallback(
 	remoteService: ISideXRemoteService,
 	quickInput: IQuickInputService,
@@ -505,6 +618,32 @@ async function connectSshWithAuthFallback(
 			return await remoteService.connectSsh(host, user, port, auth);
 		} catch (err) {
 			lastErr = err;
+			const code = sshErrorCode(err);
+			if (code === 'SIDEX_KEY_ENCRYPTED' || code === 'SIDEX_KEY_PASSPHRASE') {
+				const path = identityFile || (typeof err === 'object' && err && /key ([^ ]+)/.exec(String(err))?.[1]) || '';
+				const passphrase = await quickInput.input({
+					prompt: localize('remote.ssh.passphrase', 'Passphrase for key {0}', path || '(identity)'),
+					password: true
+				});
+				if (!passphrase) {
+					notifications.error(friendlySshError(err));
+					return undefined;
+				}
+				try {
+					return await remoteService.connectSsh(host, user, port, {
+						kind: 'keyfile',
+						path: path || identityFile || '~/.ssh/id_ed25519',
+						passphrase
+					});
+				} catch (err2) {
+					notifications.error(friendlySshError(err2));
+					return undefined;
+				}
+			}
+			if (code === 'SIDEX_HOSTKEY_CHANGED' || code === 'SIDEX_HOSTKEY_UNKNOWN' || code === 'SIDEX_TIMEOUT' || code === 'SIDEX_REFUSED' || code === 'SIDEX_UNREACHABLE' || code === 'SIDEX_CANCELLED') {
+				notifications.error(friendlySshError(err));
+				return undefined;
+			}
 		}
 	}
 
@@ -514,14 +653,14 @@ async function connectSshWithAuthFallback(
 	});
 	if (!password) {
 		if (lastErr) {
-			notifications.error(localize('remote.ssh.failed', 'SSH connection failed: {0}', String(lastErr)));
+			notifications.error(friendlySshError(lastErr));
 		}
 		return undefined;
 	}
 	try {
 		return await remoteService.connectSsh(host, user, port, { kind: 'password', password });
 	} catch (err) {
-		notifications.error(localize('remote.ssh.failed', 'SSH connection failed: {0}', String(err)));
+		notifications.error(friendlySshError(err));
 		return undefined;
 	}
 }

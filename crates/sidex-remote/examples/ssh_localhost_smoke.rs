@@ -1,9 +1,12 @@
 //! Live SSH smoke against a local sshd.
-//! Default: box@127.0.0.1:2222 with ~/.ssh/id_ed25519
+//! Default: $USER@127.0.0.1:2222 with ~/.ssh/id_ed25519
 
 use std::path::PathBuf;
+use std::time::Duration;
 
-use sidex_remote::ssh::{SshAuth, SshTransport};
+use sidex_remote::ssh::{
+    Endpoint, HostKeyPolicy, SshAuth, SshConnectOptions, SshTransport,
+};
 use sidex_remote::transport::RemoteTransport;
 
 #[tokio::main]
@@ -29,14 +32,26 @@ async fn main() -> anyhow::Result<()> {
         path: PathBuf::from(&key),
         passphrase: None,
     };
-    let transport = SshTransport::connect_as(&user, &host, port, auth, Some(10)).await?;
-    let home = transport.exec("printf %s \"$HOME\"").await?;
-    anyhow::ensure!(home.exit_code == 0, "home failed exit={} stderr={}", home.exit_code, home.stderr);
-    let home_path = home.stdout.trim();
-    anyhow::ensure!(!home_path.is_empty(), "empty home stdout={:?}", home.stdout);
+    // Isolated known_hosts so lab host-key rotation never fails the smoke.
+    let kh = std::env::temp_dir().join(format!("sidex-smoke-kh-{}-{port}", std::process::id()));
+    let opts = SshConnectOptions {
+        connect_timeout: Duration::from_secs(10),
+        known_hosts: Some(kh),
+        host_key_policy: HostKeyPolicy::AcceptNew,
+        keepalive_interval: Some(Duration::from_secs(10)),
+        ..Default::default()
+    };
+    let ep = Endpoint {
+        host: host.clone(),
+        port,
+        user: user.clone(),
+    };
+    let transport = SshTransport::connect_endpoint(&ep, &auth, &opts).await?;
+    let home_path = transport.home().await?;
+    anyhow::ensure!(!home_path.is_empty(), "empty home");
     println!("home={home_path}");
 
-    let entries = transport.read_dir(home_path).await?;
+    let entries = transport.read_dir(&home_path).await?;
     println!("readdir count={}", entries.len());
     for e in entries.iter().take(8) {
         println!("  {} {}", if e.is_dir { "d" } else { "-" }, e.name);
@@ -51,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
         String::from_utf8_lossy(&back).contains("sidex-remote-ssh-ok"),
         "roundtrip mismatch"
     );
-    let _ = transport.exec(&format!("rm -f {marker:?}")).await;
+    let _ = transport.remove(&marker, false).await;
     transport.disconnect().await?;
     println!("SIDEX_REMOTE_SSH_LIVE_OK");
     Ok(())

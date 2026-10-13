@@ -318,6 +318,7 @@ impl RemoteTransport for WslTransport {
                     name: parts[0].to_string(),
                     path: parts[4].to_string(),
                     is_dir: parts[2] == "d",
+                    is_symlink: false,
                     size: parts[1].parse().unwrap_or(0),
                     modified,
                 });
