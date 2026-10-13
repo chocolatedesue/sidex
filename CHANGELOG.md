@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.13 — 2026-10-13
+
+### Added
+- **UX / VS Code 1.141:** editor tab styles (`connected` / `pill`) via `workbench.experimental.modernUIEditorTabStyle` + Command Palette actions.
+- **UX:** View → Appearance → **Layout Density** toggle (`sidex.ux.toggleLayoutDensity`).
+- **UX:** compact editor tab height class when `window.density.layout` or `window.density.editorTabHeight` is compact.
+
+### Fixed
+- **Empty editor watermark:** shortcut labels use theme tokens (were near-invisible `#303030` on SideX dark).
+- **Version sync:** `tauri.conf.json` caught up with package / Cargo / lock (**0.1.13**).
+
+### Notes
+- Perf work stays secondary; no speculative cold-path changes this tag.
+- CI workflows unchanged (cloud-build + release only).
+
+
 ## 0.1.12 — 2026-10-13
 
 ### Fixed

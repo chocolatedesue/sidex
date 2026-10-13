@@ -355,6 +355,7 @@ async function boot() {
 			'window.density.editorTabHeight': 'default',
 			'workbench.modernUIFrostedGlass': true,
 			'workbench.modernUIFrostedGlassOpacity': 0.72,
+			'workbench.experimental.modernUIEditorTabStyle': 'default',
 			'editor.multiCursorPaste': 'spread',
 			'editor.selectedTextMatchMode': 'findOptions',
 			'workbench.list.smoothScrolling': true,
