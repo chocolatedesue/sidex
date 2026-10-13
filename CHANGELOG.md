@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.11
+
+### Fixed
+- **PDF Preview:** EmbedPDF pages actually paint (was empty dark canvas). Root cause: `page-width` zoom against a zero-sized host. Now uses `fit-page`, ArrayBuffer `documentManager` open, wasm probe, and layout resize nudge.
+- **File icons:** Packaged builds must ship `extensions/theme-seti` + non-empty `builtin-extensions.js` (postbuild guard). E2E validates explorer icon pixels, not smoke-only.
+
+
 ## 0.1.10 — 2026-10-13
 
 ### Fixed

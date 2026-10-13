@@ -72,6 +72,13 @@ export class PdfPreviewEditor extends EditorPane {
 		if (this._host) {
 			this._host.style.width = `${dimension.width}px`;
 			this._host.style.height = `${dimension.height}px`;
+			this._host.style.minHeight = dimension.height > 0 ? '' : '240px';
+		}
+		// EmbedPDF tiles sized at mount-time; notify after EditorPane gets real bounds.
+		if (this._viewer && dimension.width > 0 && dimension.height > 0) {
+			try {
+				globalThis.dispatchEvent?.(new Event('resize'));
+			} catch { /* ignore */ }
 		}
 	}
 
@@ -177,53 +184,62 @@ export class PdfPreviewEditor extends EditorPane {
 				return;
 			}
 
-			// Copy into a fresh Uint8Array so Blob never sees a SharedArrayBuffer
-			// view (WebKit/Tauri rejects that) and we do not retain the file pool.
+			// Fresh ArrayBuffer copy — WebKit/Tauri rejects SharedArrayBuffer views,
+			// and EmbedPDF `page-width` zoom paints nothing when the host is 0×0
+			// (common before the first EditorPane.layout). Prefer buffer open +
+			// fit-page so tiles appear without a blob: fetch round-trip.
 			const src = file.value.buffer;
 			const copy = new Uint8Array(src.byteLength);
 			copy.set(src);
-			const blobUrl = URL.createObjectURL(new Blob([copy], { type: 'application/pdf' }));
+			const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength);
 			if (cts.token.isCancellationRequested) {
-				URL.revokeObjectURL(blobUrl);
 				return;
 			}
 
 			const init = await this._loadEmbedPdf();
 			if (cts.token.isCancellationRequested) {
-				URL.revokeObjectURL(blobUrl);
 				return;
 			}
 
 			this._teardownViewer();
-			this._blobUrl = blobUrl;
+			this._ensureHostSize();
 
-			const wasmUrl = resolveWasmUrl();
-			this._logService.info('[PDF Preview] EmbedPDF wasmUrl=', wasmUrl);
+			const wasmUrl = await resolveWasmUrlAsync(this._logService);
+			this._logService.info('[PDF Preview] EmbedPDF wasmUrl=', wasmUrl, 'bytes=', ab.byteLength);
+			const name = resource.path.split('/').pop() || 'document.pdf';
 			this._viewer = init({
 				type: 'container',
 				target: this._host,
-				src: blobUrl,
 				// Vite bundles the PDFium worker into assets; forcing worker:true
 				// without a resolved worker URL stalls on "Initializing plugins…".
-				// Modern-PDF-Preview also defaults worker off unless the host
-				// supplies a dedicated worker config.
 				worker: false,
 				wasmUrl,
 				theme: { preference: this._themePreference() },
 				tabBar: 'never',
-				// Avoid Google-Fonts / jsDelivr fontFallback fetches (hang or CSP in app).
 				fontFallback: null,
 				fonts: { ui: null },
-				// Match Modern-PDF-Preview defaults that sidestep desktop print/export plumbing.
 				disabledCategories: ['print', 'export', 'redaction', 'document'],
 				annotations: { autoOpenLinks: false },
-				zoom: { defaultZoomLevel: 'page-width' },
+				// `page-width` yields an empty dark viewport when measured against a
+				// zero-sized host (SideX E2E / first paint). `fit-page` paints tiles.
+				zoom: { defaultZoomLevel: 'fit-page' },
 				spread: { defaultSpreadMode: 'odd' },
+				documentManager: {
+					initialDocuments: [{ buffer: ab, name, autoActivate: true }]
+				},
 			});
 
 			if (!this._viewer) {
 				this._appendMessage('EmbedPDF failed to mount the viewer.');
 				this._notificationService.warn('EmbedPDF PDF viewer failed to initialize.');
+			} else {
+				// Nudge layout after mount — EditorPane.layout may have run with 0 size.
+				queueMicrotask(() => {
+					this._ensureHostSize();
+					try {
+						globalThis.dispatchEvent?.(new Event('resize'));
+					} catch { /* ignore */ }
+				});
 			}
 		} catch (err) {
 			if (cts.token.isCancellationRequested) {
@@ -233,40 +249,81 @@ export class PdfPreviewEditor extends EditorPane {
 			this._appendMessage(`Could not open this PDF: ${err instanceof Error ? err.message : String(err)}`);
 		}
 	}
+
+	/** Ensure the EmbedPDF host has non-zero CSS size before / after init. */
+	private _ensureHostSize(): void {
+		if (!this._host || !this._container) {
+			return;
+		}
+		const parent = this._container.parentElement;
+		const pw = parent?.clientWidth || this._container.clientWidth || 0;
+		const ph = parent?.clientHeight || this._container.clientHeight || 0;
+		const w = Math.max(pw, this._host.clientWidth, 320);
+		const h = Math.max(ph, this._host.clientHeight, 240);
+		if (pw < 32 || ph < 32) {
+			this._container.style.width = `${w}px`;
+			this._container.style.height = `${h}px`;
+			this._host.style.width = '100%';
+			this._host.style.height = '100%';
+			this._host.style.minHeight = '240px';
+		}
+	}
 }
 
 /**
  * EmbedPDF defaults `wasmUrl` to jsDelivr. Always pass a same-origin URL so the
- * viewer works offline / under CSP. Prefer the stable publicDir copy
- * (`scripts/ensure-pdfium-wasm.sh` → `/pdfium.wasm`); fall back to the Vite
- * `?url` hashed asset. No network probe on the open path (cached after first).
+ * viewer works offline / under CSP. Prefer `/pdfium.wasm` (publicDir + postbuild),
+ * then the Vite `?url` hashed asset. Probe once so a missing file does not hang
+ * the viewer on a 404 empty body.
  */
 let _cachedWasmUrl: string | undefined;
 
-function resolveWasmUrl(): string {
+function wasmCandidates(): string[] {
+	const out: string[] = [];
+	const seen = new Set<string>();
+	const push = (u: string | undefined) => {
+		if (!u || seen.has(u)) {
+			return;
+		}
+		seen.add(u);
+		out.push(u);
+	};
+	push('/pdfium.wasm');
+	try {
+		const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI : '/';
+		push(new URL('pdfium.wasm', base).href);
+	} catch { /* ignore */ }
+	if (typeof pdfiumWasmUrl === 'string' && pdfiumWasmUrl.length > 0) {
+		push(pdfiumWasmUrl);
+	}
+	return out;
+}
+
+async function resolveWasmUrlAsync(log?: { info: (...a: unknown[]) => void; warn?: (...a: unknown[]) => void }): Promise<string> {
 	if (_cachedWasmUrl) {
 		return _cachedWasmUrl;
 	}
-	const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI : '/';
-	const candidates: string[] = [];
-	try {
-		candidates.push(new URL('pdfium.wasm', base).href);
-	} catch {
-		candidates.push('/pdfium.wasm');
-	}
-	candidates.push('/pdfium.wasm');
-	if (typeof pdfiumWasmUrl === 'string' && pdfiumWasmUrl.length > 0) {
-		candidates.push(pdfiumWasmUrl);
-	}
-	// First unique candidate — ensure-pdfium + postbuild guarantee /pdfium.wasm
-	// exists in packaged builds; Vite publicDir does the same for `vite build`.
+	const candidates = wasmCandidates();
 	for (const url of candidates) {
-		if (url) {
-			_cachedWasmUrl = url;
-			return url;
+		try {
+			const res = await fetch(url, { method: 'GET' });
+			if (!res.ok) {
+				continue;
+			}
+			const buf = await res.arrayBuffer();
+			if (buf.byteLength < 1000) {
+				continue;
+			}
+			// Re-serve via blob so MIME is always application/wasm under odd servers.
+			const blobUrl = URL.createObjectURL(new Blob([buf], { type: 'application/wasm' }));
+			_cachedWasmUrl = blobUrl;
+			log?.info?.('[PDF Preview] resolved pdfium wasm', url, buf.byteLength);
+			return blobUrl;
+		} catch (err) {
+			log?.warn?.('[PDF Preview] wasm candidate failed', url, err);
 		}
 	}
-	_cachedWasmUrl = '/pdfium.wasm';
+	_cachedWasmUrl = candidates[0] || '/pdfium.wasm';
 	return _cachedWasmUrl;
 }
 
