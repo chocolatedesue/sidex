@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.9 — 2026-10-13
+
+### Fixed
+- **PDF / EmbedPDF:** seed `public/pdfium.wasm` via `scripts/ensure-pdfium-wasm.sh` (setup + cloud-build) so `/pdfium.wasm` is same-origin; stop relying on EmbedPDF’s jsDelivr default. Safe Uint8Array→Blob copy for WebKit/Tauri.
+- **Cloud build `--locked`:** regenerate workspace `Cargo.lock` (syn / aws-lc bumps) so Linux/Windows `cargo build --locked` succeeds.
+- **CLI:** `sidex --version` / `--help` never open a GUI (shell fast-path); `--install-cli` prefers a binary with early-CLI.
+- **Smoke:** startup `windowMark` recorded when setup+window arrive in one chunk.
+
+### Perf
+- PDF open path prefers cached `/pdfium.wasm` (no CDN RTT / no HEAD probe). Native startup markers documented in `docs/DEV_NOTES_ISSUES_PERF.md`.
+
+
 ## 0.1.6 — 2026-10-13
 
 ### Added

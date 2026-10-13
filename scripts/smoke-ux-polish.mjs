@@ -51,10 +51,10 @@ ok('splash present', index.includes('id="sidex-splash"'));
 ok('product version 1.141', index.includes("version: '1.141.0'"));
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-ok('package 0.1.8', pkg.version === '0.1.8');
+ok('package 0.1.9', pkg.version === '0.1.9');
 
 const tauri = JSON.parse(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
-ok('tauri 0.1.8', tauri.version === '0.1.8');
+ok('tauri 0.1.9', tauri.version === '0.1.9');
 ok('tauri backgroundColor', tauri.app?.windows?.[0]?.backgroundColor === '#111111');
 
 const notes = fs.readFileSync(path.join(root, 'docs/DEV_NOTES_UX_PERF.md'), 'utf8');

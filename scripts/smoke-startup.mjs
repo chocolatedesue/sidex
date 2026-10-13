@@ -213,14 +213,19 @@ async function nativeStartup() {
   let sawSetup = false;
   let sawWindow = false;
   while (Date.now() < deadline) {
-    if (/\[sidex-startup\] setup complete/.test(stderr) || /\[sidex-startup\] setup complete/.test(stdout)) {
+    const combined = stderr + stdout;
+    // Window mark is emitted before setup complete; record it even when both
+    // arrive in the same poll chunk (old code broke on setup first → windowMark=false).
+    if (/\[sidex-startup\] window restore_and_show/.test(combined)) {
+      if (!sawWindow) {
+        sawWindow = true;
+        evidence.timingsMs.nativeWindowRestore = Date.now() - t0;
+      }
+    }
+    if (/\[sidex-startup\] setup complete/.test(combined)) {
       sawSetup = true;
       evidence.timingsMs.nativeSetupComplete = Date.now() - t0;
       break;
-    }
-    if (/\[sidex-startup\] window restore_and_show/.test(stderr + stdout)) {
-      sawWindow = true;
-      evidence.timingsMs.nativeWindowRestore = Date.now() - t0;
     }
     // xdotool window probe
     const win = spawnSync('xdotool', ['search', '--name', 'SideX'], {

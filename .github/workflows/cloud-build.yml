@@ -63,6 +63,7 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           bash scripts/ensure-file-icon-theme.sh
+          bash scripts/ensure-pdfium-wasm.sh
           npm run build
 
       - uses: swatinem/rust-cache@v2
@@ -125,6 +126,7 @@ jobs:
       - name: Frontend
         run: |
           npm ci --no-audit --no-fund
+          bash scripts/ensure-pdfium-wasm.sh
           npm run build
 
       - uses: swatinem/rust-cache@v2
@@ -202,7 +204,9 @@ jobs:
           sudo ln -sf "$(which create-dmg)" /usr/local/bin/create-dmg
 
       - name: Ensure built-in file icons
-        run: bash scripts/ensure-file-icon-theme.sh
+        run: |
+          bash scripts/ensure-file-icon-theme.sh
+          bash scripts/ensure-pdfium-wasm.sh
 
       - name: Build the macOS DMG
         # Default mac artifact is .dmg (VS Code / typical desktop feel).

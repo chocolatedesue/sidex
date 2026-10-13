@@ -79,10 +79,26 @@ Examples:
 HELP
 }
 
-# Fast path for help without needing the binary (packaging / PATH checks).
+# Fast paths that must never open a GUI window (stale release binaries may
+# ignore early-CLI and fall through into Tauri).
+cli_version() {
+  local ver=""
+  if [[ -n "${REPO_ROOT:-}" && -f "$REPO_ROOT/package.json" ]]; then
+    ver="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$REPO_ROOT/package.json" | head -1)"
+  fi
+  if [[ -z "$ver" ]]; then
+    ver="0.0.0"
+  fi
+  printf 'SideX %s\n' "$ver"
+}
+
 case "${1:-}" in
   -h|--help|help)
     print_cli_help
+    exit 0
+    ;;
+  -v|--version|version)
+    cli_version
     exit 0
     ;;
 esac
@@ -93,9 +109,32 @@ BIN="$(find_binary)" || {
   exit 127
 }
 
-# --install-cli / --version are handled inside the binary when present; the
-# shell still implements --install-cli as a fallback for script-only installs.
+# Prefer a binary that actually implements early-CLI when several exist
+# (debug often newer than a stale release).
+pick_cli_binary() {
+  local candidates=("$BIN")
+  if [[ -n "${REPO_ROOT:-}" ]]; then
+    candidates+=(
+      "$REPO_ROOT/target/debug/SideX"
+      "$REPO_ROOT/src-tauri/target/debug/SideX"
+      "$REPO_ROOT/target/release/SideX"
+      "$REPO_ROOT/src-tauri/target/release/SideX"
+    )
+  fi
+  local c out
+  for c in "${candidates[@]}"; do
+    [[ -x "$c" ]] || continue
+    out="$(timeout 2s "$c" --version 2>/dev/null || true)"
+    if [[ "$out" == SideX\ * ]]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done
+  printf '%s\n' "$BIN"
+}
+
 if [[ "${1:-}" == "--install-cli" ]]; then
+  BIN="$(pick_cli_binary)"
   exec "$BIN" --install-cli "${@:2}"
 fi
 

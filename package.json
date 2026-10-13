@@ -1,9 +1,9 @@
 {
   "name": "sidex",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "type": "module",
   "scripts": {
-    "setup": "bash scripts/ensure-file-icon-theme.sh && node scripts/generate-extension-meta.js",
+    "setup": "bash scripts/ensure-file-icon-theme.sh && bash scripts/ensure-pdfium-wasm.sh && node scripts/generate-extension-meta.js",
     "server:build": "cd sidexai/sidex-server && go build -tags fts5 -o sidex-server ./cmd/server",
     "setup:full": "bash scripts/setup-extensions.sh && node scripts/generate-extension-meta.js",
     "dev": "npm run setup && node --max-old-space-size=8192 node_modules/vite/bin/vite.js",
@@ -24,7 +24,8 @@
     "smoke:remote-ssh": "node scripts/smoke-remote-ssh.mjs",
     "cli:install": "bash scripts/install-cli.sh",
     "smoke:cli-icons": "node scripts/smoke-cli-and-icons.mjs",
-    "smoke:ux": "node scripts/smoke-ux-polish.mjs"
+    "smoke:ux": "node scripts/smoke-ux-polish.mjs",
+    "smoke:pdf": "bash scripts/ensure-pdfium-wasm.sh && node scripts/smoke-marketplace-pdf.mjs"
   },
   "dependencies": {
     "@embedpdf/snippet": "^2.15.1",

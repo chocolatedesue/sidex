@@ -177,11 +177,12 @@ export class PdfPreviewEditor extends EditorPane {
 				return;
 			}
 
-			// One ArrayBuffer copy into a Blob URL — avoid double-slice which
-			// briefly held two full PDF copies in JS heap.
+			// Copy into a fresh Uint8Array so Blob never sees a SharedArrayBuffer
+			// view (WebKit/Tauri rejects that) and we do not retain the file pool.
 			const src = file.value.buffer;
-			const ab = src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength);
-			const blobUrl = URL.createObjectURL(new Blob([ab], { type: 'application/pdf' }));
+			const copy = new Uint8Array(src.byteLength);
+			copy.set(src);
+			const blobUrl = URL.createObjectURL(new Blob([copy], { type: 'application/pdf' }));
 			if (cts.token.isCancellationRequested) {
 				URL.revokeObjectURL(blobUrl);
 				return;
@@ -197,6 +198,7 @@ export class PdfPreviewEditor extends EditorPane {
 			this._blobUrl = blobUrl;
 
 			const wasmUrl = resolveWasmUrl();
+			this._logService.info('[PDF Preview] EmbedPDF wasmUrl=', wasmUrl);
 			this._viewer = init({
 				type: 'container',
 				target: this._host,
@@ -233,15 +235,38 @@ export class PdfPreviewEditor extends EditorPane {
 	}
 }
 
+/**
+ * EmbedPDF defaults `wasmUrl` to jsDelivr. Always pass a same-origin URL so the
+ * viewer works offline / under CSP. Prefer the stable publicDir copy
+ * (`scripts/ensure-pdfium-wasm.sh` → `/pdfium.wasm`); fall back to the Vite
+ * `?url` hashed asset. No network probe on the open path (cached after first).
+ */
+let _cachedWasmUrl: string | undefined;
+
 function resolveWasmUrl(): string {
-	// Prefer the Vite-emitted asset URL; fall back to public/pdfium.wasm for preview/web.
-	if (typeof pdfiumWasmUrl === 'string' && pdfiumWasmUrl.length > 0) {
-		return pdfiumWasmUrl;
+	if (_cachedWasmUrl) {
+		return _cachedWasmUrl;
 	}
 	const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI : '/';
+	const candidates: string[] = [];
 	try {
-		return new URL('pdfium.wasm', base).href;
+		candidates.push(new URL('pdfium.wasm', base).href);
 	} catch {
-		return '/pdfium.wasm';
+		candidates.push('/pdfium.wasm');
 	}
+	candidates.push('/pdfium.wasm');
+	if (typeof pdfiumWasmUrl === 'string' && pdfiumWasmUrl.length > 0) {
+		candidates.push(pdfiumWasmUrl);
+	}
+	// First unique candidate — ensure-pdfium + postbuild guarantee /pdfium.wasm
+	// exists in packaged builds; Vite publicDir does the same for `vite build`.
+	for (const url of candidates) {
+		if (url) {
+			_cachedWasmUrl = url;
+			return url;
+		}
+	}
+	_cachedWasmUrl = '/pdfium.wasm';
+	return _cachedWasmUrl;
 }
+
