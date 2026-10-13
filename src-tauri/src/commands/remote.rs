@@ -378,3 +378,201 @@ pub async fn remote_active_connections(
     let mgr = store.inner.lock().await;
     Ok(mgr.active_connections().into_iter().map(to_entry).collect())
 }
+
+// ── Remote filesystem (SSH / WSL / container transport) ─────────────
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RemoteDirEntryInfo {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RemoteStatInfo {
+    pub size: u64,
+    pub modified_ms: Option<u64>,
+    pub is_dir: bool,
+    pub is_symlink: bool,
+}
+
+fn system_time_to_ms(t: Option<std::time::SystemTime>) -> Option<u64> {
+    t.and_then(|st| {
+        st.duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .map(|d| d.as_millis() as u64)
+    })
+}
+
+#[tauri::command]
+pub async fn remote_read_dir(
+    connection_id: u64,
+    path: String,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<Vec<RemoteDirEntryInfo>, String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    let entries = transport
+        .read_dir(&path)
+        .await
+        .map_err(|e| format!("remote read_dir failed: {e}"))?;
+    Ok(entries
+        .into_iter()
+        .map(|e| RemoteDirEntryInfo {
+            name: e.name,
+            path: e.path,
+            is_dir: e.is_dir,
+            size: e.size,
+            modified_ms: system_time_to_ms(e.modified),
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn remote_read_file(
+    connection_id: u64,
+    path: String,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<Vec<u8>, String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    transport
+        .read_file(&path)
+        .await
+        .map_err(|e| format!("remote read_file failed: {e}"))
+}
+
+#[tauri::command]
+pub async fn remote_write_file(
+    connection_id: u64,
+    path: String,
+    contents: Vec<u8>,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<(), String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    transport
+        .write_file(&path, &contents)
+        .await
+        .map_err(|e| format!("remote write_file failed: {e}"))
+}
+
+#[tauri::command]
+pub async fn remote_stat(
+    connection_id: u64,
+    path: String,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<RemoteStatInfo, String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    let st = transport
+        .stat(&path)
+        .await
+        .map_err(|e| format!("remote stat failed: {e}"))?;
+    Ok(RemoteStatInfo {
+        size: st.size,
+        modified_ms: system_time_to_ms(st.modified),
+        is_dir: st.is_dir,
+        is_symlink: st.is_symlink,
+    })
+}
+
+#[tauri::command]
+pub async fn remote_home(
+    connection_id: u64,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<String, String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    let out = transport
+        .exec("printf %s \"$HOME\"")
+        .await
+        .map_err(|e| format!("remote home failed: {e}"))?;
+    if out.exit_code != 0 {
+        return Err(format!("remote home failed: {}", out.stderr));
+    }
+    let home = out.stdout.trim();
+    if home.is_empty() {
+        return Err("remote $HOME is empty".to_string());
+    }
+    Ok(home.to_string())
+}
+
+#[tauri::command]
+pub async fn remote_mkdir(
+    connection_id: u64,
+    path: String,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<(), String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    let out = transport
+        .exec(&format!("mkdir -p {path:?}"))
+        .await
+        .map_err(|e| format!("remote mkdir failed: {e}"))?;
+    if out.exit_code != 0 {
+        return Err(format!("remote mkdir failed: {}", out.stderr));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remote_delete(
+    connection_id: u64,
+    path: String,
+    recursive: bool,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<(), String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    let cmd = if recursive {
+        format!("rm -rf {path:?}")
+    } else {
+        format!("rm -f {path:?}")
+    };
+    let out = transport
+        .exec(&cmd)
+        .await
+        .map_err(|e| format!("remote delete failed: {e}"))?;
+    if out.exit_code != 0 {
+        return Err(format!("remote delete failed: {}", out.stderr));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remote_rename(
+    connection_id: u64,
+    from: String,
+    to: String,
+    store: State<'_, RemoteManagerStore>,
+) -> Result<(), String> {
+    let mgr = store.inner.lock().await;
+    let transport = mgr
+        .get(ConnectionId(connection_id))
+        .ok_or_else(|| format!("no connection with id {connection_id}"))?;
+    let out = transport
+        .exec(&format!("mv {from:?} {to:?}"))
+        .await
+        .map_err(|e| format!("remote rename failed: {e}"))?;
+    if out.exit_code != 0 {
+        return Err(format!("remote rename failed: {}", out.stderr));
+    }
+    Ok(())
+}

@@ -229,6 +229,7 @@ import './contrib/scm/browser/git.contribution.js';
 
 // Remote Explorer
 import './contrib/remote/browser/remote.contribution.js';
+import './contrib/remote/browser/remoteSsh.contribution.js';
 
 // Debug
 import './contrib/debug/browser/debug.contribution.js';

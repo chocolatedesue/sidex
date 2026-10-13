@@ -75,3 +75,20 @@ LAB-707 / Grok Bot box pass on `chocolatedesue/sidex` (Asia/Shanghai).
 ## 0.1.3
 
 Prior fork baseline before the LAB-707 Markdown / EmbedPDF / marketplace pass.
+
+## Unreleased (post-0.1.5) — Remote SSH plugin adaptation
+
+### Added
+- **Built-in Remote SSH (plugin-shaped):** after Connect to Host / Remote Explorer SSH connect, SideX binds `ssh-remote+user@host`, registers a `vscode-remote` FileSystemProvider over `sidex-remote`, resolves the authority (`ManagedRemoteConnection`), and offers **Open Remote Home / Other Folder**.
+- **Remote FS Tauri commands:** `remote_read_dir` / `remote_read_file` / `remote_write_file` / `remote_stat` / `remote_home` / `remote_mkdir` / `remote_delete` / `remote_rename`.
+- **Open VSX Remote SSH hooks:** `extensionEnabledApiProposals` for `jeanp413.open-remote-ssh` (`resolvers`, `tunnels`, `contribRemoteHelp`, `contribViewsRemote`) in bootstrap + product fallback.
+- **Authority resolver:** deferred `resolveAuthority` + working `_setResolvedAuthority` (no longer stub-throws).
+- Auth fallback: SSH agent → identity file from `~/.ssh/config` → password prompt.
+- **SSH exec exit status:** `sidex-remote` `exec_inner` now reads `ChannelMsg::ExitStatus` (was stuck at `-1`, breaking `remote_home` / read_file checks).
+- Live example: `cargo run -p sidex-remote --example ssh_localhost_smoke` (default `127.0.0.1:2222`).
+- `npm run smoke:remote-ssh` (+ optional `SIDEX_SMOKE_SSH=user@host`).
+
+### Note / limits
+- Built-in path does **not** install Microsoft/VSCodium “VS Code Server” on the remote; it uses SideX’s Rust SSH transport for FS. Full `jeanp413.open-remote-ssh` server download still needs a healthy Node extension host + matching server build.
+- Remote file watching and remote PTY terminal UI not wired in this pass.
+- EmbedPDF / Markdown WYSIWYG / Open With / AI-off unchanged.

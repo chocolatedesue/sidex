@@ -72,6 +72,16 @@ else {
 			licenseName: 'MIT',
 			licenseUrl: 'https://github.com/Sidenai/sidex/blob/main/LICENSE',
 			serverLicenseUrl: 'https://github.com/Sidenai/sidex/blob/main/LICENSE',
+			extensionEnabledApiProposals: {
+				'jeanp413.open-remote-ssh': [
+					'resolvers',
+					'tunnels',
+					'contribRemoteHelp',
+					'contribViewsRemote'
+				],
+				'ms-vscode-remote.remote-ssh': ['resolvers', 'tunnels', 'contribRemoteHelp', 'contribViewsRemote'],
+				'ms-vscode-remote.remote-ssh-edit': ['resolvers', 'contribViewsRemote']
+			},
 			extensionsGallery: {
 				serviceUrl: 'https://marketplace.siden.ai/api/gallery',
 				controlUrl: 'https://az764295.vo.msecnd.net/extensions/marketplace.json',

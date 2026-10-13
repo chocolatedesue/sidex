@@ -13,6 +13,7 @@
 import { invoke, isTauri } from '../../../sidex-bridge.js';
 import { createDecorator } from '../../instantiation/common/instantiation.js';
 import { InstantiationType, registerSingleton } from '../../instantiation/common/extensions.js';
+import { Emitter, Event } from '../../../base/common/event.js';
 
 export type RemoteKind = 'ssh' | 'wsl' | 'container' | 'codespace' | 'tunnel';
 
@@ -55,12 +56,29 @@ export interface RemoteConnection {
 	kind: RemoteKind;
 	label: string;
 	connectedSecs: number;
+	/** VS Code-style authority, e.g. `ssh-remote+user@host`. */
+	authority?: string;
 }
 
 export interface RemoteExecResult {
 	stdout: string;
 	stderr: string;
 	exitCode: number;
+}
+
+export interface RemoteDirEntry {
+	name: string;
+	path: string;
+	isDir: boolean;
+	size: number;
+	modifiedMs: number | null;
+}
+
+export interface RemoteStat {
+	size: number;
+	modifiedMs: number | null;
+	isDir: boolean;
+	isSymlink: boolean;
 }
 
 export type SshAuth =
@@ -107,6 +125,21 @@ interface RawExec {
 	exit_code: number;
 }
 
+interface RawDirEntry {
+	name: string;
+	path: string;
+	is_dir: boolean;
+	size: number;
+	modified_ms: number | null;
+}
+
+interface RawStat {
+	size: number;
+	modified_ms: number | null;
+	is_dir: boolean;
+	is_symlink: boolean;
+}
+
 function toHost(r: RawSshHost): SshHost {
 	return {
 		host: r.host,
@@ -134,13 +167,20 @@ function toCodespace(r: RawCodespace): CodespaceEntry {
 	};
 }
 
-function toConnection(r: RawConnection): RemoteConnection {
+function toConnection(r: RawConnection, authority?: string): RemoteConnection {
 	return {
 		id: r.id,
 		kind: r.kind as RemoteKind,
 		label: r.label,
-		connectedSecs: r.connected_secs
+		connectedSecs: r.connected_secs,
+		authority
 	};
+}
+
+/** Build VS Code-compatible SSH remote authority (`ssh-remote+user@host`). */
+export function buildSshRemoteAuthority(user: string, host: string, port?: number): string {
+	const hostPart = port && port !== 22 ? `${host}:${port}` : host;
+	return `ssh-remote+${user}@${hostPart}`;
 }
 
 export const ISideXRemoteService = createDecorator<ISideXRemoteService>('sidexRemoteService');
@@ -151,6 +191,40 @@ export interface ISideXRemoteService extends SideXRemoteService {
 
 export class SideXRemoteService {
 	declare readonly _serviceBrand: undefined;
+
+	constructor() {
+		// Share one instance between DI (`ISideXRemoteService`) and `getSideXRemoteService()`.
+		_instance = this;
+	}
+
+	private readonly _authorityToConnection = new Map<string, number>();
+	private readonly _connectionToAuthority = new Map<number, string>();
+	private readonly _onDidChangeConnections = new Emitter<void>();
+	readonly onDidChangeConnections: Event<void> = this._onDidChangeConnections.event;
+
+	bindAuthority(authority: string, connectionId: number): void {
+		this._authorityToConnection.set(authority, connectionId);
+		this._connectionToAuthority.set(connectionId, authority);
+		this._onDidChangeConnections.fire();
+	}
+
+	unbindAuthority(authority: string): void {
+		const id = this._authorityToConnection.get(authority);
+		this._authorityToConnection.delete(authority);
+		if (id !== undefined) {
+			this._connectionToAuthority.delete(id);
+		}
+		this._onDidChangeConnections.fire();
+	}
+
+	getConnectionIdForAuthority(authority: string): number | undefined {
+		return this._authorityToConnection.get(authority);
+	}
+
+	getAuthorityForConnection(connectionId: number): string | undefined {
+		return this._connectionToAuthority.get(connectionId);
+	}
+
 	async listSshHosts(): Promise<SshHost[]> {
 		if (!isTauri()) {
 			return [];
@@ -159,14 +233,22 @@ export class SideXRemoteService {
 		return raw.map(toHost);
 	}
 
-	async connectSsh(host: string, user: string, port: number | undefined, auth: SshAuth): Promise<RemoteConnection> {
+	async connectSsh(
+		host: string,
+		user: string,
+		port: number | undefined,
+		auth: SshAuth
+	): Promise<RemoteConnection> {
 		const raw = await invoke<RawConnection>('remote_connect_ssh', {
 			host,
 			user,
 			port: port ?? null,
 			auth
 		});
-		return toConnection(raw);
+		const authority = buildSshRemoteAuthority(user, host, port);
+		const conn = toConnection(raw, authority);
+		this.bindAuthority(authority, conn.id);
+		return conn;
 	}
 
 	async connectWsl(distro: string): Promise<RemoteConnection> {
@@ -187,6 +269,56 @@ export class SideXRemoteService {
 	async execSsh(connectionId: number, command: string): Promise<RemoteExecResult> {
 		const raw = await invoke<RawExec>('remote_exec_ssh', { connectionId, command });
 		return { stdout: raw.stdout, stderr: raw.stderr, exitCode: raw.exit_code };
+	}
+
+	async readDir(connectionId: number, path: string): Promise<RemoteDirEntry[]> {
+		const raw = (await invoke<RawDirEntry[]>('remote_read_dir', { connectionId, path })) ?? [];
+		return raw.map(e => ({
+			name: e.name,
+			path: e.path,
+			isDir: e.is_dir,
+			size: e.size,
+			modifiedMs: e.modified_ms
+		}));
+	}
+
+	async readFile(connectionId: number, path: string): Promise<Uint8Array> {
+		const raw = await invoke<number[] | Uint8Array>('remote_read_file', { connectionId, path });
+		return raw instanceof Uint8Array ? raw : new Uint8Array(raw ?? []);
+	}
+
+	async writeFile(connectionId: number, path: string, contents: Uint8Array): Promise<void> {
+		await invoke('remote_write_file', {
+			connectionId,
+			path,
+			contents: Array.from(contents)
+		});
+	}
+
+	async stat(connectionId: number, path: string): Promise<RemoteStat> {
+		const raw = await invoke<RawStat>('remote_stat', { connectionId, path });
+		return {
+			size: raw.size,
+			modifiedMs: raw.modified_ms,
+			isDir: raw.is_dir,
+			isSymlink: raw.is_symlink
+		};
+	}
+
+	async home(connectionId: number): Promise<string> {
+		return await invoke<string>('remote_home', { connectionId });
+	}
+
+	async mkdir(connectionId: number, path: string): Promise<void> {
+		await invoke('remote_mkdir', { connectionId, path });
+	}
+
+	async delete(connectionId: number, path: string, recursive: boolean): Promise<void> {
+		await invoke('remote_delete', { connectionId, path, recursive });
+	}
+
+	async rename(connectionId: number, from: string, to: string): Promise<void> {
+		await invoke('remote_rename', { connectionId, from, to });
 	}
 
 	async listWslDistros(): Promise<WslDistro[]> {
@@ -210,7 +342,13 @@ export class SideXRemoteService {
 	}
 
 	async disconnect(connectionId: number): Promise<void> {
+		const authority = this._connectionToAuthority.get(connectionId);
 		await invoke('remote_disconnect', { connectionId });
+		if (authority) {
+			this.unbindAuthority(authority);
+		} else {
+			this._onDidChangeConnections.fire();
+		}
 	}
 
 	async activeConnections(): Promise<RemoteConnection[]> {
@@ -218,7 +356,7 @@ export class SideXRemoteService {
 			return [];
 		}
 		const raw = (await invoke<RawConnection[]>('remote_active_connections')) ?? [];
-		return raw.map(toConnection);
+		return raw.map(r => toConnection(r, this._connectionToAuthority.get(r.id)));
 	}
 }
 

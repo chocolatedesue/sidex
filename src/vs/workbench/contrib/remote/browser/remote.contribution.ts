@@ -39,6 +39,9 @@ import {
 	ContainerEntry,
 	RemoteKind
 } from '../../../../platform/sidex/browser/sidexRemoteService.js';
+import { afterSshConnected } from './remoteSsh.contribution.js';
+import { IRemoteAuthorityResolverService } from '../../../../platform/remote/common/remoteAuthorityResolver.js';
+import { IWorkspaceEditingService } from '../../../services/workspaces/common/workspaceEditing.js';
 import { IViewsService } from '../../../services/views/common/viewsService.js';
 import { IQuickInputService, IQuickPickItem } from '../../../../platform/quickinput/common/quickInput.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
@@ -168,7 +171,32 @@ registerAction2(
 			try {
 				if (type === 'ssh') {
 					const host = payload as SshHost;
-					await remoteService.connectSsh(host.host, host.user ?? 'root', host.port ?? undefined, { kind: 'agent' });
+					const quickInput = accessor.get(IQuickInputService);
+					const authorityResolver = accessor.get(IRemoteAuthorityResolverService);
+					const workspaceEditing = accessor.get(IWorkspaceEditingService);
+					const targetHost = host.hostname ?? host.host;
+					const user = host.user ?? 'root';
+					const conn = await connectSshWithAuthFallback(
+						remoteService,
+						quickInput,
+						notifications,
+						targetHost,
+						user,
+						host.port ?? undefined,
+						host.identityFile
+					);
+					if (conn) {
+						await afterSshConnected({
+							remote: remoteService,
+							authorityResolver,
+							workspaceEditing,
+							notifications,
+							quickInput,
+							connectionId: conn.id,
+							authority: conn.authority!,
+							label: conn.label
+						});
+					}
 				}
 				// WSL / containers: fire and forget with a notification for now
 				else {
@@ -228,7 +256,7 @@ registerAction2(
 				{
 					label: '$(terminal-cmd) ' + localize('remote.pick.connectToHost', 'Connect to Host…'),
 					description: localize('remote.pick.sshProvider', 'Remote-SSH'),
-					action: () => pickAndConnectSsh(quickInput, notifications, remoteService)
+					action: () => pickAndConnectSsh(accessor, quickInput, notifications, remoteService)
 				},
 				{
 					label: '$(terminal-linux) ' + localize('remote.pick.wsl', 'Connect to WSL…'),
@@ -365,6 +393,7 @@ registerAction2(
 // ── Remote-type connect flows ────────────────────────────────────────────────
 
 async function pickAndConnectSsh(
+	accessor: ServicesAccessor,
 	quickInput: IQuickInputService,
 	notifications: INotificationService,
 	remoteService: ISideXRemoteService
@@ -425,11 +454,75 @@ async function pickAndConnectSsh(
 		port = pick.host!.port ?? undefined;
 	}
 
+	const targetHost = pick.manual ? host : (pick.host!.hostname ?? host);
+	const identityFile = pick.manual ? null : pick.host!.identityFile;
+
 	try {
-		await remoteService.connectSsh(host, user, port, { kind: 'agent' });
-		notifications.info(localize('remote.ssh.connected', 'Connected to {0}@{1}', user, host));
+		const conn = await connectSshWithAuthFallback(
+			remoteService,
+			quickInput,
+			notifications,
+			targetHost,
+			user,
+			port,
+			identityFile
+		);
+		if (!conn?.authority) {
+			return;
+		}
+		await afterSshConnected({
+			remote: remoteService,
+			authorityResolver: accessor.get(IRemoteAuthorityResolverService),
+			workspaceEditing: accessor.get(IWorkspaceEditingService),
+			notifications,
+			quickInput,
+			connectionId: conn.id,
+			authority: conn.authority,
+			label: conn.label
+		});
 	} catch (err) {
 		notifications.error(localize('remote.ssh.failed', 'SSH connection failed: {0}', String(err)));
+	}
+}
+
+async function connectSshWithAuthFallback(
+	remoteService: ISideXRemoteService,
+	quickInput: IQuickInputService,
+	notifications: INotificationService,
+	host: string,
+	user: string,
+	port: number | undefined,
+	identityFile: string | null
+): Promise<import('../../../../platform/sidex/browser/sidexRemoteService.js').RemoteConnection | undefined> {
+	const attempts: import('../../../../platform/sidex/browser/sidexRemoteService.js').SshAuth[] = [{ kind: 'agent' }];
+	if (identityFile) {
+		attempts.push({ kind: 'keyfile', path: identityFile });
+	}
+
+	let lastErr: unknown;
+	for (const auth of attempts) {
+		try {
+			return await remoteService.connectSsh(host, user, port, auth);
+		} catch (err) {
+			lastErr = err;
+		}
+	}
+
+	const password = await quickInput.input({
+		prompt: localize('remote.ssh.password', 'SSH password for {0}@{1}', user, host),
+		password: true
+	});
+	if (!password) {
+		if (lastErr) {
+			notifications.error(localize('remote.ssh.failed', 'SSH connection failed: {0}', String(lastErr)));
+		}
+		return undefined;
+	}
+	try {
+		return await remoteService.connectSsh(host, user, port, { kind: 'password', password });
+	} catch (err) {
+		notifications.error(localize('remote.ssh.failed', 'SSH connection failed: {0}', String(err)));
+		return undefined;
 	}
 }
 
@@ -633,6 +726,7 @@ class RemoteStatusBarIndicator extends Disposable implements IWorkbenchContribut
 				Number.MAX_SAFE_INTEGER
 			)
 		);
+		this._register(this.remoteService.onDidChangeConnections(() => this.updateFromConnections()));
 		this.updateFromConnections();
 	}
 

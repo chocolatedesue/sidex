@@ -17,7 +17,19 @@
 	version: '1.96.0',
 	commit: '',
 	date: new Date().toISOString(),
-	quality: 'stable'
+	quality: 'stable',
+	// Open VSX Remote SSH (jeanp413.open-remote-ssh) needs proposed resolver APIs.
+	// Built-in SideX Remote-SSH (sidex-remote) works without this; keep both paths.
+	extensionEnabledApiProposals: {
+		'jeanp413.open-remote-ssh': [
+			'resolvers',
+			'tunnels',
+			'contribRemoteHelp',
+			'contribViewsRemote'
+		],
+		'ms-vscode-remote.remote-ssh': ['resolvers', 'tunnels', 'contribRemoteHelp', 'contribViewsRemote'],
+		'ms-vscode-remote.remote-ssh-edit': ['resolvers', 'contribViewsRemote']
+	}
 };
 
 (globalThis as any)._VSCODE_PACKAGE_JSON = {
