@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.10 — 2026-10-13
+
+### Fixed
+- **E2E:** cargo-built Linux/Windows SideX opened a blank window unless Vite was on `:1420`. Added `scripts/ensure-frontend-server.sh`, wired it into `scripts/sidex`, and wrap cloud-build Linux `SideX` so packaged `dist/` is served automatically. Documented in `docs/CLOUD-BUILD.md` + `docs/DEV_NOTES_E2E_STARTUP.md`.
+
+### Verification
+- Native Xvfb E2E: startup trace, explorer, terminal, palette, markdown open; PDF toolbar/assets load (canvas paint under software GL still partial).
+- `smoke:startup` 9/9, `smoke:pdf` 8/8, `smoke:remote-ssh` 39/39, interactive web 5/5.
+
 ## 0.1.9 — 2026-10-13
 
 ### Fixed

@@ -42,19 +42,29 @@ xattr -dr com.apple.quarantine /Applications/SideX.app
 open /Applications/SideX.app
 ```
 
-The tarball/zip contains the release binary (the workbench frontend is embedded
-in it), `dist/` (the built frontend assets), the `extension-host/` and
-`shell-integration/` runtime resources the app looks for next to the executable,
-and a copy of this file.
+The Linux/Windows cloud tarball uses a fast `cargo build --release` (not a full
+`tauri build`), so the workbench is **not** baked into the binary the way a
+macOS `.app` is. The package therefore ships:
 
-Running the Linux build needs GTK 3 and WebKit 2:
+- `SideX` — wrapper that serves packaged `dist/` on `http://127.0.0.1:1420` then
+  execs `SideX.bin` (cargo-built binaries still load Vite's `devUrl`)
+- `SideX.bin` — the native binary
+- `dist/` — built workbench assets (required)
+- `bin/sidex`, `bin/ensure-frontend-server.sh`, `extension-host/`,
+  `shell-integration/`, and a copy of this file
+
+Upstream `release.yml` (`tauri build`) embeds the frontend; use that when you
+need a single self-contained executable.
+
+Running the Linux build needs GTK 3, WebKit 2, and Python 3 (for the dist server):
 
 ```bash
-sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0
+sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 python3
 ./SideX /path/to/a/folder      # or: ./SideX file.md
+# Skip auto-serve only if you already run Vite: SIDEX_SKIP_FRONTEND_SERVER=1
 
 # Optional: put `sidex` on your PATH (like VS Code's `code`)
-./install-cli.sh               # or: ./SideX --install-cli
+./install-cli.sh               # or: ./SideX.bin --install-cli
 sidex .
 sidex --version
 ```

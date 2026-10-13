@@ -133,6 +133,16 @@ pick_cli_binary() {
   printf '%s\n' "$BIN"
 }
 
+# cargo-built Linux/Windows binaries still load Vite devUrl (:1420).
+# Serve sibling/package dist/ so GUI opens without a manual `npm run dev`.
+if [[ "${SIDEX_SKIP_FRONTEND_SERVER:-}" != "1" ]]; then
+  if [[ -x "$SCRIPT_DIR/ensure-frontend-server.sh" ]]; then
+    "$SCRIPT_DIR/ensure-frontend-server.sh" || true
+  elif [[ -n "${REPO_ROOT:-}" && -x "$REPO_ROOT/scripts/ensure-frontend-server.sh" ]]; then
+    "$REPO_ROOT/scripts/ensure-frontend-server.sh" || true
+  fi
+fi
+
 if [[ "${1:-}" == "--install-cli" ]]; then
   BIN="$(pick_cli_binary)"
   exec "$BIN" --install-cli "${@:2}"

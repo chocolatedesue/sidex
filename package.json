@@ -1,6 +1,6 @@
 {
   "name": "sidex",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "type": "module",
   "scripts": {
     "setup": "bash scripts/ensure-file-icon-theme.sh && bash scripts/ensure-pdfium-wasm.sh && node scripts/generate-extension-meta.js",
