@@ -4013,6 +4013,21 @@ function createVscodeShim() {
       host.emit('event', { type: 'registerUriHandler' });
       return { dispose() { host._uriHandler = null; } };
     },
+    registerLinkPresentationProvider: (selector, provider) => {
+      // The bundled markdown-language-features (10.0.0, VS Code 1.141) calls
+      // this while activating. Without it activation throws
+      // "window.registerLinkPresentationProvider is not a function" and the
+      // whole extension (preview, link providers, drop/paste edits) never
+      // loads. The workbench has no link-presentation surface yet, so the
+      // provider is only tracked and disposed on request.
+      if (!host._linkPresentationProviders) host._linkPresentationProviders = [];
+      const entry = { selector, provider };
+      host._linkPresentationProviders.push(entry);
+      return { dispose() {
+        const idx = host._linkPresentationProviders?.indexOf(entry);
+        if (idx >= 0) host._linkPresentationProviders.splice(idx, 1);
+      }};
+    },
     registerFileDecorationProvider: (provider) => {
       if (!host._fileDecorationProviders) host._fileDecorationProviders = [];
       host._fileDecorationProviders.push(provider);

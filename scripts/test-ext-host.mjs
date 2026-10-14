@@ -326,3 +326,28 @@ test('lifecycle handlers report a clear error when the provider lacks the method
     events.stop();
   }
 });
+
+test("window shim exposes registerLinkPresentationProvider and disposes cleanly", () => {
+  // The bundled markdown-language-features (10.0.0, VS Code 1.141) calls
+  // `vscode.window.registerLinkPresentationProvider` while activating. If the
+  // shim does not define it the extension throws during activate() and never
+  // loads, which is exactly what the native run showed.
+  const shim = globalThis.__sidex_vscode_shim__;
+  assert.equal(
+    typeof shim.window.registerLinkPresentationProvider,
+    "function",
+    "window.registerLinkPresentationProvider must exist"
+  );
+
+  host._linkPresentationProviders = [];
+  const provider = { provideLinkPresentation: () => undefined };
+  const disposable = shim.window.registerLinkPresentationProvider({ language: "markdown" }, provider);
+
+  assert.equal(host._linkPresentationProviders.length, 1);
+  assert.equal(host._linkPresentationProviders[0].provider, provider);
+  assert.equal(host._linkPresentationProviders[0].selector.language, "markdown");
+  assert.equal(typeof disposable.dispose, "function");
+
+  disposable.dispose();
+  assert.equal(host._linkPresentationProviders.length, 0);
+});
