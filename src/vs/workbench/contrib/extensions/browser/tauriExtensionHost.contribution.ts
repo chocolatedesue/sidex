@@ -83,7 +83,9 @@ import type { DidUninstallExtensionEvent, InstallExtensionResult, IGalleryExtens
 import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IWebviewViewService } from '../../webviewView/browser/webviewViewService.js';
-import { ExtensionIdentifier } from '../../../../platform/extensions/common/extensions.js';
+import { ExtensionIdentifier, ExtensionType, TargetPlatform, type IExtension, type IExtensionDescription, type IExtensionManifest } from '../../../../platform/extensions/common/extensions.js';
+import { IExtensionService, toExtensionDescription } from '../../../services/extensions/common/extensions.js';
+import { ExtensionMessageCollector, ExtensionsRegistry, ExtensionPoint, type IExtensionPoint, type IExtensionPointUser } from '../../../services/extensions/common/extensionsRegistry.js';
 import { IWebviewService } from '../../webview/browser/webview.js';
 import { ICodeEditorService } from '../../../../editor/browser/services/codeEditorService.js';
 import type { ICodeEditor } from '../../../../editor/browser/editorBrowser.js';
@@ -173,6 +175,8 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 	private _failureBurstLog = new Map<string, number>();
 
 	private _bootstrapExtensions: IExtensionManifestSummary[] = [];
+	private _diskExtensionDescriptions = new Map<string, IExtensionDescription>();
+	private _themeExtensionPointsApplied = false;
 	private _statusBarItems = new Map<string, IStatusbarEntryAccessor>();
 	private _webviewPanels = new Map<string, WebviewInput>();
 	private _treeViews = new Map<string, TreeView>();
@@ -207,6 +211,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		@IWebviewService private readonly webviewService: IWebviewService,
 		@ICodeEditorService private readonly codeEditorService: ICodeEditorService,
 		@IEditorResolverService private readonly editorResolverService: IEditorResolverService,
+		@IExtensionService private readonly extensionService: IExtensionService,
 	) {
 		super();
 		this._init();
@@ -283,12 +288,121 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		}
 	}
 
+	/**
+	 * Extensions installed from the marketplace live on disk, but the Tauri
+	 * build has no `file://` file-system provider, so the workbench's extension
+	 * scanner never sees them. Theme contributions are consumed by the
+	 * workbench itself (not by the Node extension host), so read the manifests
+	 * over the bridge and feed the theme extension points directly.
+	 */
+	private async _syncDiskThemeExtensions(userExtensionsDir: string | undefined): Promise<void> {
+		let installed: { id: string; path: string }[] = [];
+		try {
+			const { invoke } = await import('@tauri-apps/api/core');
+			installed = await invoke<{ id: string; path: string }[]>('list_installed_extensions');
+		} catch (err: any) {
+			this.logService.warn(`[ExtHost] Could not list installed extensions: ${err?.message ?? err}`);
+			return;
+		}
+
+		for (const ext of installed) {
+			await this._readDiskExtensionManifest(ext.path);
+		}
+		this.logService.info(
+			`[ExtHost] Registered theme contributions for ${this._diskExtensionDescriptions.size} disk extension(s)` +
+			(userExtensionsDir ? ` under ${userExtensionsDir}` : '')
+		);
+		this._applyThemeExtensionPoints();
+	}
+
+	private async _registerDiskExtensionWithWorkbench(extensionPath: string, extensionId: string): Promise<void> {
+		const description = await this._readDiskExtensionManifest(extensionPath);
+		if (!description) {
+			this.logService.warn(`[ExtHost] No manifest found for ${extensionId} at ${extensionPath}`);
+			return;
+		}
+		this._applyThemeExtensionPoints();
+	}
+
+	private async _readDiskExtensionManifest(extensionPath: string): Promise<IExtensionDescription | undefined> {
+		try {
+			const { invoke } = await import('@tauri-apps/api/core');
+			const manifest = await invoke<IExtensionManifest | null>('extension_read_manifest_json', { extensionDir: extensionPath });
+			if (!manifest?.name || !manifest?.publisher) {
+				return undefined;
+			}
+			const description = toExtensionDescription({
+				type: ExtensionType.User,
+				isBuiltin: false,
+				identifier: { id: `${manifest.publisher}.${manifest.name}` },
+				manifest,
+				location: URI.file(extensionPath),
+				targetPlatform: TargetPlatform.UNDEFINED,
+				isValid: true,
+				validations: [],
+				preRelease: false,
+			} as IExtension);
+			this._diskExtensionDescriptions.set(description.identifier.value.toLowerCase(), description);
+			return description;
+		} catch (err: any) {
+			this.logService.warn(`[ExtHost] Could not read manifest at ${extensionPath}: ${err?.message ?? err}`);
+			return undefined;
+		}
+	}
+
+	/**
+	 * `acceptUsers` replaces the whole user list of an extension point, so always
+	 * pass the union of the extension service's own descriptions and the disk
+	 * extensions we read, and re-apply whenever the service changes — an early
+	 * apply would otherwise drop the service's themes and a later scan would
+	 * drop ours.
+	 */
+	private _applyThemeExtensionPoints(): void {
+		if (!this._themeExtensionPointsApplied) {
+			this._themeExtensionPointsApplied = true;
+			this._register(this.extensionService.onDidChangeExtensions(() => this._applyThemeExtensionPoints()));
+		}
+
+		const available: IExtensionDescription[] = [...this.extensionService.extensions];
+		const seen = new Set(available.map(desc => desc.identifier.value.toLowerCase()));
+		for (const description of this._diskExtensionDescriptions.values()) {
+			const key = description.identifier.value.toLowerCase();
+			if (!seen.has(key)) {
+				seen.add(key);
+				available.push(description);
+			}
+		}
+
+		for (const point of ExtensionsRegistry.getExtensionPoints()) {
+			if (point.name === 'themes' || point.name === 'iconThemes' || point.name === 'productIconThemes') {
+				this._acceptExtensionPointUsers(point, available);
+			}
+		}
+	}
+
+	private _acceptExtensionPointUsers(extensionPoint: IExtensionPoint<unknown>, availableExtensions: readonly IExtensionDescription[]): void {
+		const users: IExtensionPointUser<unknown>[] = [];
+		for (const description of availableExtensions) {
+			const contributes = description.contributes as Record<string, unknown> | undefined;
+			if (contributes && Object.prototype.hasOwnProperty.call(contributes, extensionPoint.name)) {
+				users.push({
+					description,
+					value: contributes[extensionPoint.name],
+					collector: new ExtensionMessageCollector(() => { /* noop */ }, description, extensionPoint.name),
+				});
+			}
+		}
+		(extensionPoint as ExtensionPoint<unknown>).acceptUsers(users);
+	}
+
 	private async _removeUninstalledExtension(event: DidUninstallExtensionEvent): Promise<void> {
 		const extId = event.identifier.id;
 		try {
 			const { invoke } = await import('@tauri-apps/api/core');
 			await invoke('uninstall_extension', { extensionId: extId });
 			this.logService.info(`[ExtHost] Removed extension ${extId} from disk`);
+			this._diskExtensionDescriptions.delete(extId.toLowerCase());
+			this._applyThemeExtensionPoints();
 		} catch (err: any) {
 			this.logService.warn(`[ExtHost] Failed to remove ${extId} from disk: ${err?.message ?? err}`);
 		}
