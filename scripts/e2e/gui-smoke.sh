@@ -178,6 +178,14 @@ fi
 # is static, so a before/after pixel diff later can only be the palette. While
 # the welcome editor is showing, its rotating hint text ("Show All Commands" /
 # "Find in Files" / ...) changes on its own and makes any diff meaningless.
+#
+# Click first: right after startup the webview has not taken keyboard focus, so
+# Ctrl+P would go nowhere and no file would open.
+eval "$(xdotool getwindowgeometry --shell "$WIN")"
+xdotool mousemove $((WIDTH / 2)) $((HEIGHT / 2))
+xdotool click 1
+sleep 1
+
 xdotool key --clearmodifiers ctrl+p
 sleep 1.5
 xdotool type --delay 60 "note.md"
