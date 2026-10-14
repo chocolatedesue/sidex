@@ -162,6 +162,9 @@ class ExtensionHost extends EventEmitter {
     this._nextWatcherId = 1;
     this._activationPromises = new Map();
     this._failedExtensions = new Set();
+    this._customDocuments = new Map();
+    this._customDocumentsByResource = new Map();
+    this._customDocumentBackups = new Map();
   }
 
   initialize() {
@@ -305,6 +308,16 @@ class ExtensionHost extends EventEmitter {
         return this._handleResolveCustomEditor(id, params);
       case 'customEditorClosed':
         return this._handleCustomEditorClosed(id, params);
+      case 'saveCustomDocument':
+        return this._handleSaveCustomDocument(id, params);
+      case 'saveCustomDocumentAs':
+        return this._handleSaveCustomDocumentAs(id, params);
+      case 'revertCustomDocument':
+        return this._handleRevertCustomDocument(id, params);
+      case 'backupCustomDocument':
+        return this._handleBackupCustomDocument(id, params);
+      case 'deleteCustomDocumentBackup':
+        return this._handleDeleteCustomDocumentBackup(id, params);
       case 'webviewViewMessage':
         return this._handleWebviewViewMessage(id, params);
       case 'webviewViewVisible':
@@ -1353,11 +1366,17 @@ class ExtensionHost extends EventEmitter {
         if (typeof provider.openCustomDocument === 'function') {
           customDoc = await Promise.resolve(provider.openCustomDocument(
             document.uri,
-            { backupId: undefined, untitledDocumentData: undefined },
+            {
+              backupId: params?.backupId,
+              untitledDocumentData: params?.untitledDocumentData
+                ? (params.untitledDocumentData instanceof Uint8Array
+                  ? params.untitledDocumentData
+                  : new Uint8Array(params.untitledDocumentData))
+                : undefined,
+            },
             token
           ));
-          if (!this._customDocuments) this._customDocuments = new Map();
-          this._customDocuments.set(panelId, customDoc);
+          this._trackCustomDocument(panelId, viewType, uriStr, customDoc);
         }
         await Promise.resolve(provider.resolveCustomEditor(customDoc, panel, token));
       } else {
@@ -1381,12 +1400,179 @@ class ExtensionHost extends EventEmitter {
       } catch {}
       this._webviewPanels.delete(panelId);
     }
-    const customDoc = this._customDocuments?.get(panelId);
-    if (customDoc) {
+    const entry = this._customDocuments?.get(panelId);
+    if (entry) {
+      for (const d of entry.disposables) {
+        try { d.dispose(); } catch {}
+      }
       try {
-        if (typeof customDoc.dispose === 'function') customDoc.dispose();
+        if (entry.document && typeof entry.document.dispose === 'function') entry.document.dispose();
       } catch {}
       this._customDocuments.delete(panelId);
+      if (this._customDocumentsByResource.get(entry.resource) === panelId) {
+        this._customDocumentsByResource.delete(entry.resource);
+      }
+    }
+    return { id, result: true };
+  }
+
+  /**
+   * Track a CustomDocument returned by `openCustomDocument` so the workbench can
+   * observe dirty state and route save / save-as / revert / backup back to the provider.
+   */
+  _trackCustomDocument(panelId, viewType, resource, document) {
+    const entry = {
+      panelId,
+      viewType,
+      resource,
+      document,
+      dirty: false,
+      disposables: [],
+    };
+    this._customDocuments.set(panelId, entry);
+    this._customDocumentsByResource.set(resource, panelId);
+
+    const onDidChange = document && document.onDidChangeCustomDocument;
+    if (typeof onDidChange === 'function') {
+      const sub = onDidChange((edit) => {
+        entry.dirty = true;
+        entry.lastEdit = edit;
+        this.emit('event', {
+          type: 'customDocumentDirty',
+          panelId,
+          viewType,
+          resource,
+          dirty: true,
+        });
+      });
+      if (sub && typeof sub.dispose === 'function') entry.disposables.push(sub);
+    }
+    return entry;
+  }
+
+  _findCustomDocumentEntry(params) {
+    if (!params) return undefined;
+    if (params.panelId && this._customDocuments?.has(params.panelId)) {
+      return this._customDocuments.get(params.panelId);
+    }
+    const resource = typeof params.resource === 'string'
+      ? params.resource
+      : params.resource?.toString?.();
+    if (resource && this._customDocumentsByResource?.has(resource)) {
+      return this._customDocuments.get(this._customDocumentsByResource.get(resource));
+    }
+    return undefined;
+  }
+
+  _customEditorProviderFor(entry) {
+    return entry ? this._customEditorProviders?.get(entry.viewType) : undefined;
+  }
+
+  _markCustomDocumentClean(entry) {
+    entry.dirty = false;
+    this.emit('event', {
+      type: 'customDocumentDirty',
+      panelId: entry.panelId,
+      viewType: entry.viewType,
+      resource: entry.resource,
+      dirty: false,
+    });
+  }
+
+  async _handleSaveCustomDocument(id, params) {
+    const entry = this._findCustomDocumentEntry(params);
+    if (!entry) return { id, error: 'saveCustomDocument: no open custom document' };
+    const provider = this._customEditorProviderFor(entry);
+    if (!provider || typeof provider.saveCustomDocument !== 'function') {
+      return { id, error: `provider for ${entry.viewType} has no saveCustomDocument` };
+    }
+    const token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
+    try {
+      await Promise.resolve(provider.saveCustomDocument(entry.document, token));
+      this._markCustomDocumentClean(entry);
+      return { id, result: { saved: true, panelId: entry.panelId, resource: entry.resource } };
+    } catch (e) {
+      return { id, error: String(e && e.message ? e.message : e) };
+    }
+  }
+
+  async _handleSaveCustomDocumentAs(id, params) {
+    const entry = this._findCustomDocumentEntry(params);
+    if (!entry) return { id, error: 'saveCustomDocumentAs: no open custom document' };
+    const provider = this._customEditorProviderFor(entry);
+    if (!provider || typeof provider.saveCustomDocumentAs !== 'function') {
+      return { id, error: `provider for ${entry.viewType} has no saveCustomDocumentAs` };
+    }
+    if (!params?.destination) return { id, error: 'saveCustomDocumentAs requires destination' };
+    const destination = VscUri.parse(params.destination);
+    const token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
+    try {
+      await Promise.resolve(provider.saveCustomDocumentAs(entry.document, destination, token));
+      // The document moves to the destination resource.
+      if (this._customDocumentsByResource.get(entry.resource) === entry.panelId) {
+        this._customDocumentsByResource.delete(entry.resource);
+      }
+      entry.resource = destination.toString();
+      this._customDocumentsByResource.set(entry.resource, entry.panelId);
+      this._markCustomDocumentClean(entry);
+      return { id, result: { saved: true, panelId: entry.panelId, resource: entry.resource } };
+    } catch (e) {
+      return { id, error: String(e && e.message ? e.message : e) };
+    }
+  }
+
+  async _handleRevertCustomDocument(id, params) {
+    const entry = this._findCustomDocumentEntry(params);
+    if (!entry) return { id, error: 'revertCustomDocument: no open custom document' };
+    const provider = this._customEditorProviderFor(entry);
+    if (!provider || typeof provider.revertCustomDocument !== 'function') {
+      return { id, error: `provider for ${entry.viewType} has no revertCustomDocument` };
+    }
+    const token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
+    try {
+      await Promise.resolve(provider.revertCustomDocument(entry.document, token));
+      this._markCustomDocumentClean(entry);
+      return { id, result: { reverted: true, panelId: entry.panelId, resource: entry.resource } };
+    } catch (e) {
+      return { id, error: String(e && e.message ? e.message : e) };
+    }
+  }
+
+  async _handleBackupCustomDocument(id, params) {
+    const entry = this._findCustomDocumentEntry(params);
+    if (!entry) return { id, error: 'backupCustomDocument: no open custom document' };
+    const provider = this._customEditorProviderFor(entry);
+    if (!provider || typeof provider.backupCustomDocument !== 'function') {
+      return { id, error: `provider for ${entry.viewType} has no backupCustomDocument` };
+    }
+    const token = { isCancellationRequested: false, onCancellationRequested: () => ({ dispose() {} }) };
+    const context = params?.destination ? { destination: VscUri.parse(params.destination) } : {};
+    try {
+      const backup = await Promise.resolve(provider.backupCustomDocument(entry.document, context, token));
+      if (!backup || !backup.id) {
+        return { id, error: `provider for ${entry.viewType} returned no backup` };
+      }
+      this._customDocumentBackups.set(backup.id, backup);
+      return {
+        id,
+        result: {
+          backupId: backup.id,
+          destination: backup.destination?.toString?.() || undefined,
+        },
+      };
+    } catch (e) {
+      return { id, error: String(e && e.message ? e.message : e) };
+    }
+  }
+
+  _handleDeleteCustomDocumentBackup(id, params) {
+    const backupId = params?.backupId;
+    const backup = backupId ? this._customDocumentBackups?.get(backupId) : undefined;
+    if (backup) {
+      try {
+        if (typeof backup.delete === 'function') backup.delete();
+      } catch {}
+      this._customDocumentBackups.delete(backupId);
     }
     return { id, result: true };
   }
