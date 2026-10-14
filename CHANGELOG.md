@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.1.9 — 2026-10-14
+
+### Added
+- **Extension host: custom document lifecycle** (`host.cjs`). `openCustomDocument`
+  results are tracked by panel and by resource; `onDidChangeCustomDocument` is
+  forwarded to the workbench as `customDocumentDirty`; new protocol handlers
+  `saveCustomDocument` / `saveCustomDocumentAs` / `revertCustomDocument` /
+  `backupCustomDocument` / `deleteCustomDocumentBackup`; closing an editor
+  unsubscribes, disposes the document and clears the indexes.
+- **Workbench: custom editor module** (`contrib/customEditor`). The whole module
+  had been reduced to four stubs, so `contributes.customEditors` had nowhere to
+  land. Restored and registered in `workbench.common.main` — `CustomEditorInput`,
+  the input serializer, the working-copy handler, the capability registry and the
+  `contributes.customEditors` extension point.
+- **Node unit suite** `scripts/test-ext-host.mjs` (12 cases) and a CI job for it.
+- **Native GUI e2e** `scripts/e2e/gui-smoke.sh`: Xvfb + openbox + xdotool + scrot,
+  asserting on observable results (workbench painted, quick open shown, command
+  palette shown, Ctrl+S persisted to disk with the original line intact), plus a
+  `Native GUI e2e` workflow.
+- `docs/SIDEX-DEVELOPMENT-PLAN.md` — batched plan with per-batch acceptance
+  criteria and test method.
+
+### Fixed
+- **Disk extension theme contributions.** `_syncDiskThemeExtensions` and
+  `_registerDiskExtensionWithWorkbench` were called but never defined, so every
+  call threw and was swallowed. They now read installed manifests over the bridge
+  (new `extension_read_manifest_json` command) and feed the `themes` /
+  `iconThemes` / `productIconThemes` extension points with the union of the
+  extension service's descriptions and the disk ones, re-applying on
+  `onDidChangeExtensions`.
+- Native e2e command-palette assertion was a false positive (the welcome editor
+  rotates its hint text); it now diffs a static editor.
+
+### Notes
+- Known debt, unchanged: `prettier --check` (178 files), `cargo fmt` (141 files),
+  and 7 pre-existing `tsc` errors in unrelated files.
+
 ## 0.1.6 — 2026-10-13
 
 ### Added
