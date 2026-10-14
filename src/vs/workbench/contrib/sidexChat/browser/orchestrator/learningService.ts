@@ -33,32 +33,34 @@ export class SidexLearningService extends Disposable {
 	private _state: LearningState = {
 		lastRunAt: 0,
 		turnsSinceLastRun: 0,
-		processedSessionIds: [],
+		processedSessionIds: []
 	};
 	private _facts: LearnedFact[] = [];
 
-	constructor(
-		private readonly _chatService: ISidexChatService,
-	) {
+	constructor(private readonly _chatService: ISidexChatService) {
 		super();
 		this._loadState();
-		this._register(this._chatService.onDidChangeStreaming(streaming => {
-			if (!streaming) {
-				this._state.turnsSinceLastRun++;
-				this._checkTrigger();
-			}
-		}));
+		this._register(
+			this._chatService.onDidChangeStreaming(streaming => {
+				if (!streaming) {
+					this._state.turnsSinceLastRun++;
+					this._checkTrigger();
+				}
+			})
+		);
 	}
 
-	get facts(): readonly LearnedFact[] { return this._facts; }
+	get facts(): readonly LearnedFact[] {
+		return this._facts;
+	}
 
 	async runLearning(): Promise<void> {
 		const sessions = await this._chatService.getSavedSessionsAsync();
-		const unprocessed = sessions.filter(
-			s => !this._state.processedSessionIds.includes(s.id)
-		);
+		const unprocessed = sessions.filter(s => !this._state.processedSessionIds.includes(s.id));
 
-		if (unprocessed.length === 0) { return; }
+		if (unprocessed.length === 0) {
+			return;
+		}
 
 		for (const session of unprocessed.slice(0, 5)) {
 			await this._mineSession(session.id);
@@ -75,7 +77,9 @@ export class SidexLearningService extends Disposable {
 		await this._chatService.loadSessionAsync(sessionId);
 		const messages = this._chatService.messages;
 
-		if (messages.length < 4) { return; }
+		if (messages.length < 4) {
+			return;
+		}
 
 		const userMessages = messages.filter(m => m.role === 'user');
 		const assistantMessages = messages.filter(m => m.role === 'assistant');
@@ -96,7 +100,7 @@ export class SidexLearningService extends Disposable {
 					content: msg.content.slice(0, 200),
 					confidence: 0.8,
 					source: 'explicit',
-					learnedAt: Date.now(),
+					learnedAt: Date.now()
 				});
 			}
 
@@ -107,16 +111,13 @@ export class SidexLearningService extends Disposable {
 					content: `User correction: ${msg.content.slice(0, 150)}`,
 					confidence: 0.9,
 					source: 'correction',
-					learnedAt: Date.now(),
+					learnedAt: Date.now()
 				});
 			}
 		}
 	}
 
-	private _extractPatterns(
-		userMessages: readonly IChatMessage[],
-		assistantMessages: readonly IChatMessage[],
-	): void {
+	private _extractPatterns(userMessages: readonly IChatMessage[], assistantMessages: readonly IChatMessage[]): void {
 		// Detect repeated file paths (frequently worked-on areas)
 		const pathMentions = new Map<string, number>();
 		for (const msg of [...userMessages, ...assistantMessages]) {
@@ -133,7 +134,7 @@ export class SidexLearningService extends Disposable {
 					content: `Frequently referenced: ${path}`,
 					confidence: Math.min(0.5 + count * 0.1, 1.0),
 					source: 'frequency',
-					learnedAt: Date.now(),
+					learnedAt: Date.now()
 				});
 			}
 		}
@@ -153,10 +154,12 @@ export class SidexLearningService extends Disposable {
 									content: `Project config at ${args.path}`,
 									confidence: 1.0,
 									source: 'observation',
-									learnedAt: Date.now(),
+									learnedAt: Date.now()
 								});
 							}
-						} catch { /* ignore */ }
+						} catch {
+							/* ignore */
+						}
 					}
 				}
 			}
@@ -164,10 +167,7 @@ export class SidexLearningService extends Disposable {
 	}
 
 	private _addFact(fact: LearnedFact): void {
-		const exists = this._facts.some(f =>
-			f.category === fact.category &&
-			f.content === fact.content
-		);
+		const exists = this._facts.some(f => f.category === fact.category && f.content === fact.content);
 		if (!exists) {
 			this._facts.push(fact);
 		}
@@ -178,19 +178,21 @@ export class SidexLearningService extends Disposable {
 		const elapsed = Date.now() - this._state.lastRunAt;
 
 		if (this._state.turnsSinceLastRun >= MIN_TURNS_BETWEEN_RUNS && elapsed >= minMs) {
-			this.runLearning().catch(() => { });
+			this.runLearning().catch(() => {});
 		}
 	}
 
 	private async _writeMemoryFile(): Promise<void> {
 		const invoke = this._getInvoke();
-		if (!invoke || this._facts.length === 0) { return; }
+		if (!invoke || this._facts.length === 0) {
+			return;
+		}
 
 		const sections: Record<string, string[]> = {
 			preference: [],
 			pattern: [],
 			convention: [],
-			architecture: [],
+			architecture: []
 		};
 
 		for (const fact of this._facts) {
@@ -219,23 +221,33 @@ export class SidexLearningService extends Disposable {
 
 		try {
 			await invoke('write_file', { path: MEMORY_FILE, contents: content });
-		} catch { /* ignore write failures */ }
+		} catch {
+			/* ignore write failures */
+		}
 	}
 
 	private _loadState(): void {
 		try {
 			const raw = localStorage.getItem('sidex.learning.state');
-			if (raw) { this._state = JSON.parse(raw); }
+			if (raw) {
+				this._state = JSON.parse(raw);
+			}
 			const facts = localStorage.getItem('sidex.learning.facts');
-			if (facts) { this._facts = JSON.parse(facts); }
-		} catch { /* use defaults */ }
+			if (facts) {
+				this._facts = JSON.parse(facts);
+			}
+		} catch {
+			/* use defaults */
+		}
 	}
 
 	private _saveState(): void {
 		try {
 			localStorage.setItem('sidex.learning.state', JSON.stringify(this._state));
 			localStorage.setItem('sidex.learning.facts', JSON.stringify(this._facts));
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 	}
 
 	private _getInvoke(): ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | null {

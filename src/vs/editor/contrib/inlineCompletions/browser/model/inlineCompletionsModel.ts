@@ -335,11 +335,11 @@ export class InlineCompletionsModel extends Disposable {
 	}
 
 	private _lastShownInlineCompletionInfo:
-		| { alternateTextModelVersionId: number; /* already freed! */ inlineCompletion: InlineSuggestionItem }
-		| undefined = undefined;
+		{ alternateTextModelVersionId: number; /* already freed! */ inlineCompletion: InlineSuggestionItem } | undefined =
+		undefined;
 	private _lastAcceptedInlineCompletionInfo:
-		| { textModelVersionIdAfter: number; /* already freed! */ inlineCompletion: InlineSuggestionItem }
-		| undefined = undefined;
+		{ textModelVersionIdAfter: number; /* already freed! */ inlineCompletion: InlineSuggestionItem } | undefined =
+		undefined;
 	private readonly _didUndoInlineEdits = derivedHandleChanges(
 		{
 			owner: this,

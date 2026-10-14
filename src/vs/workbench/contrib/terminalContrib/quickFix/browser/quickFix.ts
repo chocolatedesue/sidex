@@ -34,9 +34,7 @@ export interface ITerminalQuickFixProviderSelector {
 }
 
 export type TerminalQuickFixActionInternal =
-	| IAction
-	| ITerminalQuickFixTerminalCommandAction
-	| ITerminalQuickFixOpenerAction;
+	IAction | ITerminalQuickFixTerminalCommandAction | ITerminalQuickFixOpenerAction;
 export type TerminalQuickFixCallback = (
 	matchResult: ITerminalCommandMatchResult
 ) => TerminalQuickFixActionInternal[] | TerminalQuickFixActionInternal | undefined;

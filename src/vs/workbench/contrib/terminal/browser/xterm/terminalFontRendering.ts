@@ -12,7 +12,10 @@ const enum CssClasses {
 	Grayscale = 'terminal-font-rendering-grayscale'
 }
 
-export function updateTerminalFontRendering(terminal: Terminal, fontRendering: ITerminalConfiguration['fontRendering']): void {
+export function updateTerminalFontRendering(
+	terminal: Terminal,
+	fontRendering: ITerminalConfiguration['fontRendering']
+): void {
 	const element = terminal.element;
 	if (!element) {
 		return;

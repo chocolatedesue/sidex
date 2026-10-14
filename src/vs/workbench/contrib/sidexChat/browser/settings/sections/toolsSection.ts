@@ -55,7 +55,12 @@ export class ToolsSection implements SettingsSection {
 		card.className = 'sidex-settings-card';
 
 		const modeRow = this._createRow(card, 'Auto-Run Mode', '');
-		this._addSelect(modeRow, ['Run Everything (Unsandboxed)', 'Ask for approval', 'Sandboxed'], 'Run Everything (Unsandboxed)', 'tools.autoRunMode');
+		this._addSelect(
+			modeRow,
+			['Run Everything (Unsandboxed)', 'Ask for approval', 'Sandboxed'],
+			'Run Everything (Unsandboxed)',
+			'tools.autoRunMode'
+		);
 
 		container.appendChild(card);
 	}
@@ -111,7 +116,7 @@ export class ToolsSection implements SettingsSection {
 	}
 
 	private _addSelect(row: HTMLElement, options: string[], defaultValue: string, settingKey: string): HTMLElement {
-		const dropdown = createCustomDropdown(options, defaultValue, (newValue) => {
+		const dropdown = createCustomDropdown(options, defaultValue, newValue => {
 			if (this._invoke) {
 				this._invoke('settings_update', { key: settingKey, value: newValue, scope: 'user' }).catch(() => {});
 			}

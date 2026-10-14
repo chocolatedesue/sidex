@@ -457,11 +457,7 @@ export class ModelRawEOLChanged {
  * @internal
  */
 export type ModelRawChange =
-	| ModelRawFlush
-	| ModelRawLineChanged
-	| ModelRawLinesDeleted
-	| ModelRawLinesInserted
-	| ModelRawEOLChanged;
+	ModelRawFlush | ModelRawLineChanged | ModelRawLinesDeleted | ModelRawLinesInserted | ModelRawEOLChanged;
 
 /**
  * An event describing a change in the text of a model.

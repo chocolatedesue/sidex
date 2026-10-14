@@ -47,9 +47,7 @@ export class SidexUpdateService implements IUpdateService {
 	private _state: State = State.Uninitialized;
 	private _tauriReady: Promise<{ core: TauriCore; event: TauriEvent } | undefined>;
 
-	constructor(
-		@INotificationService private readonly notificationService: INotificationService,
-	) {
+	constructor(@INotificationService private readonly notificationService: INotificationService) {
 		this._tauriReady = loadTauri();
 		this._bootstrap();
 	}

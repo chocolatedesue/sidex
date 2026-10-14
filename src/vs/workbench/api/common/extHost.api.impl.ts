@@ -1623,8 +1623,7 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 				let uriPromise: Thenable<URI>;
 
 				options = (options ?? uriOrFileNameOrOptions) as
-					| { language?: string; content?: string; encoding?: string }
-					| undefined;
+					{ language?: string; content?: string; encoding?: string } | undefined;
 
 				if (typeof uriOrFileNameOrOptions === 'string') {
 					uriPromise = Promise.resolve(URI.file(uriOrFileNameOrOptions));

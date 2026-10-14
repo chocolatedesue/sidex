@@ -1236,10 +1236,7 @@ export namespace CursorMove {
 		| Direction.WrappedLineLastNonWhitespaceCharacter;
 
 	export type ViewportDirection =
-		| Direction.ViewPortTop
-		| Direction.ViewPortCenter
-		| Direction.ViewPortBottom
-		| Direction.ViewPortIfOutside;
+		Direction.ViewPortTop | Direction.ViewPortCenter | Direction.ViewPortBottom | Direction.ViewPortIfOutside;
 
 	export const enum Unit {
 		None,

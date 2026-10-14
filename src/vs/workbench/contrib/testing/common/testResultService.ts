@@ -26,10 +26,7 @@ import {
 } from './testTypes.js';
 
 export type ResultChangeEvent =
-	| { completed: LiveTestResult }
-	| { started: LiveTestResult }
-	| { inserted: ITestResult }
-	| { removed: ITestResult[] };
+	{ completed: LiveTestResult } | { started: LiveTestResult } | { inserted: ITestResult } | { removed: ITestResult[] };
 
 export interface ITestResultService {
 	readonly _serviceBrand: undefined;

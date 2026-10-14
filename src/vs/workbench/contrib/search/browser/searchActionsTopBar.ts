@@ -428,14 +428,12 @@ function collapseDeepestExpandedLevel(accessor: ServicesAccessor) {
 
 					const immediateParent = nodeToTest.parent();
 
-					if (
-						!(
-							isTextSearchHeading(immediateParent) ||
-							isSearchTreeFolderMatchWorkspaceRoot(immediateParent) ||
-							isSearchTreeFolderMatchNoRoot(immediateParent) ||
-							isSearchResult(immediateParent)
-						)
-					) {
+					if (!(
+						isTextSearchHeading(immediateParent) ||
+						isSearchTreeFolderMatchWorkspaceRoot(immediateParent) ||
+						isSearchTreeFolderMatchNoRoot(immediateParent) ||
+						isSearchResult(immediateParent)
+					)) {
 						canCollapseFirstLevel = true;
 					}
 				}

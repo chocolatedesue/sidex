@@ -964,14 +964,14 @@ export function createCustomDropdown(
 			item.appendChild(soonSpan);
 		}
 
-		item.addEventListener('click', (e) => {
+		item.addEventListener('click', e => {
 			if (opt.disabled) {
 				e.stopPropagation();
 				return;
 			}
 			textSpan.textContent = opt.label;
 			(container as any).value = opt.value;
-			
+
 			// Update active class
 			const items = menu.querySelectorAll('.sidex-custom-dropdown-item');
 			items.forEach(itm => {
@@ -993,11 +993,13 @@ export function createCustomDropdown(
 	container.appendChild(menu);
 
 	// Event listeners to toggle open/close
-	trigger.addEventListener('click', (e) => {
+	trigger.addEventListener('click', e => {
 		const isOpen = container.classList.contains('open');
 		// Close all other dropdowns first
 		document.querySelectorAll('.sidex-custom-select-container').forEach(c => {
-			if (c !== container) { c.classList.remove('open'); }
+			if (c !== container) {
+				c.classList.remove('open');
+			}
 		});
 		if (isOpen) {
 			container.classList.remove('open');
@@ -1007,7 +1009,7 @@ export function createCustomDropdown(
 		trigger.setAttribute('aria-expanded', String(!isOpen));
 		e.stopPropagation();
 	});
-	trigger.addEventListener('keydown', (e) => {
+	trigger.addEventListener('keydown', e => {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
 			trigger.click();

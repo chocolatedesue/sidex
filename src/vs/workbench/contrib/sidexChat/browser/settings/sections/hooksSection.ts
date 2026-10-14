@@ -16,20 +16,14 @@ interface HookItem {
 	enabled: boolean;
 }
 
-const HOOK_EVENTS = [
-	'on_file_save',
-	'on_commit',
-	'on_agent_start',
-	'on_agent_end',
-	'before_tool_call',
-];
+const HOOK_EVENTS = ['on_file_save', 'on_commit', 'on_agent_start', 'on_agent_end', 'before_tool_call'];
 
 const EVENT_LABELS: Record<string, string> = {
 	on_file_save: 'On File Save',
 	on_commit: 'On Commit',
 	on_agent_start: 'On Agent Start',
 	on_agent_end: 'On Agent End',
-	before_tool_call: 'Before Tool Call',
+	before_tool_call: 'Before Tool Call'
 };
 
 export class HooksSection implements SettingsSection {
@@ -63,11 +57,17 @@ export class HooksSection implements SettingsSection {
 	}
 
 	private async _loadHooks(): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		try {
-			const data = await this._invoke('hooks_list') as HookItem[] | null;
-			if (data) { this._hooks = data; }
-		} catch { /* use empty */ }
+			const data = (await this._invoke('hooks_list')) as HookItem[] | null;
+			if (data) {
+				this._hooks = data;
+			}
+		} catch {
+			/* use empty */
+		}
 	}
 
 	private _renderAddButton(container: HTMLElement): void {
@@ -234,12 +234,14 @@ export class HooksSection implements SettingsSection {
 				removeBtn.title = 'Remove hook';
 				removeBtn.addEventListener('click', () => {
 					if (this._invoke) {
-						this._invoke('hooks_remove', { id: hook.id }).then(() => {
-							if (this._container) {
-								this._container.innerHTML = '';
-								this.render(this._container);
-							}
-						}).catch(() => {});
+						this._invoke('hooks_remove', { id: hook.id })
+							.then(() => {
+								if (this._container) {
+									this._container.innerHTML = '';
+									this.render(this._container);
+								}
+							})
+							.catch(() => {});
 					}
 				});
 				action.appendChild(removeBtn);
@@ -253,9 +255,13 @@ export class HooksSection implements SettingsSection {
 	}
 
 	private _toggleAddForm(): void {
-		if (!this._container) { return; }
+		if (!this._container) {
+			return;
+		}
 		const form = this._container.querySelector('[data-role="hook-add-form"]') as HTMLElement | null;
-		if (!form) { return; }
+		if (!form) {
+			return;
+		}
 		this._addFormVisible = !this._addFormVisible;
 		form.style.display = this._addFormVisible ? '' : 'none';
 	}
@@ -269,20 +275,24 @@ export class HooksSection implements SettingsSection {
 		const action = typeSelect?.value;
 		const command = cmdInput?.value.trim();
 
-		if (!event || !command) { return; }
+		if (!event || !command) {
+			return;
+		}
 
 		if (this._invoke) {
 			this._invoke('hooks_add', {
 				event,
 				action,
 				command,
-				enabled: true,
-			}).then(() => {
-				if (this._container) {
-					this._container.innerHTML = '';
-					this.render(this._container);
-				}
-			}).catch(() => {});
+				enabled: true
+			})
+				.then(() => {
+					if (this._container) {
+						this._container.innerHTML = '';
+						this.render(this._container);
+					}
+				})
+				.catch(() => {});
 		}
 	}
 

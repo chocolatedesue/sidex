@@ -48,10 +48,7 @@ export const INACTIVE_TUNNEL_MODE: InactiveTunnelMode = { active: false };
 export type TunnelMode = ActiveTunnelMode | InactiveTunnelMode;
 
 export type TunnelStatus =
-	| TunnelStates.Connected
-	| TunnelStates.Disconnected
-	| TunnelStates.Connecting
-	| TunnelStates.Uninitialized;
+	TunnelStates.Connected | TunnelStates.Disconnected | TunnelStates.Connecting | TunnelStates.Uninitialized;
 
 export namespace TunnelStates {
 	export interface Uninitialized {

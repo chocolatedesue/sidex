@@ -512,9 +512,7 @@ export interface RendererExtension {
 	renderer: RendererExtensionFunction;
 }
 export type TokenizerAndRendererExtension =
-	| TokenizerExtension
-	| RendererExtension
-	| (TokenizerExtension & RendererExtension);
+	TokenizerExtension | RendererExtension | (TokenizerExtension & RendererExtension);
 export type HooksApi = Omit<MarkedHooks, 'constructor' | 'options'>;
 export type HooksObject = {
 	[K in keyof HooksApi]?: (

@@ -242,9 +242,7 @@ export class ConsoleObservableLogger implements IObservableLogger {
 	}
 }
 type ConsoleText =
-	| (ConsoleText | undefined)[]
-	| { text: string; style: string; data?: unknown[] }
-	| { data: unknown[] };
+	(ConsoleText | undefined)[] | { text: string; style: string; data?: unknown[] } | { data: unknown[] };
 function consoleTextToArgs(text: ConsoleText): unknown[] {
 	const styles = new Array<any>();
 	const data: unknown[] = [];

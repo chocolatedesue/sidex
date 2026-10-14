@@ -87,9 +87,7 @@ export class TerminalQuickFixAddon extends Disposable implements ITerminalAddon,
 	private _commandListeners: Map<
 		string,
 		(
-			| ITerminalQuickFixOptions
-			| ITerminalQuickFixResolvedExtensionOptions
-			| ITerminalQuickFixUnresolvedExtensionOptions
+			ITerminalQuickFixOptions | ITerminalQuickFixResolvedExtensionOptions | ITerminalQuickFixUnresolvedExtensionOptions
 		)[]
 	> = new Map();
 
@@ -99,8 +97,7 @@ export class TerminalQuickFixAddon extends Disposable implements ITerminalAddon,
 	private readonly _decorationDisposables: MutableDisposable<IDisposable> = this._register(new MutableDisposable());
 
 	private _currentRenderContext:
-		| { quickFixes: ITerminalAction[]; anchor: IAnchor; parentElement: HTMLElement }
-		| undefined;
+		{ quickFixes: ITerminalAction[]; anchor: IAnchor; parentElement: HTMLElement } | undefined;
 
 	private _lastQuickFixId: string | undefined;
 

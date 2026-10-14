@@ -120,9 +120,7 @@ function focusHandler(focus: QuickPickFocus, focusOnQuickNatigate?: QuickPickFoc
 	return accessor => {
 		// Assuming this is a quick pick due to above when clause
 		const currentQuickPick = accessor.get(IQuickInputService).currentQuickInput as
-			| IQuickPick<any>
-			| IQuickTree<any>
-			| undefined;
+			IQuickPick<any> | IQuickTree<any> | undefined;
 		if (!currentQuickPick) {
 			return;
 		}
@@ -256,9 +254,7 @@ KeybindingsRegistry.registerCommandAndKeybindingRule({
 	},
 	handler: accessor => {
 		const currentQuickPick = accessor.get(IQuickInputService).currentQuickInput as
-			| IQuickPick<any>
-			| IQuickTree<any>
-			| IInputBox;
+			IQuickPick<any> | IQuickTree<any> | IInputBox;
 		currentQuickPick?.accept();
 	},
 	secondary: getSecondary(KeyCode.Enter, [], {

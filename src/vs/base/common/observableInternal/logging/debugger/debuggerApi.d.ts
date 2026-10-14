@@ -69,9 +69,7 @@ export interface IObsDeclarationSummary {
 }
 
 export type ObsInstancePushState =
-	| IObservableValueInstancePushState
-	| IDerivedObservableInstancePushState
-	| IAutorunInstancePushState;
+	IObservableValueInstancePushState | IDerivedObservableInstancePushState | IAutorunInstancePushState;
 
 interface IBaseObsInstancePushState {
 	instanceId: ObsInstanceId;
@@ -146,6 +144,5 @@ export type AutorunState = IObsInstanceRef & { type: 'autorun'; updateCount: num
 	);
 
 export type ObservableValueState = IObsInstanceRef & { type: 'observable/value' } & (
-		| { state: 'upToDate' }
-		| { state: 'updating' }
+		{ state: 'upToDate' } | { state: 'updating' }
 	);

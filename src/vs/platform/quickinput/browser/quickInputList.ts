@@ -1491,12 +1491,7 @@ export class QuickInputList extends Disposable {
 	}
 
 	layout(maxHeight?: number): void {
-		this._tree.getHTMLElement().style.maxHeight = maxHeight
-			? `${
-					Math.floor(maxHeight / 28) * 28 +
-					6
-				}px`
-			: '';
+		this._tree.getHTMLElement().style.maxHeight = maxHeight ? `${Math.floor(maxHeight / 28) * 28 + 6}px` : '';
 		this._tree.layout();
 	}
 

@@ -138,9 +138,7 @@ export interface IWorkspaceIdentifier extends IBaseWorkspaceIdentifier {
 export interface IEmptyWorkspaceIdentifier extends IBaseWorkspaceIdentifier {}
 
 export type IAnyWorkspaceIdentifier =
-	| IWorkspaceIdentifier
-	| ISingleFolderWorkspaceIdentifier
-	| IEmptyWorkspaceIdentifier;
+	IWorkspaceIdentifier | ISingleFolderWorkspaceIdentifier | IEmptyWorkspaceIdentifier;
 
 export function isSingleFolderWorkspaceIdentifier(obj: unknown): obj is ISingleFolderWorkspaceIdentifier {
 	const singleFolderIdentifier = obj as ISingleFolderWorkspaceIdentifier | undefined;
@@ -233,17 +231,11 @@ export function reviveIdentifier(
 export function reviveIdentifier(identifier: IEmptyWorkspaceIdentifier): IEmptyWorkspaceIdentifier;
 export function reviveIdentifier(
 	identifier:
-		| ISerializedWorkspaceIdentifier
-		| ISerializedSingleFolderWorkspaceIdentifier
-		| IEmptyWorkspaceIdentifier
-		| undefined
+		ISerializedWorkspaceIdentifier | ISerializedSingleFolderWorkspaceIdentifier | IEmptyWorkspaceIdentifier | undefined
 ): IAnyWorkspaceIdentifier | undefined;
 export function reviveIdentifier(
 	identifier:
-		| ISerializedWorkspaceIdentifier
-		| ISerializedSingleFolderWorkspaceIdentifier
-		| IEmptyWorkspaceIdentifier
-		| undefined
+		ISerializedWorkspaceIdentifier | ISerializedSingleFolderWorkspaceIdentifier | IEmptyWorkspaceIdentifier | undefined
 ): IAnyWorkspaceIdentifier | undefined {
 	// Single Folder
 	const singleFolderIdentifierCandidate = identifier as ISerializedSingleFolderWorkspaceIdentifier | undefined;

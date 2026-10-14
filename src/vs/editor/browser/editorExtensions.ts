@@ -450,10 +450,10 @@ export abstract class EditorAction extends EditorCommand {
 		};
 		accessor
 			.get(ITelemetryService)
-			.publicLog2<
-				EditorActionInvokedEvent,
-				EditorActionInvokedClassification
-			>('editorActionInvoked', { name: this.label, id: this.id });
+			.publicLog2<EditorActionInvokedEvent, EditorActionInvokedClassification>('editorActionInvoked', {
+				name: this.label,
+				id: this.id
+			});
 	}
 
 	public abstract run(accessor: ServicesAccessor, editor: ICodeEditor, args: unknown): void | Promise<void>;

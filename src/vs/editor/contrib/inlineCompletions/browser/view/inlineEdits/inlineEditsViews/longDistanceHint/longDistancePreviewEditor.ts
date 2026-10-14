@@ -57,9 +57,7 @@ export class LongDistancePreviewEditor extends Disposable {
 	private readonly _previewRef = n.ref<HTMLDivElement>();
 	public readonly element = n.div({
 		class: 'preview',
-		style: {
-			/*pointerEvents: 'none'*/
-		},
+		style: {/*pointerEvents: 'none'*/},
 		ref: this._previewRef
 	});
 

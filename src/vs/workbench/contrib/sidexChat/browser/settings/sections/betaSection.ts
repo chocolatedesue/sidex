@@ -42,22 +42,31 @@ export class BetaSection implements SettingsSection {
 		left.appendChild(label);
 		const desc = document.createElement('div');
 		desc.className = 'sidex-settings-row-description';
-		desc.textContent = 'By default, get notifications for stable updates. In Early Access, pre-release builds may be unstable for production work.';
+		desc.textContent =
+			'By default, get notifications for stable updates. In Early Access, pre-release builds may be unstable for production work.';
 		left.appendChild(desc);
 		row.appendChild(left);
 
 		const action = document.createElement('div');
 		action.className = 'sidex-settings-row-action';
-		const dropdown = createCustomDropdown(['Default', 'Early Access'], 'Default', (newValue) => {
+		const dropdown = createCustomDropdown(['Default', 'Early Access'], 'Default', newValue => {
 			if (this._invoke) {
-				this._invoke('settings_update', { key: 'sidex.beta.updateChannel', value: JSON.stringify(newValue), scope: 'user' }).catch(() => {});
+				this._invoke('settings_update', {
+					key: 'sidex.beta.updateChannel',
+					value: JSON.stringify(newValue),
+					scope: 'user'
+				}).catch(() => {});
 			}
 		});
 
 		if (this._invoke) {
-			this._invoke('settings_get', { section: 'sidex.beta.updateChannel' }).then((val) => {
-				if (val && typeof val === 'string') { (dropdown as any).setValue(val); }
-			}).catch(() => {});
+			this._invoke('settings_get', { section: 'sidex.beta.updateChannel' })
+				.then(val => {
+					if (val && typeof val === 'string') {
+						(dropdown as any).setValue(val);
+					}
+				})
+				.catch(() => {});
 		}
 
 		action.appendChild(dropdown);
@@ -81,7 +90,8 @@ export class BetaSection implements SettingsSection {
 		left.appendChild(label);
 		const desc = document.createElement('div');
 		desc.className = 'sidex-settings-row-description';
-		desc.textContent = 'Log extension host RPC messages to JSON files viewable in Perfetto for performance analysis. Requires a restart to take effect.';
+		desc.textContent =
+			'Log extension host RPC messages to JSON files viewable in Perfetto for performance analysis. Requires a restart to take effect.';
 		left.appendChild(desc);
 		row.appendChild(left);
 
@@ -92,18 +102,24 @@ export class BetaSection implements SettingsSection {
 		toggle.className = 'sidex-settings-toggle';
 
 		if (this._invoke) {
-			this._invoke('settings_get', { section: 'sidex.beta.rpcTracer' }).then((val) => {
-				if (val === true) {
-					toggle.classList.add('on');
-				}
-			}).catch(() => {});
+			this._invoke('settings_get', { section: 'sidex.beta.rpcTracer' })
+				.then(val => {
+					if (val === true) {
+						toggle.classList.add('on');
+					}
+				})
+				.catch(() => {});
 		}
 
 		toggle.addEventListener('click', () => {
 			toggle.classList.toggle('on');
 			if (this._invoke) {
 				const nowOn = toggle.classList.contains('on');
-				this._invoke('settings_update', { key: 'sidex.beta.rpcTracer', value: JSON.stringify(nowOn), scope: 'user' }).catch(() => {});
+				this._invoke('settings_update', {
+					key: 'sidex.beta.rpcTracer',
+					value: JSON.stringify(nowOn),
+					scope: 'user'
+				}).catch(() => {});
 			}
 		});
 		action.appendChild(toggle);

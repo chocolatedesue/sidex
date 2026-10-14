@@ -374,7 +374,7 @@ registerAction2(
 			const workspaceEditing = accessor.get(IWorkspaceEditingService);
 			let authority = '';
 			if (typeof uri === 'string') {
-				authority = uri.includes('ssh-remote+') ? (uri.split('/').find(p => p.startsWith('ssh-remote+')) || uri) : uri;
+				authority = uri.includes('ssh-remote+') ? uri.split('/').find(p => p.startsWith('ssh-remote+')) || uri : uri;
 			} else if (uri && typeof uri === 'object' && 'authority' in (uri as object)) {
 				authority = String((uri as { authority?: string }).authority || '');
 			}
@@ -392,7 +392,15 @@ registerAction2(
 				hostPort = m[1];
 				port = Number(m[2]);
 			}
-			const conn = await connectSshWithAuthFallback(remote, quickInput, notifications, hostPort, user || 'root', port, null);
+			const conn = await connectSshWithAuthFallback(
+				remote,
+				quickInput,
+				notifications,
+				hostPort,
+				user || 'root',
+				port,
+				null
+			);
 			if (!conn?.authority) {
 				return;
 			}
@@ -568,7 +576,9 @@ async function pickAndConnectSsh(
 function sshErrorCode(err: unknown): string | undefined {
 	const m = String(err);
 	const i = m.indexOf('[SIDEX_');
-	if (i < 0) { return undefined; }
+	if (i < 0) {
+		return undefined;
+	}
 	const j = m.indexOf(']', i);
 	return j > i ? m.slice(i + 1, j) : undefined;
 }
@@ -640,7 +650,14 @@ async function connectSshWithAuthFallback(
 					return undefined;
 				}
 			}
-			if (code === 'SIDEX_HOSTKEY_CHANGED' || code === 'SIDEX_HOSTKEY_UNKNOWN' || code === 'SIDEX_TIMEOUT' || code === 'SIDEX_REFUSED' || code === 'SIDEX_UNREACHABLE' || code === 'SIDEX_CANCELLED') {
+			if (
+				code === 'SIDEX_HOSTKEY_CHANGED' ||
+				code === 'SIDEX_HOSTKEY_UNKNOWN' ||
+				code === 'SIDEX_TIMEOUT' ||
+				code === 'SIDEX_REFUSED' ||
+				code === 'SIDEX_UNREACHABLE' ||
+				code === 'SIDEX_CANCELLED'
+			) {
 				notifications.error(friendlySshError(err));
 				return undefined;
 			}

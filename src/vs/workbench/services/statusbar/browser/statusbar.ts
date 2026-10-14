@@ -130,11 +130,7 @@ export const StatusbarEntryKinds: StatusbarEntryKind[] = [
 ];
 
 export type TooltipContent =
-	| string
-	| IMarkdownString
-	| HTMLElement
-	| IManagedHoverTooltipMarkdownString
-	| IManagedHoverTooltipHTMLElement;
+	string | IMarkdownString | HTMLElement | IManagedHoverTooltipMarkdownString | IManagedHoverTooltipHTMLElement;
 
 export interface ITooltipWithCommands {
 	readonly content: TooltipContent;

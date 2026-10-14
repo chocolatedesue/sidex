@@ -1855,10 +1855,7 @@ export class FileService extends Disposable implements IFileService {
 		resource: URI,
 		options: IWriteFileOptions | undefined,
 		bufferOrReadableOrStreamOrBufferedStream:
-			| VSBuffer
-			| VSBufferReadable
-			| VSBufferReadableStream
-			| VSBufferReadableBufferedStream
+			VSBuffer | VSBufferReadable | VSBufferReadableStream | VSBufferReadableBufferedStream
 	): Promise<void> {
 		return this.writeQueue.queueFor(
 			resource,
@@ -1872,10 +1869,7 @@ export class FileService extends Disposable implements IFileService {
 		resource: URI,
 		options: IWriteFileOptions | undefined,
 		bufferOrReadableOrStreamOrBufferedStream:
-			| VSBuffer
-			| VSBufferReadable
-			| VSBufferReadableStream
-			| VSBufferReadableBufferedStream
+			VSBuffer | VSBufferReadable | VSBufferReadableStream | VSBufferReadableBufferedStream
 	): Promise<void> {
 		let buffer: VSBuffer;
 		if (bufferOrReadableOrStreamOrBufferedStream instanceof VSBuffer) {

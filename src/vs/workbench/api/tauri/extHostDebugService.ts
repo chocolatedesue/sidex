@@ -111,8 +111,7 @@ export class ExtHostDebugService extends ExtHostDebugServiceBase {
 				continue;
 			}
 			const debuggers = (ext.contributes as Record<string, unknown>)['debuggers'] as
-				| Array<Record<string, unknown>>
-				| undefined;
+				Array<Record<string, unknown>> | undefined;
 			if (!debuggers) {
 				continue;
 			}

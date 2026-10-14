@@ -1164,7 +1164,7 @@ export class SelectionHighlighter extends Disposable implements IEditorContribut
 
 		// do not overlap with selection (issue #64 and #512)
 		const matches: Range[] = [];
-		for (let i = 0, j = 0, len = allMatches.length, lenJ = selections.length; i < len; ) {
+		for (let i = 0, j = 0, len = allMatches.length, lenJ = selections.length; i < len;) {
 			const match = allMatches[i];
 
 			if (j >= lenJ) {

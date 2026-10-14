@@ -263,13 +263,11 @@ function asListOptions<T, TFilterData, TRef>(
 			multipleSelectionController: options.multipleSelectionController && {
 				isSelectionSingleChangeEvent(e) {
 					return options.multipleSelectionController!.isSelectionSingleChangeEvent({ ...e, element: e.element } as
-						| IListMouseEvent<T>
-						| IListTouchEvent<T>);
+						IListMouseEvent<T> | IListTouchEvent<T>);
 				},
 				isSelectionRangeChangeEvent(e) {
 					return options.multipleSelectionController!.isSelectionRangeChangeEvent({ ...e, element: e.element } as
-						| IListMouseEvent<T>
-						| IListTouchEvent<T>);
+						IListMouseEvent<T> | IListTouchEvent<T>);
 				}
 			},
 			accessibilityProvider: options.accessibilityProvider && {

@@ -22,10 +22,12 @@ export class SidexUxPolishController extends Disposable implements IWorkbenchCon
 	constructor(@IConfigurationService private readonly configurationService: IConfigurationService) {
 		super();
 
-		const onChange = Event.filter(configurationService.onDidChangeConfiguration, e =>
-			e.affectsConfiguration(DENSITY_LAYOUT) ||
-			e.affectsConfiguration(FROSTED_GLASS) ||
-			e.affectsConfiguration(FROSTED_OPACITY)
+		const onChange = Event.filter(
+			configurationService.onDidChangeConfiguration,
+			e =>
+				e.affectsConfiguration(DENSITY_LAYOUT) ||
+				e.affectsConfiguration(FROSTED_GLASS) ||
+				e.affectsConfiguration(FROSTED_OPACITY)
 		);
 		this._register(onChange(() => this.apply()));
 		this.apply();
@@ -61,9 +63,8 @@ export class SidexUxPolishController extends Disposable implements IWorkbenchCon
 		root.classList.toggle('no-frosted-glass', !enabled);
 
 		const opacity = this.configurationService.getValue<number>(FROSTED_OPACITY);
-		const clamped = typeof opacity === 'number' && Number.isFinite(opacity)
-			? Math.min(1, Math.max(0.4, opacity))
-			: 0.72;
+		const clamped =
+			typeof opacity === 'number' && Number.isFinite(opacity) ? Math.min(1, Math.max(0.4, opacity)) : 0.72;
 		root.style.setProperty('--sidex-frosted-opacity', String(clamped));
 	}
 }

@@ -663,7 +663,7 @@ export class BreadcrumbsControl {
 					const data = dom.getDomNodePagePosition(event.node);
 					const y = data.top + data.height + pickerArrowSize;
 					if (y + maxHeight >= window.innerHeight) {
-						maxHeight = window.innerHeight - y - 30 /* room for shadow and status bar*/;
+						maxHeight = window.innerHeight - y - 30; /* room for shadow and status bar*/
 					}
 					let x = data.left;
 					if (x + pickerWidth >= maxInnerWidth) {

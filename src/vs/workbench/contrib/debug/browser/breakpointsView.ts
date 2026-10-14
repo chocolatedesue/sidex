@@ -125,11 +125,7 @@ export function getExpandedBodySize(model: IDebugModel, sessionId: string | unde
 	return Math.min(countLimit, length) * 22;
 }
 type BreakpointItem =
-	| IBreakpoint
-	| IFunctionBreakpoint
-	| IDataBreakpoint
-	| IExceptionBreakpoint
-	| IInstructionBreakpoint;
+	IBreakpoint | IFunctionBreakpoint | IDataBreakpoint | IExceptionBreakpoint | IInstructionBreakpoint;
 
 /**
  * Represents a file node in the breakpoints tree that groups breakpoints by file.

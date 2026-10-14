@@ -93,9 +93,7 @@ export interface IAsyncDataTreeNode<TInput, T> {
 	stale: boolean;
 	slow: boolean;
 	readonly defaultCollapseState:
-		| undefined
-		| ObjectTreeElementCollapseState.PreserveOrCollapsed
-		| ObjectTreeElementCollapseState.PreserveOrExpanded;
+		undefined | ObjectTreeElementCollapseState.PreserveOrCollapsed | ObjectTreeElementCollapseState.PreserveOrExpanded;
 	forceExpanded: boolean;
 }
 
@@ -104,9 +102,7 @@ interface IAsyncDataTreeNodeRequiredProps<TInput, T> extends Partial<IAsyncDataT
 	readonly parent: IAsyncDataTreeNode<TInput, T> | null;
 	readonly hasChildren: boolean;
 	readonly defaultCollapseState:
-		| undefined
-		| ObjectTreeElementCollapseState.PreserveOrCollapsed
-		| ObjectTreeElementCollapseState.PreserveOrExpanded;
+		undefined | ObjectTreeElementCollapseState.PreserveOrCollapsed | ObjectTreeElementCollapseState.PreserveOrExpanded;
 }
 
 function createAsyncDataTreeNode<TInput, T>(
@@ -583,13 +579,11 @@ function asObjectTreeOptions<TInput, T, TFilterData>(
 			multipleSelectionController: options.multipleSelectionController && {
 				isSelectionSingleChangeEvent(e) {
 					return options.multipleSelectionController!.isSelectionSingleChangeEvent({ ...e, element: e.element } as
-						| IListMouseEvent<T>
-						| IListTouchEvent<T>);
+						IListMouseEvent<T> | IListTouchEvent<T>);
 				},
 				isSelectionRangeChangeEvent(e) {
 					return options.multipleSelectionController!.isSelectionRangeChangeEvent({ ...e, element: e.element } as
-						| IListMouseEvent<T>
-						| IListTouchEvent<T>);
+						IListMouseEvent<T> | IListTouchEvent<T>);
 				}
 			},
 			accessibilityProvider: options.accessibilityProvider && {
@@ -664,8 +658,7 @@ function asObjectTreeOptions<TInput, T, TFilterData>(
 				}
 			},
 			stickyScrollDelegate: options.stickyScrollDelegate as
-				| IStickyScrollDelegate<IAsyncDataTreeNode<TInput, T>, TFilterData>
-				| undefined
+				IStickyScrollDelegate<IAsyncDataTreeNode<TInput, T>, TFilterData> | undefined
 		}
 	);
 }
@@ -786,8 +779,7 @@ export class AsyncDataTree<TInput, T, TFilterData = void> implements IDisposable
 	}
 
 	private focusNavigationFilter:
-		| ((node: ITreeNode<IAsyncDataTreeNode<TInput, T> | null, TFilterData>) => boolean)
-		| undefined;
+		((node: ITreeNode<IAsyncDataTreeNode<TInput, T> | null, TFilterData>) => boolean) | undefined;
 
 	readonly onDidChangeFindOpenState: Event<boolean>;
 	get onDidChangeStickyScrollFocused(): Event<boolean> {
@@ -1916,8 +1908,7 @@ function asCompressibleObjectTreeOptions<TInput, T, TFilterData>(
 				}
 			},
 			stickyScrollDelegate: objectTreeOptions.stickyScrollDelegate as
-				| IStickyScrollDelegate<IAsyncDataTreeNode<TInput, T>, TFilterData>
-				| undefined
+				IStickyScrollDelegate<IAsyncDataTreeNode<TInput, T>, TFilterData> | undefined
 		}
 	);
 }

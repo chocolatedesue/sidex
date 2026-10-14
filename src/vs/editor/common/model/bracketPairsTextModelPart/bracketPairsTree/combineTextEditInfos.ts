@@ -31,8 +31,7 @@ export function combineTextEditInfos(
 	const s0ToS1Map = new ArrayQueue(toLengthMapping(textEditInfoFirst));
 	// s1: State after first edit, but before second edit
 	const s1ToS2Map = toLengthMapping(textEditInfoSecond) as (
-		| LengthMapping
-		| { lengthBefore: undefined; lengthAfter: undefined; modified: false }
+		LengthMapping | { lengthBefore: undefined; lengthAfter: undefined; modified: false }
 	)[];
 	s1ToS2Map.push({ modified: false, lengthBefore: undefined, lengthAfter: undefined }); // Copy everything from old to new
 	// s2: State after both edits

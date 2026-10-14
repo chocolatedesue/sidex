@@ -9,7 +9,7 @@ import {
 	InlineCompletionContext,
 	InlineCompletions,
 	InlineCompletionsDisposeReason,
-	InlineCompletionsProvider,
+	InlineCompletionsProvider
 } from '../../../../editor/common/languages.js';
 import { SidexCompleteService } from './sidexCompleteService.js';
 
@@ -20,7 +20,6 @@ const MAX_TOKENS = 64;
 const CACHE_MAX = 32;
 
 export class SidexCompleteProvider implements InlineCompletionsProvider {
-
 	private readonly _service: SidexCompleteService;
 	private readonly _cache = new Map<string, string>();
 	private _inflightAbort: AbortController | null = null;
@@ -33,7 +32,7 @@ export class SidexCompleteProvider implements InlineCompletionsProvider {
 		model: ITextModel,
 		position: Position,
 		_context: InlineCompletionContext,
-		token: CancellationToken,
+		token: CancellationToken
 	): Promise<InlineCompletions> {
 		const empty: InlineCompletions = { items: [] };
 
@@ -51,9 +50,11 @@ export class SidexCompleteProvider implements InlineCompletionsProvider {
 		if (cached) {
 			console.log('[sidex-complete] cache hit');
 			return {
-				items: [{
-					insertText: cached,
-				}],
+				items: [
+					{
+						insertText: cached
+					}
+				]
 			};
 		}
 
@@ -73,9 +74,9 @@ export class SidexCompleteProvider implements InlineCompletionsProvider {
 					suffix,
 					language: model.getLanguageId(),
 					filePath: model.uri.fsPath,
-					maxTokens: MAX_TOKENS,
+					maxTokens: MAX_TOKENS
 				},
-				abort.signal,
+				abort.signal
 			);
 
 			if (!result || !result.text) {
@@ -89,9 +90,11 @@ export class SidexCompleteProvider implements InlineCompletionsProvider {
 			this._cacheSet(cacheKey, text);
 
 			return {
-				items: [{
-					insertText: text,
-				}],
+				items: [
+					{
+						insertText: text
+					}
+				]
 			};
 		} catch (e: any) {
 			if (e?.name !== 'AbortError') {
@@ -105,8 +108,7 @@ export class SidexCompleteProvider implements InlineCompletionsProvider {
 		}
 	}
 
-	disposeInlineCompletions(_completions: InlineCompletions, _reason: InlineCompletionsDisposeReason): void {
-	}
+	disposeInlineCompletions(_completions: InlineCompletions, _reason: InlineCompletionsDisposeReason): void {}
 
 	private _fnv(input: string): string {
 		let h = 0x811c9dc5;

@@ -22,7 +22,9 @@ export class MentionPopup extends Component {
 		parent.appendChild(this.element);
 	}
 
-	get isVisible(): boolean { return this._visible; }
+	get isVisible(): boolean {
+		return this._visible;
+	}
 
 	show(items: MentionItem[], anchorRect: DOMRect): void {
 		this._items = items;
@@ -48,19 +50,25 @@ export class MentionPopup extends Component {
 	}
 
 	selectNext(): void {
-		if (this._items.length === 0) { return; }
+		if (this._items.length === 0) {
+			return;
+		}
 		this._selectedIndex = (this._selectedIndex + 1) % this._items.length;
 		this._updateSelection();
 	}
 
 	selectPrevious(): void {
-		if (this._items.length === 0) { return; }
+		if (this._items.length === 0) {
+			return;
+		}
 		this._selectedIndex = (this._selectedIndex - 1 + this._items.length) % this._items.length;
 		this._updateSelection();
 	}
 
 	confirmSelection(): void {
-		if (this._items.length === 0) { return; }
+		if (this._items.length === 0) {
+			return;
+		}
 		const item = this._items[this._selectedIndex];
 		if (item) {
 			this._onSelect(item);
@@ -70,7 +78,9 @@ export class MentionPopup extends Component {
 
 	private _positionAt(anchorRect: DOMRect): void {
 		const parentRect = this.element.parentElement?.getBoundingClientRect();
-		if (!parentRect) { return; }
+		if (!parentRect) {
+			return;
+		}
 
 		this.element.style.left = `${anchorRect.left - parentRect.left}px`;
 		this.element.style.bottom = `${parentRect.bottom - anchorRect.top + 4}px`;
@@ -106,7 +116,7 @@ export class MentionPopup extends Component {
 				this._updateSelection();
 			});
 
-			row.addEventListener('mousedown', (e) => {
+			row.addEventListener('mousedown', e => {
 				e.preventDefault();
 				this._onSelect(item);
 				this.hide();

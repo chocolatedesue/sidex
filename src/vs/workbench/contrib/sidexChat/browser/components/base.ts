@@ -31,8 +31,12 @@ export abstract class Component extends Disposable {
 
 	// Accepts (and ignores) arguments so subclasses can declare richer
 	// show(...) signatures (e.g. MentionPopup.show(items, anchorRect)).
-	show(..._args: unknown[]): void { this.element.style.display = ''; }
-	hide(): void { this.element.style.display = 'none'; }
+	show(..._args: unknown[]): void {
+		this.element.style.display = '';
+	}
+	hide(): void {
+		this.element.style.display = 'none';
+	}
 
 	toggleClass(cls: string, force?: boolean): void {
 		this.element.classList.toggle(cls, force);
@@ -63,7 +67,7 @@ export abstract class ClickableComponent extends Component {
 
 	constructor(tag: string, ...classNames: string[]) {
 		super(tag, ...classNames);
-		this.on(this.element, 'click', (e) => this._onClick.fire(e as MouseEvent));
+		this.on(this.element, 'click', e => this._onClick.fire(e as MouseEvent));
 	}
 }
 
@@ -80,7 +84,9 @@ export function formatTime(ts: number): string {
 /** Format duration as "13s" or "2m 15s" */
 export function formatDuration(ms: number): string {
 	const s = Math.round(ms / 1000);
-	if (s < 60) { return `${s}s`; }
+	if (s < 60) {
+		return `${s}s`;
+	}
 	const m = Math.floor(s / 60);
 	const rem = s % 60;
 	return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
@@ -88,7 +94,9 @@ export function formatDuration(ms: number): string {
 
 /** Format token count as "12.4k" */
 export function formatTokens(n: number): string {
-	if (n < 1000) { return String(n); }
+	if (n < 1000) {
+		return String(n);
+	}
 	return (n / 1000).toFixed(1) + 'k';
 }
 

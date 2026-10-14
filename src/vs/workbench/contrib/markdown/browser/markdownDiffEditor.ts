@@ -56,12 +56,12 @@ export class MarkdownDiffEditorManager extends Disposable {
 		const originalInput = await this._markdownEditorManager.createStandaloneEditorInput(originalUri, {
 			readonly: true,
 			titlePrefix: localize('markdownDiffOriginalPrefix', 'Original (Markdown)'),
-			open: false,
+			open: false
 		});
 		const modifiedInput = await this._markdownEditorManager.createStandaloneEditorInput(modifiedUri, {
 			readonly: false,
 			titlePrefix: localize('markdownDiffModifiedPrefix', 'Modified (Markdown)'),
-			open: false,
+			open: false
 		});
 
 		if (!originalInput || !modifiedInput) {
@@ -100,7 +100,7 @@ export class MarkdownDiffEditorManager extends Disposable {
 		if (resource && isMarkdownPath(resource)) {
 			const input = await this.createDiffEditorInput({
 				original: { resource },
-				modified: { resource },
+				modified: { resource }
 			});
 			if (input) {
 				await this._editorService.openEditor(input, { pinned: true });
@@ -156,4 +156,3 @@ function isMarkdownPath(resource: URI): boolean {
 		lower.endsWith('.mdtext')
 	);
 }
-

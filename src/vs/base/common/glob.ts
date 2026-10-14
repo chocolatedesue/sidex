@@ -268,7 +268,7 @@ export type ParsedExpression = (
 	path: string,
 	basename?: string,
 	hasSibling?: (name: string) => boolean | Promise<boolean>
-) => string | null | Promise<string | null> /* the matching pattern */;
+) => string | null | Promise<string | null>; /* the matching pattern */
 
 export interface IGlobOptions {
 	/**

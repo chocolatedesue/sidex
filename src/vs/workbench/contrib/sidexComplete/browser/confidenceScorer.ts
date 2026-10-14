@@ -6,7 +6,6 @@ const DEFAULT_THRESHOLD = 0.3;
 const LEADING_TOKENS = 5;
 
 export class ConfidenceScorer {
-
 	private readonly _threshold: number;
 
 	constructor(threshold: number = DEFAULT_THRESHOLD) {

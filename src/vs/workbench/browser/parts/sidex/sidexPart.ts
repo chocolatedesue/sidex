@@ -22,7 +22,7 @@ import {
 	PANEL_ACTIVE_TITLE_BORDER,
 	PANEL_DRAG_AND_DROP_BORDER,
 	ACTIVITY_BAR_BADGE_BACKGROUND,
-	ACTIVITY_BAR_BADGE_FOREGROUND,
+	ACTIVITY_BAR_BADGE_FOREGROUND
 } from '../../../common/theme.js';
 import { IViewDescriptorService, ViewContainerLocation } from '../../../common/views.js';
 import { IExtensionService } from '../../../services/extensions/common/extensions.js';
@@ -78,14 +78,14 @@ export class SidexPart extends AbstractPaneCompositePart {
 		@IViewDescriptorService viewDescriptorService: IViewDescriptorService,
 		@IContextKeyService contextKeyService: IContextKeyService,
 		@IExtensionService extensionService: IExtensionService,
-		@IMenuService menuService: IMenuService,
+		@IMenuService menuService: IMenuService
 	) {
 		super(
 			Parts.SIDEX_PART,
 			{
 				hasTitle: false,
 				trailingSeparator: false,
-				borderWidth: () => (this.getColor(SIDE_BAR_BORDER) || this.getColor(contrastBorder) ? 1 : 0),
+				borderWidth: () => (this.getColor(SIDE_BAR_BORDER) || this.getColor(contrastBorder) ? 1 : 0)
 			},
 			SidexPart.activeViewSettingsKey,
 			ActiveSidexContext.bindTo(contextKeyService),
@@ -109,7 +109,7 @@ export class SidexPart extends AbstractPaneCompositePart {
 			viewDescriptorService,
 			contextKeyService,
 			extensionService,
-			menuService,
+			menuService
 		);
 	}
 
@@ -139,11 +139,12 @@ export class SidexPart extends AbstractPaneCompositePart {
 			orientation: ActionsOrientation.HORIZONTAL,
 			recomputeSizes: true,
 			activityHoverOptions: {
-				position: () => this.getCompositeBarPosition() === CompositeBarPosition.BOTTOM
-					? HoverPosition.ABOVE
-					: HoverPosition.BELOW,
+				position: () =>
+					this.getCompositeBarPosition() === CompositeBarPosition.BOTTOM ? HoverPosition.ABOVE : HoverPosition.BELOW
 			},
-			fillExtraContextMenuActions: () => { /* no extra context menu for now */ },
+			fillExtraContextMenuActions: () => {
+				/* no extra context menu for now */
+			},
 			compositeSize: 0,
 			iconSize: 16,
 			overflowActionSize: 40,
@@ -155,9 +156,9 @@ export class SidexPart extends AbstractPaneCompositePart {
 				inactiveForegroundColor: theme.getColor(PANEL_INACTIVE_TITLE_FOREGROUND),
 				badgeBackground: theme.getColor(ACTIVITY_BAR_BADGE_BACKGROUND),
 				badgeForeground: theme.getColor(ACTIVITY_BAR_BADGE_FOREGROUND),
-				dragAndDropBorder: theme.getColor(PANEL_DRAG_AND_DROP_BORDER),
+				dragAndDropBorder: theme.getColor(PANEL_DRAG_AND_DROP_BORDER)
 			}),
-			compact: true,
+			compact: true
 		};
 	}
 
@@ -171,7 +172,7 @@ export class SidexPart extends AbstractPaneCompositePart {
 
 	override toJSON(): object {
 		return {
-			type: Parts.SIDEX_PART,
+			type: Parts.SIDEX_PART
 		};
 	}
 }

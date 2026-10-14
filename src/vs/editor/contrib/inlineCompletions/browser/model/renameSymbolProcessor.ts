@@ -72,9 +72,7 @@ export namespace PrepareNesRenameResult {
 }
 
 export type PrepareNesRenameResult =
-	| PrepareNesRenameResult.Yes
-	| PrepareNesRenameResult.Maybe
-	| PrepareNesRenameResult.No;
+	PrepareNesRenameResult.Yes | PrepareNesRenameResult.Maybe | PrepareNesRenameResult.No;
 
 export type TextChange = {
 	range: { start: { line: number; character: number }; end: { line: number; character: number } };

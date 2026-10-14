@@ -67,8 +67,10 @@ export class PlanUsageSection implements SettingsSection {
 
 		let usage: TauriUsage | null = null;
 		try {
-			usage = await this._invoke('auth_get_usage') as TauriUsage;
-		} catch { /* local server may not be up yet */ }
+			usage = (await this._invoke('auth_get_usage')) as TauriUsage;
+		} catch {
+			/* local server may not be up yet */
+		}
 
 		loading.remove();
 
@@ -129,18 +131,15 @@ export class PlanUsageSection implements SettingsSection {
 			const empty = document.createElement('div');
 			empty.className = 'sidex-settings-row-description';
 			empty.style.padding = '0 16px 12px';
-			empty.textContent = account.source === 'oauth'
-				? 'Plan limits will show here after this account answers a usage request.'
-				: 'API keys have no 5-hour or weekly session cap — spend below is what SideX recorded.';
+			empty.textContent =
+				account.source === 'oauth'
+					? 'Plan limits will show here after this account answers a usage request.'
+					: 'API keys have no 5-hour or weekly session cap — spend below is what SideX recorded.';
 			card.appendChild(empty);
 		}
 
 		for (const window of windows) {
-			card.appendChild(meterRow(
-				window.label,
-				window.usedPercent,
-				formatReset(window.resetsAt)
-			));
+			card.appendChild(meterRow(window.label, window.usedPercent, formatReset(window.resetsAt)));
 		}
 
 		if (account.extraCredits) {
@@ -148,9 +147,10 @@ export class PlanUsageSection implements SettingsSection {
 			const usd = extraUsdRemaining(extra);
 			if (usd != null && extra.limit === 0) {
 				const credits = extra.creditsRemaining ?? parseCreditBalance(extra.balance);
-				const detail = credits != null && credits > 0
-					? `${credits.toLocaleString(undefined, { maximumFractionDigits: 2 })} credits`
-					: '';
+				const detail =
+					credits != null && credits > 0
+						? `${credits.toLocaleString(undefined, { maximumFractionDigits: 2 })} credits`
+						: '';
 				card.appendChild(moneyRow('Extra usage', formatUSD(usd), detail));
 			} else {
 				card.appendChild(meterRow('Extra usage', extra.usedPercent, extraCreditDetail(extra)));
@@ -385,10 +385,14 @@ function extraCreditDetail(extra: ExtraCredits): string {
 
 function sourceLabel(source: string): string {
 	switch (source) {
-		case 'oauth': return 'Connected account';
-		case 'api_key': return 'API key';
-		case 'local': return 'Local server';
-		default: return 'Recorded in SideX';
+		case 'oauth':
+			return 'Connected account';
+		case 'api_key':
+			return 'API key';
+		case 'local':
+			return 'Local server';
+		default:
+			return 'Recorded in SideX';
 	}
 }
 

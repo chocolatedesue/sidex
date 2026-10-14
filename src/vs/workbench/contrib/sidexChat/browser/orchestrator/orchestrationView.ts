@@ -5,13 +5,7 @@
 import './orchestration.css';
 import { Component, DOM, $ } from '../components/base.js';
 import { Emitter, Event } from '../../../../../base/common/event.js';
-import type {
-	OrchestrationPlan,
-	TaskNode,
-	TaskStatus,
-	OrchestratorEvent,
-	TaskHandoff,
-} from './types.js';
+import type { OrchestrationPlan, TaskNode, TaskStatus, OrchestratorEvent, TaskHandoff } from './types.js';
 
 const STATUS_ICONS: Record<TaskStatus, string> = {
 	pending: '○',
@@ -20,7 +14,7 @@ const STATUS_ICONS: Record<TaskStatus, string> = {
 	completed: '●',
 	failed: '✕',
 	cancelled: '⊘',
-	blocked: '◫',
+	blocked: '◫'
 };
 
 const STATUS_CLASSES: Record<TaskStatus, string> = {
@@ -30,7 +24,7 @@ const STATUS_CLASSES: Record<TaskStatus, string> = {
 	completed: 'orch-status-completed',
 	failed: 'orch-status-failed',
 	cancelled: 'orch-status-cancelled',
-	blocked: 'orch-status-blocked',
+	blocked: 'orch-status-blocked'
 };
 
 export class OrchestrationView extends Component {
@@ -122,7 +116,9 @@ export class OrchestrationView extends Component {
 	}
 
 	private _renderTree(): void {
-		if (!this._plan) { return; }
+		if (!this._plan) {
+			return;
+		}
 		DOM.clearNode(this._treeEl);
 		this._taskElements.clear();
 
@@ -168,12 +164,16 @@ export class OrchestrationView extends Component {
 		// Deselect previous
 		if (this._selectedTaskId) {
 			const prev = this._taskElements.get(this._selectedTaskId);
-			if (prev) { prev.classList.remove('orch-task-selected'); }
+			if (prev) {
+				prev.classList.remove('orch-task-selected');
+			}
 		}
 
 		this._selectedTaskId = taskId;
 		const row = this._taskElements.get(taskId);
-		if (row) { row.classList.add('orch-task-selected'); }
+		if (row) {
+			row.classList.add('orch-task-selected');
+		}
 
 		this._showDetail(taskId);
 	}
@@ -219,7 +219,9 @@ export class OrchestrationView extends Component {
 		}
 		const logs = this._taskLogs.get(taskId)!;
 		logs.push(text);
-		if (logs.length > 500) { logs.splice(0, logs.length - 500); }
+		if (logs.length > 500) {
+			logs.splice(0, logs.length - 500);
+		}
 
 		// If this task is selected, append to detail view
 		if (this._selectedTaskId === taskId) {
@@ -236,7 +238,9 @@ export class OrchestrationView extends Component {
 
 	private _updateTask(taskId: string, status: TaskStatus): void {
 		const row = this._taskElements.get(taskId);
-		if (!row) { return; }
+		if (!row) {
+			return;
+		}
 
 		const icon = row.querySelector('.orch-task-icon') as HTMLElement;
 		if (icon) {
@@ -253,13 +257,17 @@ export class OrchestrationView extends Component {
 	private _updateProgress(completed: number, total: number, elapsedMs: number): void {
 		const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 		const bar = this._progressEl.querySelector('.orch-progress-bar') as HTMLElement;
-		if (bar) { bar.style.width = `${pct}%`; }
+		if (bar) {
+			bar.style.width = `${pct}%`;
+		}
 		this._statusEl.textContent = `${completed}/${total} tasks • ${formatElapsed(elapsedMs)}`;
 	}
 
 	private _showHandoff(handoff: TaskHandoff): void {
 		const row = this._taskElements.get(handoff.taskId);
-		if (!row) { return; }
+		if (!row) {
+			return;
+		}
 		const badge = document.createElement('span');
 		badge.className = `orch-handoff-badge orch-handoff-${handoff.status}`;
 		badge.textContent = handoff.status === 'success' ? '✓' : '✕';
@@ -269,7 +277,9 @@ export class OrchestrationView extends Component {
 
 	private _showVerdict(taskId: string, verdict: string, reason: string): void {
 		const row = this._taskElements.get(taskId);
-		if (!row) { return; }
+		if (!row) {
+			return;
+		}
 		const badge = document.createElement('span');
 		badge.className = `orch-verdict-badge orch-verdict-${verdict}`;
 		badge.textContent = verdict === 'pass' ? '✓' : verdict === 'partial' ? '~' : '✕';
@@ -281,7 +291,9 @@ export class OrchestrationView extends Component {
 		this._headerEl.classList.add('orch-complete');
 		this._statusEl.textContent = `Complete • ${formatElapsed(elapsedMs)}`;
 		const bar = this._progressEl.querySelector('.orch-progress-bar') as HTMLElement;
-		if (bar) { bar.style.width = '100%'; }
+		if (bar) {
+			bar.style.width = '100%';
+		}
 	}
 
 	private _showCancelled(reason: string): void {
@@ -291,7 +303,9 @@ export class OrchestrationView extends Component {
 
 	private _showTaskError(taskId: string, _error: string): void {
 		const row = this._taskElements.get(taskId);
-		if (row) { row.classList.add('orch-task-error'); }
+		if (row) {
+			row.classList.add('orch-task-error');
+		}
 	}
 }
 
@@ -301,7 +315,9 @@ function truncate(s: string, max: number): string {
 
 function formatElapsed(ms: number): string {
 	const s = Math.floor(ms / 1000);
-	if (s < 60) { return `${s}s`; }
+	if (s < 60) {
+		return `${s}s`;
+	}
 	const m = Math.floor(s / 60);
 	return `${m}m ${s % 60}s`;
 }

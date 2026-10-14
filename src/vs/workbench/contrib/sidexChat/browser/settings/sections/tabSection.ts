@@ -25,9 +25,13 @@ export class TabSection implements SettingsSection {
 
 		if (this._invoke) {
 			try {
-				const data = await this._invoke('settings_get', { section: 'sidex.tab' }) as SettingsData | null;
-				if (data) { this._settings = data; }
-			} catch { /* use defaults */ }
+				const data = (await this._invoke('settings_get', { section: 'sidex.tab' })) as SettingsData | null;
+				if (data) {
+					this._settings = data;
+				}
+			} catch {
+				/* use defaults */
+			}
 		}
 
 		const title = document.createElement('div');
@@ -43,17 +47,37 @@ export class TabSection implements SettingsSection {
 	private _renderCompletionSettings(container: HTMLElement): void {
 		const card = this._createCard(container);
 
-		this._createToggleRow(card, 'Sidex Tab', 'Context-aware multi-line code suggestions as you type',
-			'sidex.tab.cursorTab', this._getSetting('cursorTab', true) as boolean);
+		this._createToggleRow(
+			card,
+			'Sidex Tab',
+			'Context-aware multi-line code suggestions as you type',
+			'sidex.tab.cursorTab',
+			this._getSetting('cursorTab', true) as boolean
+		);
 
-		this._createToggleRow(card, 'Partial Accepts', 'Accept the next word of a suggestion via Cmd+\u2192',
-			'sidex.tab.partialAccepts', this._getSetting('partialAccepts', false) as boolean);
+		this._createToggleRow(
+			card,
+			'Partial Accepts',
+			'Accept the next word of a suggestion via Cmd+\u2192',
+			'sidex.tab.partialAccepts',
+			this._getSetting('partialAccepts', false) as boolean
+		);
 
-		this._createToggleRow(card, 'Suggestions While Commenting', 'Allow Tab completions in comment regions',
-			'sidex.tab.suggestionsWhileCommenting', this._getSetting('suggestionsWhileCommenting', true) as boolean);
+		this._createToggleRow(
+			card,
+			'Suggestions While Commenting',
+			'Allow Tab completions in comment regions',
+			'sidex.tab.suggestionsWhileCommenting',
+			this._getSetting('suggestionsWhileCommenting', true) as boolean
+		);
 
-		this._createToggleRow(card, 'Whitespace-Only Suggestions', 'Allow suggestions that only change whitespace',
-			'sidex.tab.whitespaceOnlySuggestions', this._getSetting('whitespaceOnlySuggestions', false) as boolean);
+		this._createToggleRow(
+			card,
+			'Whitespace-Only Suggestions',
+			'Allow suggestions that only change whitespace',
+			'sidex.tab.whitespaceOnlySuggestions',
+			this._getSetting('whitespaceOnlySuggestions', false) as boolean
+		);
 	}
 
 	private _renderImportSettings(container: HTMLElement): void {
@@ -65,11 +89,22 @@ export class TabSection implements SettingsSection {
 
 		const card = this._createCard(container);
 
-		this._createToggleRow(card, 'Imports', 'Automatically import necessary modules for TypeScript',
-			'sidex.tab.imports', this._getSetting('imports', true) as boolean);
+		this._createToggleRow(
+			card,
+			'Imports',
+			'Automatically import necessary modules for TypeScript',
+			'sidex.tab.imports',
+			this._getSetting('imports', true) as boolean
+		);
 
-		this._createToggleRowWithBadge(card, 'Auto Import for Python', 'Automatically add import statements for Python files',
-			'sidex.tab.autoImportPython', this._getSetting('autoImportPython', false) as boolean, 'BETA');
+		this._createToggleRowWithBadge(
+			card,
+			'Auto Import for Python',
+			'Automatically add import statements for Python files',
+			'sidex.tab.autoImportPython',
+			this._getSetting('autoImportPython', false) as boolean,
+			'BETA'
+		);
 	}
 
 	private _renderIgnoredFiles(container: HTMLElement): void {
@@ -103,7 +138,7 @@ export class TabSection implements SettingsSection {
 		wrapper.className = 'sidex-input-wrapper';
 		const input = document.createElement('input');
 		input.type = 'text';
-		input.value = (this._getSetting('ignoredFiles', '') as string);
+		input.value = this._getSetting('ignoredFiles', '') as string;
 		input.placeholder = 'e.g., *.md, **/generated/';
 		input.addEventListener('change', () => this._saveSetting('sidex.tab.ignoredFiles', input.value));
 		wrapper.appendChild(input);
@@ -119,7 +154,9 @@ export class TabSection implements SettingsSection {
 	}
 
 	private _saveSetting(key: string, value: unknown): void {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		this._invoke('settings_update', { key, value: JSON.stringify(value), scope: 'user' }).catch(() => {});
 	}
 
@@ -130,7 +167,13 @@ export class TabSection implements SettingsSection {
 		return card;
 	}
 
-	private _createToggleRow(parent: HTMLElement, label: string, description: string, settingKey: string, initialState: boolean): void {
+	private _createToggleRow(
+		parent: HTMLElement,
+		label: string,
+		description: string,
+		settingKey: string,
+		initialState: boolean
+	): void {
 		const row = document.createElement('div');
 		row.className = 'sidex-settings-row';
 
@@ -162,7 +205,14 @@ export class TabSection implements SettingsSection {
 		parent.appendChild(row);
 	}
 
-	private _createToggleRowWithBadge(parent: HTMLElement, label: string, description: string, settingKey: string, initialState: boolean, badgeText: string): void {
+	private _createToggleRowWithBadge(
+		parent: HTMLElement,
+		label: string,
+		description: string,
+		settingKey: string,
+		initialState: boolean,
+		badgeText: string
+	): void {
 		const row = document.createElement('div');
 		row.className = 'sidex-settings-row';
 
@@ -172,7 +222,8 @@ export class TabSection implements SettingsSection {
 		lbl.textContent = label;
 
 		const badge = document.createElement('span');
-		badge.style.cssText = 'display:inline-block;margin-left:8px;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:0.5px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);vertical-align:middle;';
+		badge.style.cssText =
+			'display:inline-block;margin-left:8px;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;letter-spacing:0.5px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);vertical-align:middle;';
 		badge.textContent = badgeText;
 		lbl.appendChild(badge);
 		left.appendChild(lbl);

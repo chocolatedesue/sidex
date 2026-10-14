@@ -37,11 +37,7 @@ export interface IExtensionFeatureMarkdownRenderer extends IExtensionFeatureRend
 }
 
 export type IRowData =
-	| string
-	| IMarkdownString
-	| ResolvedKeybinding
-	| Color
-	| ReadonlyArray<ResolvedKeybinding | IMarkdownString | Color>;
+	string | IMarkdownString | ResolvedKeybinding | Color | ReadonlyArray<ResolvedKeybinding | IMarkdownString | Color>;
 
 export interface ITableData {
 	headers: string[];

@@ -7,16 +7,19 @@ export class UserMessage extends Component {
 
 	constructor(msg: IChatMessage, onRevert?: () => void) {
 		super('div', 'composer-rendered-message');
-		this.element.style.cssText = 'display: block; outline: none; padding-top: 10px; margin-bottom: 6px; position: relative; width: 100%;';
+		this.element.style.cssText =
+			'display: block; outline: none; padding-top: 10px; margin-bottom: 6px; position: relative; width: 100%;';
 
 		const container = this.append('div', 'composer-human-message-container');
-		container.style.cssText = 'display: flex; align-items: flex-start; gap: 8px; width: 100%; background-color: color-mix(in srgb, var(--vscode-sideBar-background) 60%, transparent); outline: none; border-radius: 12px;';
+		container.style.cssText =
+			'display: flex; align-items: flex-start; gap: 8px; width: 100%; background-color: color-mix(in srgb, var(--vscode-sideBar-background) 60%, transparent); outline: none; border-radius: 12px;';
 
 		const wrapper = DOM.append(container, $('div'));
 		wrapper.style.cssText = 'display: flex; flex-direction: column; align-items: flex-end; width: 100%;';
 
 		const messageBox = DOM.append(wrapper, $('div.composer-human-message'));
-		messageBox.style.cssText = 'background-color: color-mix(in srgb, var(--vscode-input-background) 90%, #181818); cursor: pointer; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--vscode-foreground); word-wrap: break-word; position: relative; max-width: 100%; box-sizing: border-box;';
+		messageBox.style.cssText =
+			'background-color: color-mix(in srgb, var(--vscode-input-background) 90%, #181818); cursor: pointer; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--vscode-foreground); word-wrap: break-word; position: relative; max-width: 100%; box-sizing: border-box;';
 
 		const contentEl = DOM.append(messageBox, $('div.composer-human-message-content'));
 
@@ -27,8 +30,9 @@ export class UserMessage extends Component {
 		}
 
 		const flexRow = DOM.append(contentEl, $('div'));
-		flexRow.style.cssText = 'display: flex; width: 100%; justify-content: space-between; box-sizing: border-box; gap: 10px; align-items: center;';
-		
+		flexRow.style.cssText =
+			'display: flex; width: 100%; justify-content: space-between; box-sizing: border-box; gap: 10px; align-items: center;';
+
 		const textCol = DOM.append(flexRow, $('div'));
 		textCol.style.cssText = 'min-width: 0; display: flex; flex-direction: column;';
 
@@ -41,30 +45,40 @@ export class UserMessage extends Component {
 
 		if (onRevert && msg.checkpointLabel) {
 			const btnCol = DOM.append(flexRow, $('div'));
-			btnCol.style.cssText = 'display: flex; flex-direction: column; justify-content: flex-end; align-self: flex-end; width: 20px; flex-shrink: 0; align-items: flex-end; position: relative;';
+			btnCol.style.cssText =
+				'display: flex; flex-direction: column; justify-content: flex-end; align-self: flex-end; width: 20px; flex-shrink: 0; align-items: flex-end; position: relative;';
 
 			const revertBtn = DOM.append(btnCol, $('button.sc-user-msg-revert'));
 			revertBtn.innerHTML = '<span class="codicon codicon-restore" style="font-size: 16px;"></span>';
-			revertBtn.style.cssText = 'background: transparent; border: none; color: var(--vscode-descriptionForeground); display: flex; width: 20px; height: 20px; align-items: center; justify-content: center; box-sizing: border-box; flex-shrink: 0; border-radius: 5px; cursor: pointer; transition: opacity 0.15s ease; opacity: 0;';
-			
-			revertBtn.addEventListener('click', (e) => {
+			revertBtn.style.cssText =
+				'background: transparent; border: none; color: var(--vscode-descriptionForeground); display: flex; width: 20px; height: 20px; align-items: center; justify-content: center; box-sizing: border-box; flex-shrink: 0; border-radius: 5px; cursor: pointer; transition: opacity 0.15s ease; opacity: 0;';
+
+			revertBtn.addEventListener('click', e => {
 				e.stopPropagation();
 				this._showConfirmation(onRevert);
 			});
-			
-			messageBox.addEventListener('mouseenter', () => revertBtn.style.opacity = '0.6');
-			messageBox.addEventListener('mouseleave', () => revertBtn.style.opacity = '0');
-			revertBtn.addEventListener('mouseenter', () => { revertBtn.style.opacity = '1'; revertBtn.style.background = 'var(--vscode-toolbar-hoverBackground)'; });
-			revertBtn.addEventListener('mouseleave', () => { revertBtn.style.background = 'transparent'; });
+
+			messageBox.addEventListener('mouseenter', () => (revertBtn.style.opacity = '0.6'));
+			messageBox.addEventListener('mouseleave', () => (revertBtn.style.opacity = '0'));
+			revertBtn.addEventListener('mouseenter', () => {
+				revertBtn.style.opacity = '1';
+				revertBtn.style.background = 'var(--vscode-toolbar-hoverBackground)';
+			});
+			revertBtn.addEventListener('mouseleave', () => {
+				revertBtn.style.background = 'transparent';
+			});
 		}
 	}
 
 	private _showConfirmation(onRevert: () => void): void {
-		if (this._confirmCard) { return; }
+		if (this._confirmCard) {
+			return;
+		}
 
 		const card = document.createElement('div');
 		card.className = 'sc-revert-confirm';
-		card.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; margin: 6px 0 8px; background: var(--vscode-editor-background); border: 1px solid var(--cursor-stroke-secondary); border-radius: 8px; font-family: var(--cursor-font-family-sans);';
+		card.style.cssText =
+			'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; margin: 6px 0 8px; background: var(--vscode-editor-background); border: 1px solid var(--cursor-stroke-secondary); border-radius: 8px; font-family: var(--cursor-font-family-sans);';
 
 		const text = document.createElement('span');
 		text.className = 'sc-revert-confirm-text';
@@ -79,8 +93,9 @@ export class UserMessage extends Component {
 		const cancelBtn = document.createElement('button');
 		cancelBtn.className = 'sc-revert-confirm-btn sc-revert-cancel';
 		cancelBtn.textContent = 'Cancel';
-		cancelBtn.style.cssText = 'padding: 3px 10px; border-radius: 4px; font-size: 11px; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: var(--vscode-descriptionForeground); cursor: pointer;';
-		cancelBtn.addEventListener('click', (e) => {
+		cancelBtn.style.cssText =
+			'padding: 3px 10px; border-radius: 4px; font-size: 11px; background: transparent; border: 1px solid rgba(255,255,255,0.1); color: var(--vscode-descriptionForeground); cursor: pointer;';
+		cancelBtn.addEventListener('click', e => {
 			e.stopPropagation();
 			this._dismissConfirmation();
 		});
@@ -89,8 +104,9 @@ export class UserMessage extends Component {
 		const continueBtn = document.createElement('button');
 		continueBtn.className = 'sc-revert-confirm-btn sc-revert-continue';
 		continueBtn.textContent = 'Continue';
-		continueBtn.style.cssText = 'padding: 3px 10px; border-radius: 4px; font-size: 11px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: var(--vscode-foreground); cursor: pointer;';
-		continueBtn.addEventListener('click', (e) => {
+		continueBtn.style.cssText =
+			'padding: 3px 10px; border-radius: 4px; font-size: 11px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: var(--vscode-foreground); cursor: pointer;';
+		continueBtn.addEventListener('click', e => {
 			e.stopPropagation();
 			this._dismissConfirmation();
 			onRevert();
@@ -140,7 +156,7 @@ function extractAttachmentPreviews(content: string): AttachmentPreview[] {
 		previews.push({
 			kind: 'image',
 			name: match[1].trim() || basename(path),
-			path,
+			path
 		});
 	}
 	for (const match of content.matchAll(/^Attached file:\s+`([^`]+)`\s*$/gm)) {
@@ -148,7 +164,7 @@ function extractAttachmentPreviews(content: string): AttachmentPreview[] {
 		previews.push({
 			kind: 'file',
 			name: basename(path),
-			path,
+			path
 		});
 	}
 	return previews;
@@ -195,7 +211,7 @@ async function loadImagePreview(img: HTMLImageElement, path: string): Promise<vo
 		return;
 	}
 	try {
-		const bytes = await invoke('read_file_bytes', { path: localPath }) as number[] | Uint8Array;
+		const bytes = (await invoke('read_file_bytes', { path: localPath })) as number[] | Uint8Array;
 		const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 		img.src = `data:${mimeFromPath(localPath)};base64,${base64FromBytes(data)}`;
 	} catch (error) {

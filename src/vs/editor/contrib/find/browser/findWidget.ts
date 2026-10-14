@@ -919,13 +919,13 @@ export class FindWidget extends Widget implements IOverlayWidget, IVerticalSashL
 		totalheight += 4;
 
 		// find input height
-		totalheight += this._findInput.inputBox.height + 2 /** input box border */;
+		totalheight += this._findInput.inputBox.height + 2; /** input box border */
 
 		if (this._isReplaceVisible) {
 			// replace input margin
 			totalheight += 4;
 
-			totalheight += this._replaceInput.inputBox.height + 2 /** input box border */;
+			totalheight += this._replaceInput.inputBox.height + 2; /** input box border */
 		}
 
 		// margin bottom

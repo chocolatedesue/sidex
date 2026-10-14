@@ -11,8 +11,13 @@ import { ILanguageService } from '../../../../../../editor/common/languages/lang
 import { IModelService } from '../../../../../../editor/common/services/model.js';
 
 const EDIT_TOOL_NAMES = new Set([
-	'edit_file', 'write_file', 'multi_edit', 'create_file',
-	'str_replace_editor', 'insert_text', 'replace_in_file',
+	'edit_file',
+	'write_file',
+	'multi_edit',
+	'create_file',
+	'str_replace_editor',
+	'insert_text',
+	'replace_in_file'
 ]);
 
 export class AssistantMessage extends Component {
@@ -20,11 +25,22 @@ export class AssistantMessage extends Component {
 	readonly onCopy: Event<string> = this._onCopy.event;
 	private _thinkingBlock: ThinkingBlock | null = null;
 
-	get thinkingBlock(): ThinkingBlock | null { return this._thinkingBlock; }
+	get thinkingBlock(): ThinkingBlock | null {
+		return this._thinkingBlock;
+	}
 
-	constructor(msg: IChatMessage, turnDurationMs?: number, onFileClick?: (path: string) => void, isThinking?: boolean, allMessages?: readonly IChatMessage[], languageService?: ILanguageService, modelService?: IModelService) {
+	constructor(
+		msg: IChatMessage,
+		turnDurationMs?: number,
+		onFileClick?: (path: string) => void,
+		isThinking?: boolean,
+		allMessages?: readonly IChatMessage[],
+		languageService?: ILanguageService,
+		modelService?: IModelService
+	) {
 		super('div', 'composer-rendered-message');
-		this.element.style.cssText = 'display: block; outline: none; padding-top: 0px; padding-bottom: 0px; background-color: var(--composer-pane-background); opacity: 1; z-index: 99; margin-bottom: 12px;';
+		this.element.style.cssText =
+			'display: block; outline: none; padding-top: 0px; padding-bottom: 0px; background-color: var(--composer-pane-background); opacity: 1; z-index: 99; margin-bottom: 12px;';
 
 		// Thinking block — rendered above everything else
 		if (msg.thinkingContent || isThinking) {
@@ -44,7 +60,9 @@ export class AssistantMessage extends Component {
 		const allToolCalls: IToolCallInfo[] = [];
 		if (allMessages) {
 			for (const m of allMessages) {
-				if (m.toolCalls) { allToolCalls.push(...m.toolCalls); }
+				if (m.toolCalls) {
+					allToolCalls.push(...m.toolCalls);
+				}
 			}
 		} else if (msg.toolCalls) {
 			allToolCalls.push(...msg.toolCalls);
@@ -83,7 +101,8 @@ export class AssistantMessage extends Component {
 			const bodyWrapper = this.append('div', 'markdown-root');
 			bodyWrapper.style.cssText = 'font-size: 13px; line-height: 1.5; color: var(--vscode-foreground);';
 			const bodyEl = DOM.append(bodyWrapper, DOM.$('div'));
-			bodyEl.style.cssText = 'display: flex; flex-direction: column; gap: 8px; white-space: normal; overflow-wrap: break-word;';
+			bodyEl.style.cssText =
+				'display: flex; flex-direction: column; gap: 8px; white-space: normal; overflow-wrap: break-word;';
 			bodyEl.innerHTML = renderMarkdown(msg.content);
 
 			// Wire up code citation click handlers
@@ -109,7 +128,9 @@ export class AssistantMessage extends Component {
 			dotsIcon.classList.add(...ThemeIcon.asClassNameArray(Codicon.ellipsis));
 			dots.appendChild(dotsIcon);
 			this.on(dots, 'click', () => {
-				navigator.clipboard.writeText(msg.content).catch(() => { /* */ });
+				navigator.clipboard.writeText(msg.content).catch(() => {
+					/* */
+				});
 				dots.textContent = '✓';
 				setTimeout(() => {
 					dots.textContent = '';
@@ -121,8 +142,14 @@ export class AssistantMessage extends Component {
 }
 
 const READ_TOOLS = new Set([
-	'read_file', 'grep', 'glob', 'search_files',
-	'batch_read', 'lsp_hover', 'lsp_definition', 'lsp_references',
+	'read_file',
+	'grep',
+	'glob',
+	'search_files',
+	'batch_read',
+	'lsp_hover',
+	'lsp_definition',
+	'lsp_references'
 ]);
 
 /**
@@ -150,7 +177,9 @@ function buildEditInfoMap(toolCalls: IToolCallInfo[]): Map<string, FileEditInfo>
 					fileContents.set(args.path, stripLineNumbers(tc.output));
 					fileDirtySinceRead.delete(args.path);
 				}
-			} catch { /* ignore */ }
+			} catch {
+				/* ignore */
+			}
 		}
 
 		// Process edit tools
@@ -158,7 +187,9 @@ function buildEditInfoMap(toolCalls: IToolCallInfo[]): Map<string, FileEditInfo>
 			try {
 				const args = JSON.parse(tc.input);
 				const filePath = args.path || args.file_path || args.file || '';
-				if (!filePath) { continue; }
+				if (!filePath) {
+					continue;
+				}
 
 				const oldContent = fileContents.get(filePath) || '';
 				let newContent = '';
@@ -211,7 +242,9 @@ function buildEditInfoMap(toolCalls: IToolCallInfo[]): Map<string, FileEditInfo>
 					fileContents.set(filePath, newContent);
 					fileDirtySinceRead.add(filePath);
 				}
-			} catch { /* ignore parse errors */ }
+			} catch {
+				/* ignore parse errors */
+			}
 		}
 	}
 
@@ -230,15 +263,30 @@ function stripLineNumbers(output: string): string {
 	let prefixed = 0;
 	let nonEmpty = 0;
 	for (const line of lines) {
-		if (line.trim() === '') { continue; }
+		if (line.trim() === '') {
+			continue;
+		}
 		nonEmpty++;
-		if (prefix.test(line)) { prefixed++; }
+		if (prefix.test(line)) {
+			prefixed++;
+		}
 	}
-	if (nonEmpty === 0 || prefixed < nonEmpty) { return output; }
+	if (nonEmpty === 0 || prefixed < nonEmpty) {
+		return output;
+	}
 	return lines.map(line => line.replace(prefix, '')).join('\n');
 }
 
-const READ_TOOL_SET = new Set(['read_file', 'batch_read', 'grep', 'glob', 'search_files', 'lsp_hover', 'lsp_definition', 'lsp_references']);
+const READ_TOOL_SET = new Set([
+	'read_file',
+	'batch_read',
+	'grep',
+	'glob',
+	'search_files',
+	'lsp_hover',
+	'lsp_definition',
+	'lsp_references'
+]);
 const SEARCH_TOOL_SET = new Set(['grep', 'glob', 'search_files', 'context_search', 'web_search']);
 const SHELL_TOOL_SET = new Set(['shell', 'run_background']);
 
@@ -257,10 +305,16 @@ function buildActivityLabel(toolCalls: IToolCallInfo[]): string {
 					const name = args.path.split('/').pop() || args.path;
 					readFiles.add(name);
 				}
-			} catch { /* */ }
+			} catch {
+				/* */
+			}
 		}
-		if (SEARCH_TOOL_SET.has(tc.name)) { searchCount++; }
-		if (SHELL_TOOL_SET.has(tc.name)) { shellCount++; }
+		if (SEARCH_TOOL_SET.has(tc.name)) {
+			searchCount++;
+		}
+		if (SHELL_TOOL_SET.has(tc.name)) {
+			shellCount++;
+		}
 	}
 
 	if (readCount > 0 && searchCount === 0 && shellCount === 0) {
@@ -276,8 +330,14 @@ function buildActivityLabel(toolCalls: IToolCallInfo[]): string {
 
 	// Mixed activities
 	const parts: string[] = [];
-	if (readCount > 0) { parts.push(`${readFiles.size || readCount} file${readFiles.size > 1 ? 's' : ''}`); }
-	if (searchCount > 0) { parts.push(`${searchCount} search${searchCount > 1 ? 'es' : ''}`); }
-	if (shellCount > 0) { parts.push(`${shellCount} command${shellCount > 1 ? 's' : ''}`); }
+	if (readCount > 0) {
+		parts.push(`${readFiles.size || readCount} file${readFiles.size > 1 ? 's' : ''}`);
+	}
+	if (searchCount > 0) {
+		parts.push(`${searchCount} search${searchCount > 1 ? 'es' : ''}`);
+	}
+	if (shellCount > 0) {
+		parts.push(`${shellCount} command${shellCount > 1 ? 's' : ''}`);
+	}
 	return `Explored ${parts.join(', ')}`;
 }

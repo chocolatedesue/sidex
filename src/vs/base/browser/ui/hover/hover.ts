@@ -440,11 +440,7 @@ export function isManagedHoverTooltipHTMLElement(obj: unknown): obj is IManagedH
 }
 
 export type IManagedHoverContent =
-	| string
-	| IManagedHoverTooltipMarkdownString
-	| IManagedHoverTooltipHTMLElement
-	| HTMLElement
-	| undefined;
+	string | IManagedHoverTooltipMarkdownString | IManagedHoverTooltipHTMLElement | HTMLElement | undefined;
 export type IManagedHoverContentOrFactory = IManagedHoverContent | (() => IManagedHoverContent);
 
 export interface IManagedHoverOptions extends Pick<IHoverOptions, 'actions' | 'linkHandler' | 'trapFocus'> {

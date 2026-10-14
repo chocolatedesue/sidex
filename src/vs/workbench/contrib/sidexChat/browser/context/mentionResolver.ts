@@ -27,12 +27,29 @@ interface ICodebaseSearchProvider {
 }
 
 const FILE_EXTENSIONS: Record<string, string> = {
-	'.ts': 'TypeScript', '.tsx': 'TypeScript React', '.js': 'JavaScript',
-	'.jsx': 'JavaScript React', '.rs': 'Rust', '.go': 'Go', '.py': 'Python',
-	'.java': 'Java', '.c': 'C', '.cpp': 'C++', '.h': 'C Header',
-	'.css': 'CSS', '.html': 'HTML', '.json': 'JSON', '.md': 'Markdown',
-	'.yaml': 'YAML', '.yml': 'YAML', '.toml': 'TOML', '.sql': 'SQL',
-	'.sh': 'Shell', '.bash': 'Shell', '.vue': 'Vue', '.svelte': 'Svelte',
+	'.ts': 'TypeScript',
+	'.tsx': 'TypeScript React',
+	'.js': 'JavaScript',
+	'.jsx': 'JavaScript React',
+	'.rs': 'Rust',
+	'.go': 'Go',
+	'.py': 'Python',
+	'.java': 'Java',
+	'.c': 'C',
+	'.cpp': 'C++',
+	'.h': 'C Header',
+	'.css': 'CSS',
+	'.html': 'HTML',
+	'.json': 'JSON',
+	'.md': 'Markdown',
+	'.yaml': 'YAML',
+	'.yml': 'YAML',
+	'.toml': 'TOML',
+	'.sql': 'SQL',
+	'.sh': 'Shell',
+	'.bash': 'Shell',
+	'.vue': 'Vue',
+	'.svelte': 'Svelte'
 };
 
 const MAX_SUGGESTIONS = 10;
@@ -55,12 +72,14 @@ export class MentionResolver {
 		}
 
 		if (trimmed === 'codebase' || trimmed.startsWith('codebase ')) {
-			return [{
-				type: 'codebase',
-				label: 'codebase',
-				detail: 'Search the entire indexed codebase',
-				iconClass: 'codicon-search',
-			}];
+			return [
+				{
+					type: 'codebase',
+					label: 'codebase',
+					detail: 'Search the entire indexed codebase',
+					iconClass: 'codicon-search'
+				}
+			];
 		}
 
 		const isFileLike = trimmed.startsWith('/') || trimmed.includes('.') || trimmed.includes('/');
@@ -126,7 +145,7 @@ export class MentionResolver {
 					label,
 					detail: FILE_EXTENSIONS[ext] || 'File',
 					fullPath,
-					iconClass: 'codicon-file',
+					iconClass: 'codicon-file'
 				});
 			}
 		} catch {
@@ -154,12 +173,14 @@ export class MentionResolver {
 				items.push({
 					type: isDir ? 'folder' : 'file',
 					label,
-					detail: isDir ? 'Folder' : (FILE_EXTENSIONS[ext] || 'File'),
+					detail: isDir ? 'Folder' : FILE_EXTENSIONS[ext] || 'File',
 					fullPath,
-					iconClass: isDir ? 'codicon-folder' : 'codicon-file',
+					iconClass: isDir ? 'codicon-folder' : 'codicon-file'
 				});
 
-				if (items.length >= MAX_SUGGESTIONS) { break; }
+				if (items.length >= MAX_SUGGESTIONS) {
+					break;
+				}
 			}
 		} catch {
 			// search failed
@@ -169,7 +190,9 @@ export class MentionResolver {
 	}
 
 	private async _resolveFile(item: MentionItem): Promise<string> {
-		if (!item.fullPath) { return ''; }
+		if (!item.fullPath) {
+			return '';
+		}
 
 		try {
 			const uri = URI.file(item.fullPath);
@@ -190,7 +213,9 @@ export class MentionResolver {
 	}
 
 	private async _resolveFolder(item: MentionItem): Promise<string> {
-		if (!item.fullPath) { return ''; }
+		if (!item.fullPath) {
+			return '';
+		}
 
 		try {
 			const uri = URI.file(item.fullPath);
@@ -202,13 +227,17 @@ export class MentionResolver {
 	}
 
 	private async _buildTree(uri: URI, depth: number, indent: string): Promise<string> {
-		if (depth <= 0) { return ''; }
+		if (depth <= 0) {
+			return '';
+		}
 
 		const entries = await this._fsProvider.readDirectory(uri);
 		const lines: string[] = [];
 
 		const sorted = entries.sort((a, b) => {
-			if (a[1] === b[1]) { return a[0].localeCompare(b[0]); }
+			if (a[1] === b[1]) {
+				return a[0].localeCompare(b[0]);
+			}
 			return a[1] === 'directory' ? -1 : 1;
 		});
 
@@ -223,7 +252,9 @@ export class MentionResolver {
 			if (type === 'directory' && depth > 1) {
 				const childUri = URI.joinPath(uri, name);
 				const subTree = await this._buildTree(childUri, depth - 1, indent + '  ');
-				if (subTree) { lines.push(subTree); }
+				if (subTree) {
+					lines.push(subTree);
+				}
 			}
 		}
 
@@ -232,7 +263,9 @@ export class MentionResolver {
 
 	private _getExtension(path: string): string {
 		const idx = path.lastIndexOf('.');
-		if (idx === -1) { return ''; }
+		if (idx === -1) {
+			return '';
+		}
 		return path.slice(idx).toLowerCase();
 	}
 }

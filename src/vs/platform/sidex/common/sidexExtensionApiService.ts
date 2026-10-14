@@ -17,15 +17,7 @@ export interface ExtCommandInfo {
 }
 
 export type ExtNamespace =
-	| 'window'
-	| 'workspace'
-	| 'commands'
-	| 'languages'
-	| 'debug'
-	| 'tasks'
-	| 'scm'
-	| 'tests'
-	| 'env';
+	'window' | 'workspace' | 'commands' | 'languages' | 'debug' | 'tasks' | 'scm' | 'tests' | 'env';
 
 export type ExtCommandResult = unknown;
 

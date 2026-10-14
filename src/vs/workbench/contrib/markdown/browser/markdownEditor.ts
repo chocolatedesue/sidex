@@ -62,9 +62,7 @@ function encodeInitialState(state: object): string {
 
 function markdownEditorAssetBase(): string {
 	// Absolute origin URL so srcdoc webviews can resolve ES module chunks.
-	const origin = typeof window !== 'undefined' && window.location?.origin
-		? window.location.origin
-		: '';
+	const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
 	return `${origin}/extensions/markdown-language-features/markdown-editor-out`;
 }
 
@@ -99,16 +97,19 @@ export class MarkdownEditorManager extends Disposable {
 	private _readonly = true;
 	private _ready = false;
 	/** Standalone panes (e.g. Markdown Diff sides) keyed by instance id. */
-	private readonly _standalone = new Map<string, {
-		input: WebviewInput;
-		resource: URI;
-		readonly: boolean;
-		messageSecret: string;
-		editEpoch: number;
-		ready: boolean;
-		applying: boolean;
-		store: DisposableStore;
-	}>();
+	private readonly _standalone = new Map<
+		string,
+		{
+			input: WebviewInput;
+			resource: URI;
+			readonly: boolean;
+			messageSecret: string;
+			editEpoch: number;
+			ready: boolean;
+			applying: boolean;
+			store: DisposableStore;
+		}
+	>();
 
 	constructor(
 		@IEditorService private readonly _editorService: IEditorService,
@@ -179,22 +180,18 @@ export class MarkdownEditorManager extends Disposable {
 		const name = resource.path.split('/').pop() || resource.path;
 		const title = options?.titlePrefix
 			? `${options.titlePrefix}: ${name}`
-			: (readonly
+			: readonly
 				? localize('markdownEditorLockedTitle', 'Markdown Editor (locked): {0}', name)
-				: localize('markdownEditorEditingTitle', 'Markdown Editor: {0}', name));
+				: localize('markdownEditorEditingTitle', 'Markdown Editor: {0}', name);
 		const instanceId = generateUuid();
 		const messageSecret = generateUuid();
 		const store = new DisposableStore();
 		const initInfo = this._initInfo(resource, title);
 		const open = options?.open !== false;
 		const input = open
-			? this._webviewWorkbenchService.openWebview(
-					initInfo,
-					MARKDOWN_EDITOR_VIEW_TYPE,
-					title,
-					undefined,
-					{ preserveFocus: true }
-				)
+			? this._webviewWorkbenchService.openWebview(initInfo, MARKDOWN_EDITOR_VIEW_TYPE, title, undefined, {
+					preserveFocus: true
+				})
 			: this._instantiationService.createInstance(
 					WebviewInput,
 					{
@@ -214,22 +211,22 @@ export class MarkdownEditorManager extends Disposable {
 			editEpoch: 0,
 			ready: false,
 			applying: false,
-			store,
+			store
 		};
 		this._standalone.set(instanceId, session);
 		this._register(store);
 
-		store.add(input.onWillDispose(() => {
-			store.dispose();
-			this._standalone.delete(instanceId);
-		}));
+		store.add(
+			input.onWillDispose(() => {
+				store.dispose();
+				this._standalone.delete(instanceId);
+			})
+		);
 		store.add(input.webview.onMessage(event => this._onStandaloneMessage(instanceId, event.message)));
 
 		// Initial HTML
 		const fileModel = this._textFileService.files.get(resource);
-		const text = fileModel?.isResolved()
-			? fileModel.textEditorModel.getValue(EndOfLinePreference.LF)
-			: '';
+		const text = fileModel?.isResolved() ? fileModel.textEditorModel.getValue(EndOfLinePreference.LF) : '';
 		const version = fileModel?.isResolved() ? fileModel.textEditorModel.getVersionId() : 0;
 		// Temporarily swap secrets/readonly for build helpers
 		const prevSecret = this._messageSecret;
@@ -244,20 +241,26 @@ export class MarkdownEditorManager extends Disposable {
 		this._editEpoch = prevEpoch;
 
 		if (fileModel?.isResolved()) {
-			store.add(fileModel.textEditorModel.onDidChangeContent(() => {
-				const s = this._standalone.get(instanceId);
-				if (!s || s.applying) {
-					return;
-				}
-				s.editEpoch += 1;
-				const content = fileModel.textEditorModel.getValue(EndOfLinePreference.LF);
-				input.webview.postMessage({
-					type: 'update',
-					content,
-					editEpoch: s.editEpoch,
-					messageSecret: s.messageSecret,
-				}).catch(() => { /* gone */ });
-			}));
+			store.add(
+				fileModel.textEditorModel.onDidChangeContent(() => {
+					const s = this._standalone.get(instanceId);
+					if (!s || s.applying) {
+						return;
+					}
+					s.editEpoch += 1;
+					const content = fileModel.textEditorModel.getValue(EndOfLinePreference.LF);
+					input.webview
+						.postMessage({
+							type: 'update',
+							content,
+							editEpoch: s.editEpoch,
+							messageSecret: s.messageSecret
+						})
+						.catch(() => {
+							/* gone */
+						});
+				})
+			);
 		}
 
 		input.setWebviewTitle(title);
@@ -288,12 +291,16 @@ export class MarkdownEditorManager extends Disposable {
 				{
 					const fileModel = this._textFileService.files.get(session.resource);
 					if (fileModel?.isResolved()) {
-						session.input.webview.postMessage({
-							type: 'update',
-							content: fileModel.textEditorModel.getValue(EndOfLinePreference.LF),
-							editEpoch: session.editEpoch,
-							messageSecret: session.messageSecret,
-						}).catch(() => { /* */ });
+						session.input.webview
+							.postMessage({
+								type: 'update',
+								content: fileModel.textEditorModel.getValue(EndOfLinePreference.LF),
+								editEpoch: session.editEpoch,
+								messageSecret: session.messageSecret
+							})
+							.catch(() => {
+								/* */
+							});
 					}
 				}
 				break;
@@ -326,12 +333,16 @@ export class MarkdownEditorManager extends Disposable {
 		}
 		if (typeof message.editEpoch === 'number' && message.editEpoch !== session.editEpoch) {
 			session.editEpoch += 1;
-			session.input.webview.postMessage({
-				type: 'update',
-				content: fileModel.textEditorModel.getValue(EndOfLinePreference.LF),
-				editEpoch: session.editEpoch,
-				messageSecret: session.messageSecret,
-			}).catch(() => { /* */ });
+			session.input.webview
+				.postMessage({
+					type: 'update',
+					content: fileModel.textEditorModel.getValue(EndOfLinePreference.LF),
+					editEpoch: session.editEpoch,
+					messageSecret: session.messageSecret
+				})
+				.catch(() => {
+					/* */
+				});
 			return;
 		}
 		const model = fileModel.textEditorModel;
@@ -345,10 +356,12 @@ export class MarkdownEditorManager extends Disposable {
 		try {
 			model.pushEditOperations(
 				null,
-				[{
-					range: new Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-					text: insert,
-				}],
+				[
+					{
+						range: new Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+						text: insert
+					}
+				],
 				() => null
 			);
 		} finally {
@@ -389,13 +402,12 @@ export class MarkdownEditorManager extends Disposable {
 		this._pushAuthoritativeUpdate();
 	}
 
-	private _openOrCreate(
-		resource: URI,
-		open: boolean,
-		side?: boolean,
-		preserveFocus = false
-	): WebviewInput | undefined {
-		const title = localize('markdownEditorTitle', 'Markdown Editor: {0}', resource.path.split('/').pop() || resource.path);
+	private _openOrCreate(resource: URI, open: boolean, side?: boolean, preserveFocus = false): WebviewInput | undefined {
+		const title = localize(
+			'markdownEditorTitle',
+			'Markdown Editor: {0}',
+			resource.path.split('/').pop() || resource.path
+		);
 
 		if (this._webviewInput && !this._webviewInput.isDisposed()) {
 			this._webviewInput.setWebviewTitle(title);
@@ -406,13 +418,10 @@ export class MarkdownEditorManager extends Disposable {
 
 		const initInfo = this._initInfo(resource, title);
 		const input = open
-			? this._webviewWorkbenchService.openWebview(
-					initInfo,
-					MARKDOWN_EDITOR_VIEW_TYPE,
-					title,
-					undefined,
-					{ preserveFocus, group: side ? SIDE_GROUP : undefined }
-				)
+			? this._webviewWorkbenchService.openWebview(initInfo, MARKDOWN_EDITOR_VIEW_TYPE, title, undefined, {
+					preserveFocus,
+					group: side ? SIDE_GROUP : undefined
+				})
 			: this._instantiationService.createInstance(
 					WebviewInput,
 					{
@@ -452,7 +461,7 @@ export class MarkdownEditorManager extends Disposable {
 			contentOptions: {
 				allowScripts: true,
 				localResourceRoots: [
-					URI.joinPath(resource, '..'),
+					URI.joinPath(resource, '..')
 					// Same-origin /extensions/… is also used; keep parent dir as a root for images.
 				]
 			},
@@ -467,9 +476,7 @@ export class MarkdownEditorManager extends Disposable {
 			return;
 		}
 		const fileModel = this._textFileService.files.get(resource);
-		const text = fileModel?.isResolved()
-			? fileModel.textEditorModel.getValue(EndOfLinePreference.LF)
-			: '';
+		const text = fileModel?.isResolved() ? fileModel.textEditorModel.getValue(EndOfLinePreference.LF) : '';
 		const version = fileModel?.isResolved() ? fileModel.textEditorModel.getVersionId() : 0;
 		this._messageSecret = generateUuid();
 		this._editEpoch = 0;
@@ -565,11 +572,9 @@ export class MarkdownEditorManager extends Disposable {
 	}
 
 	private _postToWebview(message: Record<string, unknown>): void {
-		this._webviewInput?.webview
-			.postMessage({ ...message, messageSecret: this._messageSecret })
-			.catch(() => {
-				/* editor may be gone */
-			});
+		this._webviewInput?.webview.postMessage({ ...message, messageSecret: this._messageSecret }).catch(() => {
+			/* editor may be gone */
+		});
 	}
 
 	private _onWebviewMessage(raw: unknown): void {
@@ -597,12 +602,7 @@ export class MarkdownEditorManager extends Disposable {
 			case 'setReadonly':
 				if (typeof message.readonly === 'boolean') {
 					this._readonly = message.readonly;
-					this._storageService.store(
-						READONLY_STATE_KEY,
-						this._readonly,
-						StorageScope.PROFILE,
-						StorageTarget.USER
-					);
+					this._storageService.store(READONLY_STATE_KEY, this._readonly, StorageScope.PROFILE, StorageTarget.USER);
 					this._updateTitle();
 				}
 				break;
@@ -719,15 +719,13 @@ export class MarkdownEditorManager extends Disposable {
 			return undefined;
 		}
 		const lower = resource.path.toLowerCase();
-		if (
-			!(
-				lower.endsWith('.md') ||
-				lower.endsWith('.markdown') ||
-				lower.endsWith('.mdx') ||
-				lower.endsWith('.mdtxt') ||
-				lower.endsWith('.mdtext')
-			)
-		) {
+		if (!(
+			lower.endsWith('.md') ||
+			lower.endsWith('.markdown') ||
+			lower.endsWith('.mdx') ||
+			lower.endsWith('.mdtxt') ||
+			lower.endsWith('.mdtext')
+		)) {
 			return undefined;
 		}
 		return resource;

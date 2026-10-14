@@ -107,7 +107,7 @@ export class AccountPanel extends Component {
 
 		let providers: IProviderStatus[];
 		try {
-			providers = await invoke('providers_status') as IProviderStatus[];
+			providers = (await invoke('providers_status')) as IProviderStatus[];
 		} catch {
 			return;
 		}
@@ -143,11 +143,16 @@ export class AccountPanel extends Component {
 	/** Human label for the `source` field on `ProviderStatus` (settings|env|cli|local). */
 	private static _sourceLabel(source: string | null): string {
 		switch (source) {
-			case 'settings': return 'API key';
-			case 'env': return 'Environment';
-			case 'cli': return 'CLI login';
-			case 'local': return 'Local server';
-			default: return '';
+			case 'settings':
+				return 'API key';
+			case 'env':
+				return 'Environment';
+			case 'cli':
+				return 'CLI login';
+			case 'local':
+				return 'Local server';
+			default:
+				return '';
 		}
 	}
 

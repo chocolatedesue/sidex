@@ -13,20 +13,23 @@ import { Registry } from '../../../../platform/registry/common/platform.js';
 import { IWorkbenchContributionsRegistry, Extensions as WorkbenchExtensions } from '../../../common/contributions.js';
 import { LifecyclePhase } from '../../../services/lifecycle/common/lifecycle.js';
 import { IUpdateService, StateType, State } from '../../../../platform/update/common/update.js';
-import { INotificationService, Severity, INotificationHandle } from '../../../../platform/notification/common/notification.js';
+import {
+	INotificationService,
+	Severity,
+	INotificationHandle
+} from '../../../../platform/notification/common/notification.js';
 
 const INITIAL_CHECK_DELAY = 5 * 1000; // Check 5s after startup (Cursor style)
 const RECHECK_INTERVAL = 4 * 60 * 60 * 1000; // Check every 4 hours
 
 export class SidexUpdateContribution extends Disposable {
-
 	private _notification: INotificationHandle | undefined;
 	private _notifiedVersion: string | undefined;
 	private _notifiedState: StateType | undefined;
 
 	constructor(
 		@IUpdateService private readonly updateService: IUpdateService,
-		@INotificationService private readonly notificationService: INotificationService,
+		@INotificationService private readonly notificationService: INotificationService
 	) {
 		super();
 
@@ -41,7 +44,12 @@ export class SidexUpdateContribution extends Disposable {
 			this._notifiedState = undefined;
 			this._onState(this.updateService.state);
 		}, RECHECK_INTERVAL);
-		this._register({ dispose: () => { clearTimeout(initial); clearInterval(interval); } });
+		this._register({
+			dispose: () => {
+				clearTimeout(initial);
+				clearInterval(interval);
+			}
+		});
 	}
 
 	private _onState(state: State): void {
@@ -89,7 +97,7 @@ export class SidexUpdateContribution extends Disposable {
 						run: () => {
 							this._notification?.close();
 							this.updateService.downloadUpdate(false);
-						},
+						}
 					},
 					{
 						id: 'sidex.update.later',
@@ -99,10 +107,10 @@ export class SidexUpdateContribution extends Disposable {
 						enabled: true,
 						run: () => {
 							this._notification?.close();
-						},
+						}
 					}
-				],
-			},
+				]
+			}
 		});
 		this._register({ dispose: () => this._notification?.close() });
 	}
@@ -130,7 +138,7 @@ export class SidexUpdateContribution extends Disposable {
 						run: () => {
 							this._notification?.close();
 							this.updateService.quitAndInstall();
-						},
+						}
 					},
 					{
 						id: 'sidex.update.ready_later',
@@ -140,14 +148,16 @@ export class SidexUpdateContribution extends Disposable {
 						enabled: true,
 						run: () => {
 							this._notification?.close();
-						},
+						}
 					}
-				],
-			},
+				]
+			}
 		});
 		this._register({ dispose: () => this._notification?.close() });
 	}
 }
 
-Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench)
-	.registerWorkbenchContribution(SidexUpdateContribution, LifecyclePhase.Restored);
+Registry.as<IWorkbenchContributionsRegistry>(WorkbenchExtensions.Workbench).registerWorkbenchContribution(
+	SidexUpdateContribution,
+	LifecyclePhase.Restored
+);

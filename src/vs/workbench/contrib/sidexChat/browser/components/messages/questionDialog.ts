@@ -57,7 +57,7 @@ export class QuestionDialog extends Component {
 					// Single select — immediately respond
 					this._onRespond.fire({
 						toolCallId: data.toolCallId,
-						selectedIds: [opt.id],
+						selectedIds: [opt.id]
 					});
 					btn.classList.add('sc-question-selected');
 					this._disable();
@@ -74,7 +74,7 @@ export class QuestionDialog extends Component {
 				if (this._selected.size > 0) {
 					this._onRespond.fire({
 						toolCallId: data.toolCallId,
-						selectedIds: [...this._selected],
+						selectedIds: [...this._selected]
 					});
 					this._disable();
 				}

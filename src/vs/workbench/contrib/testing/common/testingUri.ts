@@ -48,10 +48,7 @@ interface ITestDiffOutputReference extends IResultTestUri {
 }
 
 export type ParsedTestUri =
-	| IAllOutputReference
-	| IResultTestMessageReference
-	| ITestDiffOutputReference
-	| ITestOutputReference;
+	IAllOutputReference | IResultTestMessageReference | ITestDiffOutputReference | ITestOutputReference;
 
 const enum TestUriParts {
 	Results = 'results',

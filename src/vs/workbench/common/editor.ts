@@ -606,8 +606,7 @@ export interface IMultiDiffEditorResource extends IResourceDiffEditorInput {
 	readonly goToFileResource?: URI;
 }
 export type IResourceMergeEditorInputSide = (
-	| Omit<IResourceEditorInput, 'options'>
-	| Omit<ITextResourceEditorInput, 'options'>
+	Omit<IResourceEditorInput, 'options'> | Omit<ITextResourceEditorInput, 'options'>
 ) & { detail?: string };
 
 /**

@@ -85,9 +85,7 @@ export interface RemoteStat {
 }
 
 export type SshAuth =
-	| { kind: 'password'; password: string }
-	| { kind: 'keyfile'; path: string; passphrase?: string }
-	| { kind: 'agent' };
+	{ kind: 'password'; password: string } | { kind: 'keyfile'; path: string; passphrase?: string } | { kind: 'agent' };
 
 interface RawSshHost {
 	host: string;

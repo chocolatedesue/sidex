@@ -9029,9 +9029,7 @@ declare namespace monaco.languages {
 	}
 
 	export type IMonarchLanguageRule =
-		| IShortMonarchLanguageRule1
-		| IShortMonarchLanguageRule2
-		| IExpandedMonarchLanguageRule;
+		IShortMonarchLanguageRule1 | IShortMonarchLanguageRule2 | IExpandedMonarchLanguageRule;
 
 	/**
 	 * An action is either an array of actions...

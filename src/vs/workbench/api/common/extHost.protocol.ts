@@ -1622,9 +1622,7 @@ export interface ICellExecutionStateUpdateDto extends ICellExecutionStateUpdate 
 export interface ICellExecutionCompleteDto extends ICellExecutionComplete {}
 
 export type ICellExecuteUpdateDto =
-	| ICellExecuteOutputEditDto
-	| ICellExecuteOutputItemEditDto
-	| ICellExecutionStateUpdateDto;
+	ICellExecuteOutputEditDto | ICellExecuteOutputItemEditDto | ICellExecutionStateUpdateDto;
 
 export interface VariablesResult {
 	id: number;

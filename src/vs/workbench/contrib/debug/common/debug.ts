@@ -1336,10 +1336,7 @@ export interface IDebugAdapterImpl {
 }
 
 export type IAdapterDescriptor =
-	| IDebugAdapterExecutable
-	| IDebugAdapterServer
-	| IDebugAdapterNamedPipeServer
-	| IDebugAdapterImpl;
+	IDebugAdapterExecutable | IDebugAdapterServer | IDebugAdapterNamedPipeServer | IDebugAdapterImpl;
 
 export interface IPlatformSpecificAdapterContribution {
 	program?: string;
@@ -1843,8 +1840,7 @@ export const enum DebugVisualizationType {
 }
 
 export type MainThreadDebugVisualization =
-	| { type: DebugVisualizationType.Command }
-	| { type: DebugVisualizationType.Tree; id: string };
+	{ type: DebugVisualizationType.Command } | { type: DebugVisualizationType.Tree; id: string };
 
 export const enum DebugTreeItemCollapsibleState {
 	None = 0,

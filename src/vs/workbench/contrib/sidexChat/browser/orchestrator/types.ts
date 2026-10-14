@@ -14,14 +14,7 @@
 
 export type TaskNodeType = 'planner' | 'subplanner' | 'worker' | 'verifier';
 
-export type TaskStatus =
-	| 'pending'
-	| 'queued'
-	| 'running'
-	| 'completed'
-	| 'failed'
-	| 'cancelled'
-	| 'blocked';
+export type TaskStatus = 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'blocked';
 
 export type VerifierVerdict = 'pass' | 'fail' | 'partial';
 
@@ -226,5 +219,5 @@ export const DEFAULT_ORCHESTRATOR_CONFIG: OrchestratorConfig = {
 	verifierModel: 'anthropic/claude-sonnet-4.6',
 	timeoutMs: 600_000, // 10 minutes per task
 	retryOnFailure: true,
-	maxRetries: 2,
+	maxRetries: 2
 };

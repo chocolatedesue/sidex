@@ -43,7 +43,7 @@ export class IndexingSection implements SettingsSection {
 
 	async render(container: HTMLElement): Promise<void> {
 		this._container = container;
-		
+
 		// Clear everything synchronously before any awaits
 		container.innerHTML = '';
 
@@ -52,9 +52,11 @@ export class IndexingSection implements SettingsSection {
 
 		if (this._invoke) {
 			try {
-				const cloudApi = await this._invoke('get_env', { key: 'SIDEX_CLOUD_API' }) as string | null;
+				const cloudApi = (await this._invoke('get_env', { key: 'SIDEX_CLOUD_API' })) as string | null;
 				this._cloudApiConfigured = !!cloudApi;
-			} catch { this._cloudApiConfigured = false; }
+			} catch {
+				this._cloudApiConfigured = false;
+			}
 		}
 
 		const title = document.createElement('div');
@@ -63,8 +65,8 @@ export class IndexingSection implements SettingsSection {
 		container.appendChild(title);
 
 		await this._renderStatsCard(container);
-		
-		// If the container was cleared by another render while we were awaiting, 
+
+		// If the container was cleared by another render while we were awaiting,
 		// don't append the settings card to a dead DOM
 		if (this._container && this._container.contains(title)) {
 			this._renderSettingsCard(container);
@@ -85,7 +87,8 @@ export class IndexingSection implements SettingsSection {
 			card.className = 'sidex-settings-card';
 
 			const emptyRow = document.createElement('div');
-			emptyRow.style.cssText = 'padding: 24px 20px; text-align: center; color: var(--vscode-descriptionForeground); font-size: 12px; line-height: 1.5; display: flex; flex-direction: column; align-items: center; gap: 6px;';
+			emptyRow.style.cssText =
+				'padding: 24px 20px; text-align: center; color: var(--vscode-descriptionForeground); font-size: 12px; line-height: 1.5; display: flex; flex-direction: column; align-items: center; gap: 6px;';
 
 			const icon = document.createElement('span');
 			icon.className = 'codicon codicon-info';
@@ -119,8 +122,10 @@ export class IndexingSection implements SettingsSection {
 		let stats: IndexStats | null = null;
 		if (this._invoke && this._workspacePath) {
 			try {
-				stats = await this._invoke('index_stats') as IndexStats | null;
-			} catch { /* no index yet */ }
+				stats = (await this._invoke('index_stats')) as IndexStats | null;
+			} catch {
+				/* no index yet */
+			}
 		}
 
 		loading.remove();
@@ -137,12 +142,14 @@ export class IndexingSection implements SettingsSection {
 			row1.style.cssText = 'flex-direction: column; align-items: stretch; padding: 14px 20px;';
 
 			const header = document.createElement('div');
-			header.style.cssText = 'font-size:14px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:6px;';
+			header.style.cssText =
+				'font-size:14px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:6px;';
 			header.innerHTML = `Codebase Indexing <span class="codicon codicon-question" style="font-size:12px;opacity:0.6;"></span>`;
 			row1.appendChild(header);
 
 			const desc = document.createElement('div');
-			desc.style.cssText = 'font-size:12px;color:var(--vscode-descriptionForeground);line-height:1.4;margin-bottom:16px;';
+			desc.style.cssText =
+				'font-size:12px;color:var(--vscode-descriptionForeground);line-height:1.4;margin-bottom:16px;';
 			desc.textContent = this._indexingDescription();
 			row1.appendChild(desc);
 
@@ -154,11 +161,12 @@ export class IndexingSection implements SettingsSection {
 			if (isIndexingActive) {
 				barInner.style.width = '10%'; // show some progress
 				// animate progress infinitely if active
-				barInner.animate([
-					{ backgroundPosition: '0% 0' },
-					{ backgroundPosition: '200% 0' }
-				], { duration: 1500, iterations: Infinity });
-				barInner.style.background = 'linear-gradient(90deg, var(--vscode-button-background, #007fd4) 25%, #66b1ff 50%, var(--vscode-button-background, #007fd4) 75%)';
+				barInner.animate([{ backgroundPosition: '0% 0' }, { backgroundPosition: '200% 0' }], {
+					duration: 1500,
+					iterations: Infinity
+				});
+				barInner.style.background =
+					'linear-gradient(90deg, var(--vscode-button-background, #007fd4) 25%, #66b1ff 50%, var(--vscode-button-background, #007fd4) 75%)';
 				barInner.style.backgroundSize = '200% 100%';
 			}
 			barOuter.appendChild(barInner);
@@ -174,7 +182,7 @@ export class IndexingSection implements SettingsSection {
 			const row2 = document.createElement('div');
 			row2.className = 'sidex-settings-row';
 			row2.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;padding:10px 20px;min-height:48px;';
-			
+
 			const syncBtn = this._makeSyncBtn(card);
 			syncBtn.innerHTML = `<span class="codicon codicon-sync ${isIndexingActive ? 'codicon-modifier-spin' : ''}"></span> ${isIndexingActive ? 'Indexing...' : 'Sync'}`;
 			if (isIndexingActive) {
@@ -201,12 +209,14 @@ export class IndexingSection implements SettingsSection {
 			row1.style.cssText = 'flex-direction: column; align-items: stretch; padding: 14px 20px;';
 
 			const header = document.createElement('div');
-			header.style.cssText = 'font-size:14px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:6px;';
+			header.style.cssText =
+				'font-size:14px;font-weight:500;margin-bottom:8px;display:flex;align-items:center;gap:6px;';
 			header.innerHTML = `Codebase Indexing <span class="codicon codicon-question" style="font-size:12px;opacity:0.6;"></span>`;
 			row1.appendChild(header);
 
 			const desc = document.createElement('div');
-			desc.style.cssText = 'font-size:12px;color:var(--vscode-descriptionForeground);line-height:1.4;margin-bottom:16px;';
+			desc.style.cssText =
+				'font-size:12px;color:var(--vscode-descriptionForeground);line-height:1.4;margin-bottom:16px;';
 			desc.textContent = this._indexingDescription();
 			row1.appendChild(desc);
 
@@ -234,7 +244,7 @@ export class IndexingSection implements SettingsSection {
 			const row2 = document.createElement('div');
 			row2.className = 'sidex-settings-row';
 			row2.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;padding:10px 20px;min-height:48px;';
-			
+
 			const syncBtn = this._makeSyncBtn(card);
 			syncBtn.innerHTML = `<span class="codicon codicon-sync ${isIndexingActive ? 'codicon-modifier-spin' : ''}"></span> ${isIndexingActive ? 'Indexing...' : 'Sync'}`;
 			if (isIndexingActive) {
@@ -249,21 +259,37 @@ export class IndexingSection implements SettingsSection {
 			deleteBtn.style.alignItems = 'center';
 			deleteBtn.style.gap = '6px';
 			deleteBtn.innerHTML = `<span class="codicon codicon-trash"></span> Delete Index`;
-			deleteBtn.addEventListener('mouseover', () => { if (!deleteBtn.disabled) {deleteBtn.style.background = 'rgba(255,0,0,0.1)';} deleteBtn.style.borderColor = 'rgba(255,0,0,0.4)'; });
-			deleteBtn.addEventListener('mouseout', () => { if (!deleteBtn.disabled) {deleteBtn.style.background = '';} deleteBtn.style.borderColor = ''; });
+			deleteBtn.addEventListener('mouseover', () => {
+				if (!deleteBtn.disabled) {
+					deleteBtn.style.background = 'rgba(255,0,0,0.1)';
+				}
+				deleteBtn.style.borderColor = 'rgba(255,0,0,0.4)';
+			});
+			deleteBtn.addEventListener('mouseout', () => {
+				if (!deleteBtn.disabled) {
+					deleteBtn.style.background = '';
+				}
+				deleteBtn.style.borderColor = '';
+			});
 			deleteBtn.addEventListener('click', () => {
-				if (!this._invoke) { return; }
+				if (!this._invoke) {
+					return;
+				}
 				deleteBtn.disabled = true;
 				deleteBtn.textContent = 'Deleting…';
-				this._invoke('index_clear').then(() => {
-					// Fire the event to reload the UI cleanly
-					window.dispatchEvent(new CustomEvent('sidex-indexing-status', { 
-						detail: { status: 'deleted', path: this._workspacePath } 
-					}));
-				}).catch(() => {
-					deleteBtn.disabled = false;
-					deleteBtn.innerHTML = `<span class="codicon codicon-trash"></span> Delete Index`;
-				});
+				this._invoke('index_clear')
+					.then(() => {
+						// Fire the event to reload the UI cleanly
+						window.dispatchEvent(
+							new CustomEvent('sidex-indexing-status', {
+								detail: { status: 'deleted', path: this._workspacePath }
+							})
+						);
+					})
+					.catch(() => {
+						deleteBtn.disabled = false;
+						deleteBtn.innerHTML = `<span class="codicon codicon-trash"></span> Delete Index`;
+					});
 			});
 			row2.appendChild(deleteBtn);
 
@@ -273,7 +299,7 @@ export class IndexingSection implements SettingsSection {
 
 	private _indexingDescription(): string {
 		return this._cloudApiConfigured
-			? 'Your codebase is indexed on-device with BM25 keyword search, and results are augmented from the remote semantic index you\'ve configured via SIDEX_CLOUD_API. Search queries are sent there — your code itself never leaves this machine.'
+			? "Your codebase is indexed on-device with BM25 keyword search, and results are augmented from the remote semantic index you've configured via SIDEX_CLOUD_API. Search queries are sent there — your code itself never leaves this machine."
 			: 'Your codebase is indexed on-device with BM25 keyword search. Nothing leaves this machine — there is no cloud index configured.';
 	}
 
@@ -286,29 +312,41 @@ export class IndexingSection implements SettingsSection {
 		btn.innerHTML = `<span class="codicon codicon-sync"></span> Sync`;
 
 		btn.addEventListener('mouseover', () => {
-			if (!btn.disabled) {btn.style.background = 'var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31))';}
+			if (!btn.disabled) {
+				btn.style.background = 'var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31))';
+			}
 		});
 		btn.addEventListener('mouseout', () => {
-			if (!btn.disabled) {btn.style.background = '';}
+			if (!btn.disabled) {
+				btn.style.background = '';
+			}
 		});
-		
-		btn.addEventListener('click', () => {
-			if (!this._invoke || !this._workspacePath) { return; }
-			
-			// Fire the global event so other UI can update
-			window.dispatchEvent(new CustomEvent('sidex-indexing-status', { 
-				detail: { status: 'indexing', path: this._workspacePath } 
-			}));
 
-			this._invoke('index_build', { root: this._workspacePath }).then(() => {
-				// index_build resolves once the on-device index is written.
-				// The Rust backend will emit the real 'done' event when the cloud finishes!
-			}).catch((err) => {
-				console.error('[sidex-index] Build failed:', err);
-				window.dispatchEvent(new CustomEvent('sidex-indexing-status', { 
-					detail: { status: 'error', path: this._workspacePath, error: err } 
-				}));
-			});
+		btn.addEventListener('click', () => {
+			if (!this._invoke || !this._workspacePath) {
+				return;
+			}
+
+			// Fire the global event so other UI can update
+			window.dispatchEvent(
+				new CustomEvent('sidex-indexing-status', {
+					detail: { status: 'indexing', path: this._workspacePath }
+				})
+			);
+
+			this._invoke('index_build', { root: this._workspacePath })
+				.then(() => {
+					// index_build resolves once the on-device index is written.
+					// The Rust backend will emit the real 'done' event when the cloud finishes!
+				})
+				.catch(err => {
+					console.error('[sidex-index] Build failed:', err);
+					window.dispatchEvent(
+						new CustomEvent('sidex-indexing-status', {
+							detail: { status: 'error', path: this._workspacePath, error: err }
+						})
+					);
+				});
 		});
 		return btn;
 	}
@@ -317,21 +355,24 @@ export class IndexingSection implements SettingsSection {
 		const card = document.createElement('div');
 		card.className = 'sidex-settings-card';
 
-		this._addToggleRow(card,
+		this._addToggleRow(
+			card,
 			'Auto-index new folders',
 			'Automatically re-index when files change',
 			'sidex.indexing.autoIndex',
 			true
 		);
 
-		this._addToggleRow(card,
+		this._addToggleRow(
+			card,
 			'Respect .gitignore',
 			'Skip files and directories listed in .gitignore',
 			'sidex.indexing.respectGitignore',
 			true
 		);
 
-		this._addToggleRow(card,
+		this._addToggleRow(
+			card,
 			'Instant grep',
 			'Use the local index for fast grep across the codebase',
 			'sidex.indexing.instantGrep',
@@ -341,13 +382,7 @@ export class IndexingSection implements SettingsSection {
 		container.appendChild(card);
 	}
 
-	private _addToggleRow(
-		parent: HTMLElement,
-		label: string,
-		desc: string,
-		key: string,
-		defaultOn: boolean
-	): void {
+	private _addToggleRow(parent: HTMLElement, label: string, desc: string, key: string, defaultOn: boolean): void {
 		const row = document.createElement('div');
 		row.className = 'sidex-settings-row';
 
@@ -368,10 +403,15 @@ export class IndexingSection implements SettingsSection {
 		toggle.className = 'sidex-settings-toggle' + (defaultOn ? ' on' : '');
 
 		if (this._invoke) {
-			this._invoke('settings_get', { section: key }).then((val) => {
-				if (val === true) { toggle.classList.add('on'); }
-				else if (val === false) { toggle.classList.remove('on'); }
-			}).catch(() => {});
+			this._invoke('settings_get', { section: key })
+				.then(val => {
+					if (val === true) {
+						toggle.classList.add('on');
+					} else if (val === false) {
+						toggle.classList.remove('on');
+					}
+				})
+				.catch(() => {});
 		}
 
 		toggle.addEventListener('click', () => {
@@ -380,7 +420,7 @@ export class IndexingSection implements SettingsSection {
 				this._invoke('settings_update', {
 					key,
 					value: JSON.stringify(toggle.classList.contains('on')),
-					scope: 'user',
+					scope: 'user'
 				}).catch(() => {});
 			}
 		});

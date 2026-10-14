@@ -82,7 +82,7 @@ export class FileUserDataProvider
 		this._onDidChangeFile = this._register(new Emitter());
 		this.onDidChangeFile = this._onDidChangeFile.event;
 		this.watchResources = TernarySearchTree.forUris(
-			() => !((this.capabilities & 1024) /* FileSystemProviderCapabilities.PathCaseSensitive */)
+			() => !(this.capabilities & 1024 /* FileSystemProviderCapabilities.PathCaseSensitive */)
 		);
 		this.atomicReadWriteResources = new ResourceSet(uri =>
 			this.uriIdentityService.extUri.getComparisonKey(this.toFileSystemResource(uri))

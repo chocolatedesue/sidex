@@ -80,13 +80,13 @@ export class ConfirmDialog extends Component {
 		this._confirmBtn = confirmBtn;
 
 		// Overlay click dismisses like a Cancel — but only the backdrop itself, not the dialog body.
-		this.on(this.element, 'click', (e) => {
+		this.on(this.element, 'click', e => {
 			if (e.target === this.element) {
 				this._close(false);
 			}
 		});
 
-		this.on(this.element, 'keydown', (e) => {
+		this.on(this.element, 'keydown', e => {
 			const ke = e as KeyboardEvent;
 			if (ke.key === 'Escape') {
 				ke.preventDefault();
@@ -105,9 +105,11 @@ export class ConfirmDialog extends Component {
 	}
 
 	private _focusableElements(): HTMLElement[] {
-		return Array.from(this._dialog.querySelectorAll<HTMLElement>(
-			'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-		)).filter(el => !el.hasAttribute('disabled'));
+		return Array.from(
+			this._dialog.querySelectorAll<HTMLElement>(
+				'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+			)
+		).filter(el => !el.hasAttribute('disabled'));
 	}
 
 	private _trapTab(e: KeyboardEvent): void {

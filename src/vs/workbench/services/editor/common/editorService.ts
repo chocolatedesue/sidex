@@ -62,12 +62,7 @@ export const MODAL_GROUP = -4;
 export type MODAL_GROUP_TYPE = typeof MODAL_GROUP;
 
 export type PreferredGroup =
-	| IEditorGroup
-	| GroupIdentifier
-	| SIDE_GROUP_TYPE
-	| ACTIVE_GROUP_TYPE
-	| AUX_WINDOW_GROUP_TYPE
-	| MODAL_GROUP_TYPE;
+	IEditorGroup | GroupIdentifier | SIDE_GROUP_TYPE | ACTIVE_GROUP_TYPE | AUX_WINDOW_GROUP_TYPE | MODAL_GROUP_TYPE;
 
 export function isPreferredGroup(obj: unknown): obj is PreferredGroup {
 	const candidate = obj as PreferredGroup | undefined;

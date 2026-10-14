@@ -73,13 +73,23 @@ export class ChatInput extends Component {
 	readonly onThinkingBudgetChange: Event<number> = this._onThinkingBudgetChange.event;
 
 	private static readonly REASONING_STORAGE_KEY = 'sidex.reasoningLevel';
-	private static readonly REASONING_LEVELS: Array<'None' | 'Low' | 'Medium' | 'High' | 'Ultra'> = ['None', 'Low', 'Medium', 'High', 'Ultra'];
+	private static readonly REASONING_LEVELS: Array<'None' | 'Low' | 'Medium' | 'High' | 'Ultra'> = [
+		'None',
+		'Low',
+		'Medium',
+		'High',
+		'Ultra'
+	];
 
 	private _maxMode = false;
-	get maxMode(): boolean { return this._maxMode; }
+	get maxMode(): boolean {
+		return this._maxMode;
+	}
 
 	private _reasoningLevel: 'None' | 'Low' | 'Medium' | 'High' | 'Ultra' = ChatInput._loadReasoningLevel();
-	get reasoningLevel() { return this._reasoningLevel; }
+	get reasoningLevel() {
+		return this._reasoningLevel;
+	}
 
 	private static _loadReasoningLevel(): 'None' | 'Low' | 'Medium' | 'High' | 'Ultra' {
 		try {
@@ -87,15 +97,23 @@ export class ChatInput extends Component {
 			if (saved && (ChatInput.REASONING_LEVELS as readonly string[]).includes(saved)) {
 				return saved as 'None' | 'Low' | 'Medium' | 'High' | 'Ultra';
 			}
-		} catch { /* */ }
+		} catch {
+			/* */
+		}
 		return 'None';
 	}
 
 	private _localOnly = false;
-	get localOnly(): boolean { return this._localOnly; }
+	get localOnly(): boolean {
+		return this._localOnly;
+	}
 
-	get mode(): AgentMode { return this._currentMode; }
-	get resolvedMentions(): readonly ResolvedMention[] { return this._resolvedMentions; }
+	get mode(): AgentMode {
+		return this._currentMode;
+	}
+	get resolvedMentions(): readonly ResolvedMention[] {
+		return this._resolvedMentions;
+	}
 
 	constructor(private readonly _chatService: ISidexChatService) {
 		super('div', 'sc-input-area');
@@ -103,10 +121,12 @@ export class ChatInput extends Component {
 
 		const container = this.append('div', 'sc-input-container');
 		this._bindAttachmentDrop(this.element, container);
-		this._disposables.add(DOM.addDisposableListener(window, 'sidex-attach-paths', ((event: CustomEvent<{ paths?: string[] }>) => {
-			const paths = event.detail?.paths ?? [];
-			void this._addAttachments(paths);
-		}) as EventListener));
+		this._disposables.add(
+			DOM.addDisposableListener(window, 'sidex-attach-paths', ((event: CustomEvent<{ paths?: string[] }>) => {
+				const paths = event.detail?.paths ?? [];
+				void this._addAttachments(paths);
+			}) as EventListener)
+		);
 
 		// Inject custom styles for Context Usage Popover and Reasoning Slider
 		const styleEl = document.createElement('style');
@@ -496,7 +516,8 @@ export class ChatInput extends Component {
 		// Mode dropdown — icon + "Agent" + chevron
 		const modeBtn = DOM.append(left, $('button.sc-mode-dropdown'));
 		const modeIconEl = DOM.append(modeBtn, $('span.sc-mode-icon'));
-		modeIconEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><line x1="10" y1="3" x2="10" y2="4"/><line x1="6.5" y1="3.9378" x2="7" y2="4.8038"/><line x1="3.9378" y1="6.5" x2="4.8038" y2="7"/><line x1="3" y1="10" x2="4" y2="10"/><line x1="3.9378" y1="13.5" x2="4.8038" y2="13"/><line x1="6.5" y1="16.0622" x2="7" y2="15.1962"/><line x1="10" y1="17" x2="10" y2="16"/><line x1="13.5" y1="16.0622" x2="13" y2="15.1962"/><line x1="16.0622" y1="13.5" x2="15.1962" y2="13"/><line x1="17" y1="10" x2="16" y2="10"/><line x1="16.0622" y1="6.5" x2="15.1962" y2="7"/><line x1="13.5" y1="3.9378" x2="13" y2="4.8038"/></g></svg>';
+		modeIconEl.innerHTML =
+			'<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><g stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><line x1="10" y1="3" x2="10" y2="4"/><line x1="6.5" y1="3.9378" x2="7" y2="4.8038"/><line x1="3.9378" y1="6.5" x2="4.8038" y2="7"/><line x1="3" y1="10" x2="4" y2="10"/><line x1="3.9378" y1="13.5" x2="4.8038" y2="13"/><line x1="6.5" y1="16.0622" x2="7" y2="15.1962"/><line x1="10" y1="17" x2="10" y2="16"/><line x1="13.5" y1="16.0622" x2="13" y2="15.1962"/><line x1="16.0622" y1="13.5" x2="15.1962" y2="13"/><line x1="17" y1="10" x2="16" y2="10"/><line x1="16.0622" y1="6.5" x2="15.1962" y2="7"/><line x1="13.5" y1="3.9378" x2="13" y2="4.8038"/></g></svg>';
 		this._modeLabel = DOM.append(modeBtn, $('span.sc-mode-label'));
 		this._modeLabel.textContent = 'Agent';
 		const modeChevEl = document.createElement('span');
@@ -509,7 +530,9 @@ export class ChatInput extends Component {
 			const item = DOM.append(this._modeMenu, $('div.sc-mode-menu-item'));
 			item.dataset.mode = mode;
 			item.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
-			if (mode === 'agent') { item.classList.add('active'); }
+			if (mode === 'agent') {
+				item.classList.add('active');
+			}
 			this.on(item, 'click', () => {
 				this._setMode(mode);
 				this._modeMenu.classList.remove('visible');
@@ -528,7 +551,7 @@ export class ChatInput extends Component {
 				this.element.querySelector('.sc-tray-btn')?.classList.remove('dropdown-active');
 			}
 		});
-		this.on(document.body, 'click', (e) => {
+		this.on(document.body, 'click', e => {
 			if (!modeBtn.contains(e.target as Node) && !this._modeMenu.contains(e.target as Node)) {
 				this._modeMenu.classList.remove('visible');
 			}
@@ -555,7 +578,7 @@ export class ChatInput extends Component {
 				this.element.querySelector('.sc-tray-btn')?.classList.remove('dropdown-active');
 			}
 		});
-		this.on(document.body, 'click', (e) => {
+		this.on(document.body, 'click', e => {
 			if (!modelBtn.contains(e.target as Node) && !modelMenu.contains(e.target as Node)) {
 				modelMenu.classList.remove('visible');
 			}
@@ -576,7 +599,7 @@ export class ChatInput extends Component {
 
 		const contextPopover = DOM.append(this.element, $('div.sc-context-popover'));
 
-		this.on(contextBadge, 'click', (e) => {
+		this.on(contextBadge, 'click', e => {
 			e.stopPropagation();
 			const show = !contextPopover.classList.contains('visible');
 			if (show) {
@@ -591,7 +614,7 @@ export class ChatInput extends Component {
 		});
 
 		// Close popovers on click outside
-		this.on(document.body, 'click', (e) => {
+		this.on(document.body, 'click', e => {
 			const target = e.target as Node;
 			if (!contextBadge.contains(target) && !contextPopover.contains(target)) {
 				contextPopover.classList.remove('visible');
@@ -601,9 +624,11 @@ export class ChatInput extends Component {
 		// Update badge content on init and every message change
 		this._updateContextUsage(contextPopover, contextBadge);
 		if (this._chatService) {
-			this._register(this._chatService.onDidChangeMessages(() => {
-				this._updateContextUsage(contextPopover, contextBadge);
-			}));
+			this._register(
+				this._chatService.onDidChangeMessages(() => {
+					this._updateContextUsage(contextPopover, contextBadge);
+				})
+			);
 		}
 
 		// Attach button — folder icon
@@ -617,12 +642,14 @@ export class ChatInput extends Component {
 		// Send button — custom SVG (circle + up arrow)
 		this._sendBtn = DOM.append(right, $('button.sc-send-btn'));
 		this._sendBtn.title = 'Send';
-		this._sendBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M4.14645 6.14645L6.64645 3.64645C6.84171 3.45118 7.15829 3.45118 7.35355 3.64645L9.8536 6.14645C10.0488 6.34171 10.0488 6.65829 9.8536 6.85355C9.6583 7.04882 9.3417 7.04882 9.1464 6.85355L8.3232 6.03033L7.5 5.20711V10C7.5 10.2761 7.27614 10.5 7 10.5C6.72386 10.5 6.5 10.2761 6.5 10V5.20711L4.85355 6.85355C4.65829 7.04882 4.34171 7.04882 4.14645 6.85355C3.95118 6.65829 3.95118 6.34171 4.14645 6.14645ZM7 0C3.13401 0 0 3.13401 0 7C0 10.866 3.13401 14 7 14C10.866 14 14 10.866 14 7C14 3.13401 10.866 0 7 0Z"/></svg>';
+		this._sendBtn.innerHTML =
+			'<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M4.14645 6.14645L6.64645 3.64645C6.84171 3.45118 7.15829 3.45118 7.35355 3.64645L9.8536 6.14645C10.0488 6.34171 10.0488 6.65829 9.8536 6.85355C9.6583 7.04882 9.3417 7.04882 9.1464 6.85355L8.3232 6.03033L7.5 5.20711V10C7.5 10.2761 7.27614 10.5 7 10.5C6.72386 10.5 6.5 10.2761 6.5 10V5.20711L4.85355 6.85355C4.65829 7.04882 4.34171 7.04882 4.14645 6.85355C3.95118 6.65829 3.95118 6.34171 4.14645 6.14645ZM7 0C3.13401 0 0 3.13401 0 7C0 10.866 3.13401 14 7 14C10.866 14 14 10.866 14 7C14 3.13401 10.866 0 7 0Z"/></svg>';
 
 		// Stop button — custom SVG (circle + square)
 		this._stopBtn = DOM.append(right, $('button.sc-stop-btn'));
 		this._stopBtn.title = 'Stop';
-		this._stopBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M5 4C4.44772 4 4 4.44772 4 5V9C4 9.5523 4.44772 10 5 10H9C9.5523 10 10 9.5523 10 9V5C10 4.44772 9.5523 4 9 4H5ZM0 7C0 3.13401 3.13401 0 7 0C10.866 0 14 3.13401 14 7C14 10.866 10.866 14 7 14C3.13401 14 0 10.866 0 7Z"/></svg>';
+		this._stopBtn.innerHTML =
+			'<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M5 4C4.44772 4 4 4.44772 4 5V9C4 9.5523 4.44772 10 5 10H9C9.5523 10 10 9.5523 10 9V5C10 4.44772 9.5523 4 9 4H5ZM0 7C0 3.13401 3.13401 0 7 0C10.866 0 14 3.13401 14 7C14 10.866 10.866 14 7 14C3.13401 14 0 10.866 0 7Z"/></svg>';
 		this._stopBtn.style.display = 'none';
 
 		// Initialize mention system
@@ -633,7 +660,9 @@ export class ChatInput extends Component {
 					if (vscode?.workspace?.findFiles) {
 						return await vscode.workspace.findFiles(pattern, '**/node_modules/**', maxResults);
 					}
-				} catch { /* fallback */ }
+				} catch {
+					/* fallback */
+				}
 				return [];
 			},
 			readFile: async (uri: URI): Promise<string> => {
@@ -643,7 +672,9 @@ export class ChatInput extends Component {
 						const bytes = await vscode.workspace.fs.readFile(uri);
 						return new TextDecoder().decode(bytes);
 					}
-				} catch { /* fallback */ }
+				} catch {
+					/* fallback */
+				}
 				return '';
 			},
 			readDirectory: async (uri: URI): Promise<Array<[string, 'file' | 'directory']>> => {
@@ -651,9 +682,13 @@ export class ChatInput extends Component {
 					const vscode = (globalThis as any).vscode;
 					if (vscode?.workspace?.fs?.readDirectory) {
 						const entries = await vscode.workspace.fs.readDirectory(uri);
-						return entries.map((e: [string, number]) => [e[0], e[1] === 2 ? 'directory' : 'file'] as [string, 'file' | 'directory']);
+						return entries.map(
+							(e: [string, number]) => [e[0], e[1] === 2 ? 'directory' : 'file'] as [string, 'file' | 'directory']
+						);
 					}
-				} catch { /* fallback */ }
+				} catch {
+					/* fallback */
+				}
 				return [];
 			},
 			getWorkspaceFolderPath: (): string | undefined => {
@@ -662,16 +697,18 @@ export class ChatInput extends Component {
 					if (vscode?.workspace?.workspaceFolders?.[0]) {
 						return vscode.workspace.workspaceFolders[0].uri.fsPath;
 					}
-				} catch { /* fallback */ }
+				} catch {
+					/* fallback */
+				}
 				return undefined;
-			},
+			}
 		});
 
-		this._mentionPopup = new MentionPopup(this.element, (item) => this._onMentionSelected(item));
+		this._mentionPopup = new MentionPopup(this.element, item => this._onMentionSelected(item));
 		this._disposables.add(this._mentionPopup);
 
 		// Keyboard events — handle mention popup navigation before normal input handling
-		this.on(this._textareaEl, 'keydown', (e) => {
+		this.on(this._textareaEl, 'keydown', e => {
 			const ke = e as KeyboardEvent;
 
 			if (this._mentionPopup.isVisible) {
@@ -769,7 +806,7 @@ export class ChatInput extends Component {
 			<span style="font-size: 10px; opacity: 0.6; margin-left: auto; padding-right: 4px;">soon</span>
 		`;
 
-		this.on(localBtn, 'click', (e) => {
+		this.on(localBtn, 'click', e => {
 			e.stopPropagation();
 			const show = !trayMenu.classList.contains('visible');
 			trayMenu.classList.toggle('visible', show);
@@ -780,7 +817,7 @@ export class ChatInput extends Component {
 			this._modeMenu.classList.remove('visible');
 		});
 
-		this.on(document.body, 'click', (e) => {
+		this.on(document.body, 'click', e => {
 			const target = e.target as Node;
 			if (!localBtn.contains(target) && !trayMenu.contains(target)) {
 				trayMenu.classList.remove('visible');
@@ -794,7 +831,13 @@ export class ChatInput extends Component {
 			tInvoke('settings_get', { section: 'sidex.general' })
 				.then(raw => {
 					let data: any = raw;
-					if (typeof raw === 'string') { try { data = JSON.parse(raw); } catch { return; } }
+					if (typeof raw === 'string') {
+						try {
+							data = JSON.parse(raw);
+						} catch {
+							return;
+						}
+					}
 					if (data && typeof data === 'object') {
 						const mode = data.defaultAgent;
 						if (mode === 'agent' || mode === 'plan' || mode === 'ask') {
@@ -806,7 +849,9 @@ export class ChatInput extends Component {
 		}
 	}
 
-	focus(): void { this._textareaEl.focus(); }
+	focus(): void {
+		this._textareaEl.focus();
+	}
 
 	setStreaming(streaming: boolean): void {
 		this._sendBtn.style.display = streaming ? 'none' : 'flex';
@@ -826,12 +871,12 @@ export class ChatInput extends Component {
 		this._currentModel = model;
 		const known = this._modelCatalog.find(m => m.id === model);
 		const base = known?.name || model.replace(/^[a-z0-9-]+\//, '') || model;
-		this._modelLabel.textContent = this._reasoningLevel === 'None'
-			? base
-			: `${base} · ${this._reasoningLevel}`;
+		this._modelLabel.textContent = this._reasoningLevel === 'None' ? base : `${base} · ${this._reasoningLevel}`;
 	}
 
-	getModel(): string { return this._currentModel; }
+	getModel(): string {
+		return this._currentModel;
+	}
 
 	private _modelCatalog: Array<{ id: string; name: string }> = [];
 	private readonly _modelMenuDisposables = this._register(new DisposableStore());
@@ -839,7 +884,9 @@ export class ChatInput extends Component {
 	/** Populate the model dropdown with models from the server. */
 	setAvailableModels(models: Array<{ id: string; name: string }>): void {
 		const menu = this.element.querySelector('.sc-model-menu');
-		if (!menu) { return; }
+		if (!menu) {
+			return;
+		}
 		// Clear stale listeners from the previous population — registering
 		// into the component-lifetime store leaked one set per refresh.
 		this._modelMenuDisposables.clear();
@@ -861,20 +908,24 @@ export class ChatInput extends Component {
 			item.dataset.modelId = m.id;
 			item.textContent = m.name;
 			item.title = m.id;
-			if (m.id === this._currentModel) { item.classList.add('active'); }
+			if (m.id === this._currentModel) {
+				item.classList.add('active');
+			}
 			this._onMenu(item, 'click', () => {
 				this.setModel(m.id);
 				this._onModelChange.fire(m.id);
 				menu.classList.remove('visible');
-				menu.querySelectorAll('.sc-model-menu-item').forEach(el =>
-					(el as HTMLElement).classList.toggle('active', (el as HTMLElement).dataset.modelId === m.id)
-				);
+				menu
+					.querySelectorAll('.sc-model-menu-item')
+					.forEach(el => (el as HTMLElement).classList.toggle('active', (el as HTMLElement).dataset.modelId === m.id));
 			});
 			menu.appendChild(item);
 		}
 
 		// Re-render the footer label now that display names are known.
-		if (this._currentModel) { this.setModel(this._currentModel); }
+		if (this._currentModel) {
+			this.setModel(this._currentModel);
+		}
 
 		// ULTRA Mode toggle — at the bottom of the model picker, like Cursor's Max Mode
 		const sep = document.createElement('div');
@@ -900,7 +951,7 @@ export class ChatInput extends Component {
 		const reasoningRow = document.createElement('div');
 		reasoningRow.className = 'sc-model-menu-reasoning';
 		// Prevent clicking on the slider row from closing the dropdown menu
-		this._onMenu(reasoningRow, 'click', (e) => e.stopPropagation());
+		this._onMenu(reasoningRow, 'click', e => e.stopPropagation());
 
 		const rHeader = DOM.append(reasoningRow, $('div.sc-model-menu-reasoning-header'));
 		const rTitle = DOM.append(rHeader, $('span'));
@@ -922,18 +973,24 @@ export class ChatInput extends Component {
 		const commitLevel = (lvl: 'None' | 'Low' | 'Medium' | 'High' | 'Ultra') => {
 			this._reasoningLevel = lvl;
 			this._maxMode = lvl === 'Ultra';
-			try { localStorage.setItem(ChatInput.REASONING_STORAGE_KEY, lvl); } catch { /* */ }
+			try {
+				localStorage.setItem(ChatInput.REASONING_STORAGE_KEY, lvl);
+			} catch {
+				/* */
+			}
 			rVal.textContent = lvl;
 			const idx = ChatInput.REASONING_LEVELS.indexOf(lvl);
 			rSlider.value = String(idx < 0 ? 0 : idx);
 			ultraToggle.classList.toggle('on', this._maxMode);
 			this._paintEffortTicks(ticks, idx < 0 ? 0 : idx);
-			if (this._currentModel) { this.setModel(this._currentModel); }
+			if (this._currentModel) {
+				this.setModel(this._currentModel);
+			}
 			this._onMaxModeChange.fire(this._maxMode);
 			this._onThinkingBudgetChange.fire(this.thinkingBudget);
 		};
 
-		this._onMenu(ultraRow, 'click', (e) => {
+		this._onMenu(ultraRow, 'click', e => {
 			e.stopPropagation();
 			commitLevel(this._reasoningLevel === 'Ultra' ? 'High' : 'Ultra');
 		});
@@ -1008,7 +1065,9 @@ export class ChatInput extends Component {
 		this._debounceTimer = setTimeout(async () => {
 			try {
 				const suggestions = await this._mentionResolver.getSuggestions(query);
-				if (!this._mentionTracking.active) { return; }
+				if (!this._mentionTracking.active) {
+					return;
+				}
 
 				const anchorRect = this._getCaretRect();
 				this._mentionPopup.show(suggestions, anchorRect);
@@ -1024,16 +1083,13 @@ export class ChatInput extends Component {
 		const rect = textarea.getBoundingClientRect();
 
 		// Rough estimation: use textarea position as anchor
-		return new DOMRect(
-			rect.left + 12,
-			rect.top,
-			1,
-			20
-		);
+		return new DOMRect(rect.left + 12, rect.top, 1, 20);
 	}
 
 	private async _onMentionSelected(item: MentionItem): Promise<void> {
-		if (!this._mentionTracking.active) { return; }
+		if (!this._mentionTracking.active) {
+			return;
+		}
 
 		const value = this._textareaEl.value;
 		const cursorPos = this._textareaEl.selectionStart;
@@ -1088,10 +1144,12 @@ export class ChatInput extends Component {
 		const removeBtn = document.createElement('span');
 		removeBtn.className = 'sc-mention-pill-remove';
 		removeBtn.innerHTML = '&times;';
-		removeBtn.addEventListener('click', (e) => {
+		removeBtn.addEventListener('click', e => {
 			e.stopPropagation();
 			const idx = this._resolvedMentions.indexOf(mention);
-			if (idx !== -1) { this._resolvedMentions.splice(idx, 1); }
+			if (idx !== -1) {
+				this._resolvedMentions.splice(idx, 1);
+			}
 			pill.remove();
 			this._syncSendButtonState();
 		});
@@ -1106,13 +1164,9 @@ export class ChatInput extends Component {
 			const { open } = await import('@tauri-apps/plugin-dialog');
 			const selected = await open({
 				multiple: true,
-				directory: false,
+				directory: false
 			});
-			const paths = Array.isArray(selected)
-				? selected
-				: typeof selected === 'string'
-					? [selected]
-					: [];
+			const paths = Array.isArray(selected) ? selected : typeof selected === 'string' ? [selected] : [];
 			await this._addAttachments(paths);
 		} catch (e) {
 			console.warn('[sidex-chat] attach file failed:', e);
@@ -1121,13 +1175,15 @@ export class ChatInput extends Component {
 
 	private async _addAttachments(paths: string[]): Promise<void> {
 		for (const path of paths) {
-			if (!path || this._attachments.some(a => a.path === path)) { continue; }
+			if (!path || this._attachments.some(a => a.path === path)) {
+				continue;
+			}
 			const storedPath = await this._copyAttachmentToAssets(path);
 			const attachment: ChatAttachment = {
 				path: storedPath,
 				originalPath: path,
 				name: this._basename(path),
-				kind: this._isImagePath(path) ? 'image' : 'file',
+				kind: this._isImagePath(path) ? 'image' : 'file'
 			};
 			this._attachments.push(attachment);
 			this._renderAttachmentPill(attachment);
@@ -1137,9 +1193,10 @@ export class ChatInput extends Component {
 
 	private _renderAttachmentPill(attachment: ChatAttachment): void {
 		const pill = document.createElement('span');
-		pill.className = attachment.kind === 'image'
-			? 'context-pill context-pill-image sc-attachment-image-pill'
-			: 'sc-mention-pill sc-attachment-pill';
+		pill.className =
+			attachment.kind === 'image'
+				? 'context-pill context-pill-image sc-attachment-image-pill'
+				: 'sc-mention-pill sc-attachment-pill';
 		pill.title = attachment.path;
 
 		const removeBtn = document.createElement('button');
@@ -1147,7 +1204,7 @@ export class ChatInput extends Component {
 		removeBtn.className = attachment.kind === 'image' ? 'sc-attachment-image-remove' : 'sc-mention-pill-remove';
 		removeBtn.setAttribute('aria-label', `Remove ${attachment.name}`);
 		removeBtn.textContent = '×';
-		removeBtn.addEventListener('click', (e) => {
+		removeBtn.addEventListener('click', e => {
 			e.stopPropagation();
 			this._attachments = this._attachments.filter(a => a !== attachment);
 			pill.remove();
@@ -1182,17 +1239,21 @@ export class ChatInput extends Component {
 	}
 
 	private _bindAttachmentDrop(dropArea: HTMLElement, visualTarget: HTMLElement): void {
-		this.on(dropArea, 'dragenter', (e) => {
+		this.on(dropArea, 'dragenter', e => {
 			const event = e as DragEvent;
-			if (!this._eventHasFiles(event)) { return; }
+			if (!this._eventHasFiles(event)) {
+				return;
+			}
 			event.preventDefault();
 			event.stopPropagation();
 			this._dragDepth++;
 			visualTarget.classList.add('drag-over');
 		});
-		this.on(dropArea, 'dragover', (e) => {
+		this.on(dropArea, 'dragover', e => {
 			const event = e as DragEvent;
-			if (!this._eventHasFiles(event)) { return; }
+			if (!this._eventHasFiles(event)) {
+				return;
+			}
 			event.preventDefault();
 			event.stopPropagation();
 			if (event.dataTransfer) {
@@ -1200,9 +1261,11 @@ export class ChatInput extends Component {
 			}
 			visualTarget.classList.add('drag-over');
 		});
-		this.on(dropArea, 'dragleave', (e) => {
+		this.on(dropArea, 'dragleave', e => {
 			const event = e as DragEvent;
-			if (!this._eventHasFiles(event)) { return; }
+			if (!this._eventHasFiles(event)) {
+				return;
+			}
 			event.preventDefault();
 			event.stopPropagation();
 			this._dragDepth = Math.max(0, this._dragDepth - 1);
@@ -1210,9 +1273,11 @@ export class ChatInput extends Component {
 				visualTarget.classList.remove('drag-over');
 			}
 		});
-		this.on(dropArea, 'drop', (e) => {
+		this.on(dropArea, 'drop', e => {
 			const event = e as DragEvent;
-			if (!this._eventHasFiles(event)) { return; }
+			if (!this._eventHasFiles(event)) {
+				return;
+			}
 			event.preventDefault();
 			event.stopPropagation();
 			this._dragDepth = 0;
@@ -1223,7 +1288,9 @@ export class ChatInput extends Component {
 
 	private _eventHasFiles(event: DragEvent): boolean {
 		const transfer = event.dataTransfer;
-		if (!transfer) { return false; }
+		if (!transfer) {
+			return false;
+		}
 		return transfer.files.length > 0 || Array.from(transfer.types).includes('Files');
 	}
 
@@ -1242,7 +1309,9 @@ export class ChatInput extends Component {
 		await this._addAttachments(pathBackedFiles);
 		for (const file of byteBackedFiles) {
 			const attachment = await this._attachmentFromDroppedBytes(file);
-			if (!attachment || this._attachments.some(a => a.path === attachment.path)) { continue; }
+			if (!attachment || this._attachments.some(a => a.path === attachment.path)) {
+				continue;
+			}
 			this._attachments.push(attachment);
 			this._renderAttachmentPill(attachment);
 		}
@@ -1259,12 +1328,16 @@ export class ChatInput extends Component {
 
 	private async _attachmentFromDroppedBytes(file: File): Promise<ChatAttachment | null> {
 		const invoke = this._getTauriInvoke();
-		if (!invoke) { return null; }
+		if (!invoke) {
+			return null;
+		}
 		try {
-			const osInfo = await invoke('get_os_info') as { homedir?: string };
+			const osInfo = (await invoke('get_os_info')) as { homedir?: string };
 			const home = osInfo?.homedir;
 			const workspace = this._chatService.workspacePath || 'default';
-			if (!home) { return null; }
+			if (!home) {
+				return null;
+			}
 			const assetsDir = `${home}/.sidex/projects/${this._workspaceSlug(workspace)}/assets`;
 			await invoke('mkdir', { path: assetsDir, recursive: true });
 			const sourceName = file.name || `dropped-${Date.now()}`;
@@ -1275,7 +1348,7 @@ export class ChatInput extends Component {
 				path: assetPath,
 				originalPath: sourceName,
 				name: sourceName,
-				kind: this._isImagePath(sourceName) || file.type.startsWith('image/') ? 'image' : 'file',
+				kind: this._isImagePath(sourceName) || file.type.startsWith('image/') ? 'image' : 'file'
 			};
 		} catch (e) {
 			console.warn('[sidex-chat] failed to attach dropped file:', e);
@@ -1285,9 +1358,11 @@ export class ChatInput extends Component {
 
 	private async _loadAttachmentImage(img: HTMLImageElement, path: string): Promise<void> {
 		const invoke = this._getTauriInvoke();
-		if (!invoke) { return; }
+		if (!invoke) {
+			return;
+		}
 		try {
-			const bytes = await invoke('read_file_bytes', { path }) as number[] | Uint8Array;
+			const bytes = (await invoke('read_file_bytes', { path })) as number[] | Uint8Array;
 			const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
 			img.src = `data:${this._mimeFromPath(path)};base64,${this._base64FromBytes(data)}`;
 		} catch (e) {
@@ -1306,20 +1381,30 @@ export class ChatInput extends Component {
 
 	private _mimeFromPath(path: string): string {
 		const lowered = path.toLowerCase();
-		if (lowered.endsWith('.jpg') || lowered.endsWith('.jpeg')) { return 'image/jpeg'; }
-		if (lowered.endsWith('.gif')) { return 'image/gif'; }
-		if (lowered.endsWith('.webp')) { return 'image/webp'; }
+		if (lowered.endsWith('.jpg') || lowered.endsWith('.jpeg')) {
+			return 'image/jpeg';
+		}
+		if (lowered.endsWith('.gif')) {
+			return 'image/gif';
+		}
+		if (lowered.endsWith('.webp')) {
+			return 'image/webp';
+		}
 		return 'image/png';
 	}
 
 	private _buildAttachmentContext(): string {
-		if (this._attachments.length === 0) { return ''; }
+		if (this._attachments.length === 0) {
+			return '';
+		}
 		const lines = [
 			'<attachments>',
-			'The user attached these local files. They were copied into the SideX project assets directory. Use read_file before making claims about their contents; read_file supports both text/code files and image files.',
+			'The user attached these local files. They were copied into the SideX project assets directory. Use read_file before making claims about their contents; read_file supports both text/code files and image files.'
 		];
 		for (const attachment of this._attachments) {
-			lines.push(`- ${attachment.kind}: ${attachment.path} (name: ${attachment.name}, original: ${attachment.originalPath}, use read_file)`);
+			lines.push(
+				`- ${attachment.kind}: ${attachment.path} (name: ${attachment.name}, original: ${attachment.originalPath}, use read_file)`
+			);
 		}
 		lines.push('</attachments>', '');
 		return lines.join('\n');
@@ -1327,12 +1412,16 @@ export class ChatInput extends Component {
 
 	private async _copyAttachmentToAssets(sourcePath: string): Promise<string> {
 		const invoke = this._getTauriInvoke();
-		if (!invoke) { return sourcePath; }
+		if (!invoke) {
+			return sourcePath;
+		}
 		try {
-			const osInfo = await invoke('get_os_info') as { homedir?: string };
+			const osInfo = (await invoke('get_os_info')) as { homedir?: string };
 			const home = osInfo?.homedir;
 			const workspace = this._chatService.workspacePath || 'default';
-			if (!home) { return sourcePath; }
+			if (!home) {
+				return sourcePath;
+			}
 
 			const assetsDir = `${home}/.sidex/projects/${this._workspaceSlug(workspace)}/assets`;
 			await invoke('mkdir', { path: assetsDir, recursive: true });
@@ -1348,7 +1437,9 @@ export class ChatInput extends Component {
 	}
 
 	private _buildAttachmentDisplayMarkdown(): string {
-		if (this._attachments.length === 0) { return ''; }
+		if (this._attachments.length === 0) {
+			return '';
+		}
 		const lines: string[] = [];
 		for (const attachment of this._attachments) {
 			if (attachment.kind === 'image') {
@@ -1361,9 +1452,9 @@ export class ChatInput extends Component {
 	}
 
 	private _hasSendableContent(): boolean {
-		return this._textareaEl.value.trim().length > 0 ||
-			this._resolvedMentions.length > 0 ||
-			this._attachments.length > 0;
+		return (
+			this._textareaEl.value.trim().length > 0 || this._resolvedMentions.length > 0 || this._attachments.length > 0
+		);
 	}
 
 	private _syncSendButtonState(): void {
@@ -1401,7 +1492,9 @@ export class ChatInput extends Component {
 
 	private _doSend(): void {
 		const text = this._textareaEl.value.trim();
-		if (!this._hasSendableContent()) { return; }
+		if (!this._hasSendableContent()) {
+			return;
+		}
 
 		this._textareaEl.value = '';
 		this._autoResize();
@@ -1435,11 +1528,16 @@ export class ChatInput extends Component {
 
 	get thinkingBudget(): number {
 		switch (this._reasoningLevel) {
-			case 'Low': return 2000;
-			case 'Medium': return 4000;
-			case 'High': return 8000;
-			case 'Ultra': return 16000;
-			default: return 0;
+			case 'Low':
+				return 2000;
+			case 'Medium':
+				return 4000;
+			case 'High':
+				return 8000;
+			case 'Ultra':
+				return 16000;
+			default:
+				return 0;
 		}
 	}
 
@@ -1504,7 +1602,8 @@ export class ChatInput extends Component {
 			const offset = circumference - (pct / 100) * circumference;
 			fill.style.strokeDashoffset = `${offset}`;
 		}
-		const maxLabel = maxTokens >= 1_000_000 ? `${(maxTokens / 1_000_000).toFixed(0)}M` : `${Math.round(maxTokens / 1000)}K`;
+		const maxLabel =
+			maxTokens >= 1_000_000 ? `${(maxTokens / 1_000_000).toFixed(0)}M` : `${Math.round(maxTokens / 1000)}K`;
 		contextBadge.title = `Context: ~${(totalTokens / 1000).toFixed(1)}K of ${maxLabel} tokens (${pct < 1 ? pct.toFixed(1) : Math.round(pct)}% full)`;
 
 		// Clear and rebuild popover body dynamically

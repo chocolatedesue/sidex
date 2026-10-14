@@ -435,8 +435,7 @@ export interface IResourceUriProvider {
 export type ExtensionId = string;
 
 export type MarketplaceExtension =
-	| ExtensionId
-	| { readonly id: ExtensionId; preRelease?: boolean; migrateStorageFrom?: ExtensionId };
+	ExtensionId | { readonly id: ExtensionId; preRelease?: boolean; migrateStorageFrom?: ExtensionId };
 
 export interface ICommonTelemetryPropertiesResolver {
 	(): { [key: string]: unknown };

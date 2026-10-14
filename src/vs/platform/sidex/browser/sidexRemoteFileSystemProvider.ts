@@ -122,10 +122,7 @@ export class SideXRemoteFileSystemProvider
 }
 
 /** Convenience: read remote file as VSBuffer (editor path). */
-export async function readRemoteVSBuffer(
-	remote: ISideXRemoteService,
-	resource: URI
-): Promise<VSBuffer> {
+export async function readRemoteVSBuffer(remote: ISideXRemoteService, resource: URI): Promise<VSBuffer> {
 	const id = remote.getConnectionIdForAuthority(resource.authority);
 	if (id === undefined) {
 		throw new Error(`No remote connection for ${resource.authority}`);

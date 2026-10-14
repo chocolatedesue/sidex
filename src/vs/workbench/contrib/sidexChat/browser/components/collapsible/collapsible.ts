@@ -19,12 +19,14 @@ export class Collapsible extends Component {
 		this._headerEl.setAttribute('role', 'button');
 		this._headerEl.setAttribute('aria-expanded', 'false');
 		this._headerEl.tabIndex = 0;
-		this._headerEl.style.cssText = 'cursor: pointer; opacity: 1; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.06)); background: var(--vscode-editor-background);';
+		this._headerEl.style.cssText =
+			'cursor: pointer; opacity: 1; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.06)); background: var(--vscode-editor-background);';
 
 		const action = DOM.append(this._headerEl, $('span.ui-collapsible-action'));
 		action.style.cssText = 'font-weight: 400; color: var(--vscode-descriptionForeground); flex-shrink: 0;';
 		this._labelEl = DOM.append(this._headerEl, $('span.ui-collapsible-details'));
-		this._labelEl.style.cssText = 'color: var(--vscode-descriptionForeground); opacity: 0.6; overflow: hidden; text-overflow: ellipsis; flex: 1;';
+		this._labelEl.style.cssText =
+			'color: var(--vscode-descriptionForeground); opacity: 0.6; overflow: hidden; text-overflow: ellipsis; flex: 1;';
 		// Highlight first word
 		const spaceIdx = label.indexOf(' ');
 		if (spaceIdx > 0) {
@@ -48,7 +50,9 @@ export class Collapsible extends Component {
 		this.on(this._headerEl, 'click', () => this.toggle());
 	}
 
-	get body(): HTMLElement { return this._bodyEl; }
+	get body(): HTMLElement {
+		return this._bodyEl;
+	}
 
 	setLabel(label: string): void {
 		this._labelEl.textContent = label;
@@ -62,6 +66,10 @@ export class Collapsible extends Component {
 		(this._headerEl.parentElement as HTMLElement).dataset.open = String(this._expanded);
 	}
 
-	expand(): void { this.toggle(true); }
-	collapse(): void { this.toggle(false); }
+	expand(): void {
+		this.toggle(true);
+	}
+	collapse(): void {
+		this.toggle(false);
+	}
 }

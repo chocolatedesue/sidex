@@ -598,9 +598,7 @@ interface RenderedResourceData {
 class RepositoryPaneActionRunner extends ActionRunner {
 	constructor(
 		private getSelectedResources: () => (
-			| ISCMResourceGroup
-			| ISCMResource
-			| IResourceNode<ISCMResource, ISCMResourceGroup>
+			ISCMResourceGroup | ISCMResource | IResourceNode<ISCMResource, ISCMResourceGroup>
 		)[]
 	) {
 		super();
@@ -2251,9 +2249,7 @@ export class SCMViewPane extends ViewPane {
 	}
 
 	private getSelectedResources(): (
-		| ISCMResourceGroup
-		| ISCMResource
-		| IResourceNode<ISCMResource, ISCMResourceGroup>
+		ISCMResourceGroup | ISCMResource | IResourceNode<ISCMResource, ISCMResourceGroup>
 	)[] {
 		return this.tree.getSelection().filter(r => isSCMResourceGroup(r) || isSCMResource(r) || isSCMResourceNode(r));
 	}

@@ -77,9 +77,20 @@ export class SidexChatViewPane extends ViewPane {
 		@IModelService private readonly modelService: IModelService,
 		@IAccountService private readonly accountService: IAccountService,
 		@ICommandService private readonly commandService: ICommandService,
-		@IWorkspaceContextService private readonly contextService: IWorkspaceContextService,
+		@IWorkspaceContextService private readonly contextService: IWorkspaceContextService
 	) {
-		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
+		super(
+			options,
+			keybindingService,
+			contextMenuService,
+			configurationService,
+			contextKeyService,
+			viewDescriptorService,
+			instantiationService,
+			openerService,
+			themeService,
+			hoverService
+		);
 	}
 
 	protected override renderBody(parent: HTMLElement): void {
@@ -100,10 +111,14 @@ export class SidexChatViewPane extends ViewPane {
 		this._messagesEl = DOM.append(parent, $('div.sc-messages'));
 
 		// Force trackpad/mouse wheel scrolling — ViewPane can intercept wheel events
-		this._messagesEl.addEventListener('wheel', (e) => {
-			this._messagesEl.scrollTop += e.deltaY;
-			e.stopPropagation();
-		}, { passive: false });
+		this._messagesEl.addEventListener(
+			'wheel',
+			e => {
+				this._messagesEl.scrollTop += e.deltaY;
+				e.stopPropagation();
+			},
+			{ passive: false }
+		);
 
 		this._welcomeEl = DOM.append(this._messagesEl, $('div.sc-welcome'));
 
@@ -135,29 +150,47 @@ export class SidexChatViewPane extends ViewPane {
 		// Fetch autoScroll setting from settings
 		const tInvoke = (globalThis as any).__TAURI_INTERNALS__?.invoke;
 		if (tInvoke) {
-			tInvoke('settings_get', { section: 'sidex.general' }).then(raw => {
-				let data: any = raw;
-				if (typeof raw === 'string') { try { data = JSON.parse(raw); } catch { return; } }
-				if (data && typeof data === 'object' && data.autoScroll !== undefined) {
-					this._autoScrollValue = !!data.autoScroll;
-				}
-			}).catch(() => {});
+			tInvoke('settings_get', { section: 'sidex.general' })
+				.then(raw => {
+					let data: any = raw;
+					if (typeof raw === 'string') {
+						try {
+							data = JSON.parse(raw);
+						} catch {
+							return;
+						}
+					}
+					if (data && typeof data === 'object' && data.autoScroll !== undefined) {
+						this._autoScrollValue = !!data.autoScroll;
+					}
+				})
+				.catch(() => {});
 		}
 
 		// Update on changed event
 		const onSettingsChanged = () => {
 			if (tInvoke) {
-				tInvoke('settings_get', { section: 'sidex.general' }).then(raw => {
-					let data: any = raw;
-					if (typeof raw === 'string') { try { data = JSON.parse(raw); } catch { return; } }
-					if (data && typeof data === 'object' && data.autoScroll !== undefined) {
-						this._autoScrollValue = !!data.autoScroll;
-					}
-				}).catch(() => {});
+				tInvoke('settings_get', { section: 'sidex.general' })
+					.then(raw => {
+						let data: any = raw;
+						if (typeof raw === 'string') {
+							try {
+								data = JSON.parse(raw);
+							} catch {
+								return;
+							}
+						}
+						if (data && typeof data === 'object' && data.autoScroll !== undefined) {
+							this._autoScrollValue = !!data.autoScroll;
+						}
+					})
+					.catch(() => {});
 			}
 		};
 		window.addEventListener('sidex-settings-changed', onSettingsChanged);
-		this._viewDisposables.add({ dispose: () => window.removeEventListener('sidex-settings-changed', onSettingsChanged) });
+		this._viewDisposables.add({
+			dispose: () => window.removeEventListener('sidex-settings-changed', onSettingsChanged)
+		});
 	}
 
 	private _blockPanelFileDropsOutsideInput(parent: HTMLElement): void {
@@ -204,57 +237,73 @@ export class SidexChatViewPane extends ViewPane {
 	private _bindScrollDetection(): void {
 		const threshold = 50;
 		this._messagesEl.addEventListener('scroll', () => {
-			const distanceFromBottom = this._messagesEl.scrollHeight
-				- this._messagesEl.scrollTop
-				- this._messagesEl.clientHeight;
+			const distanceFromBottom =
+				this._messagesEl.scrollHeight - this._messagesEl.scrollTop - this._messagesEl.clientHeight;
 			this._userHasScrolledUp = distanceFromBottom > threshold;
 		});
 	}
 
 	private _bindEvents(): void {
-		this._viewDisposables.add(this._input.onSend(text => {
-			if (text.startsWith('/orchestrate ')) {
-				this._startOrchestration(text.slice('/orchestrate '.length));
-				return;
-			}
-			this._turnStartTime = Date.now();
-			this._userHasScrolledUp = false;
-			this._lastDiffRebuildEditCount = 0;
-			this.chatService.sendMessage(text);
-		}));
+		this._viewDisposables.add(
+			this._input.onSend(text => {
+				if (text.startsWith('/orchestrate ')) {
+					this._startOrchestration(text.slice('/orchestrate '.length));
+					return;
+				}
+				this._turnStartTime = Date.now();
+				this._userHasScrolledUp = false;
+				this._lastDiffRebuildEditCount = 0;
+				this.chatService.sendMessage(text);
+			})
+		);
 		this._viewDisposables.add(this._input.onStop(() => this.chatService.stopStreaming()));
 		this._viewDisposables.add(this._input.onModeChange(mode => this.chatService.setMode(mode)));
 		this._viewDisposables.add(this._input.onMaxModeChange(on => this.chatService.setMaxMode(on)));
-		this._viewDisposables.add(this._input.onThinkingBudgetChange(budget => {
-			this.chatService.setThinkingBudget(budget);
-			this.chatService.setThinkingEffort(this._input.thinkingEffort);
-		}));
+		this._viewDisposables.add(
+			this._input.onThinkingBudgetChange(budget => {
+				this.chatService.setThinkingBudget(budget);
+				this.chatService.setThinkingEffort(this._input.thinkingEffort);
+			})
+		);
 		this.chatService.setMaxMode(this._input.maxMode);
 		this.chatService.setThinkingBudget(this._input.thinkingBudget);
 		this.chatService.setThinkingEffort(this._input.thinkingEffort);
 
 		// Account button → toggle panel
-		this._viewDisposables.add(this._header.onAccountClick(() => {
-			this._accountPanel.toggle();
-		}));
+		this._viewDisposables.add(
+			this._header.onAccountClick(() => {
+				this._accountPanel.toggle();
+			})
+		);
 
 		// Account panel actions
-		this._viewDisposables.add(this._accountPanel.onDidRequestManagePlan(() => {
-			// Credentials are configured in Settings → Models, not on a website.
-			this._accountPanel.close();
-			import('./settings/sidexSettingsPanel.js').then(({ SidexSettingsPanel }) => {
-				SidexSettingsPanel.getInstance().toggle();
-			}).catch(() => { /* panel is optional */ });
-		}));
+		this._viewDisposables.add(
+			this._accountPanel.onDidRequestManagePlan(() => {
+				// Credentials are configured in Settings → Models, not on a website.
+				this._accountPanel.close();
+				import('./settings/sidexSettingsPanel.js')
+					.then(({ SidexSettingsPanel }) => {
+						SidexSettingsPanel.getInstance().toggle();
+					})
+					.catch(() => {
+						/* panel is optional */
+					});
+			})
+		);
 
 		// Close account panel when clicking outside
 		this._viewDisposables.add({
-			dispose: () => { /* no-op */ }
+			dispose: () => {
+				/* no-op */
+			}
 		});
 		const closeOnOutsideClick = (e: MouseEvent) => {
-			if (this._accountPanel.isVisible() &&
+			if (
+				this._accountPanel.isVisible() &&
 				!this._accountPanel.element.contains(e.target as Node) &&
-				!(this._header.element.querySelector('.sc-account-btn-header') as HTMLElement | null)?.contains(e.target as Node)
+				!(this._header.element.querySelector('.sc-account-btn-header') as HTMLElement | null)?.contains(
+					e.target as Node
+				)
 			) {
 				this._accountPanel.close();
 			}
@@ -262,215 +311,246 @@ export class SidexChatViewPane extends ViewPane {
 		document.addEventListener('click', closeOnOutsideClick);
 		this._viewDisposables.add({ dispose: () => document.removeEventListener('click', closeOnOutsideClick) });
 
-		this._viewDisposables.add(this._header.onNewChat(() => {
-			this._renderedMessageCount = 0;
-			this.chatService.clearMessages();
-		}));
+		this._viewDisposables.add(
+			this._header.onNewChat(() => {
+				this._renderedMessageCount = 0;
+				this.chatService.clearMessages();
+			})
+		);
 
 		this._viewDisposables.add(this._header.onHistory(() => this._fetchSessions()));
 
-		this._viewDisposables.add(this._header.onSearch(query => {
-			if (query.length > 1) {
-				this.chatService.searchSessions(query).then(sessions => {
-					this._header.setSessions(sessions.map(s => ({
-						id: s.id,
-						title: s.title,
-						updated_at: s.date,
-						pinned: s.pinned,
-					})));
-				});
-			} else {
-				this._fetchSessions();
-			}
-		}));
-
-		this._viewDisposables.add(this._header.onSelectSession(sessionId => {
-			this._renderedMessageCount = 0;
-			this.chatService.loadSession(sessionId);
-		}));
-
-		this._viewDisposables.add(this._header.onSessionAction(async ({ sessionId, action }) => {
-			const sessions = await this.chatService.getSavedSessionsAsync();
-			const session = sessions.find(s => s.id === sessionId);
-			if (!session) { return; }
-
-			switch (action) {
-				case 'pin':
-					await this.chatService.pinSession(sessionId, !session.pinned);
+		this._viewDisposables.add(
+			this._header.onSearch(query => {
+				if (query.length > 1) {
+					this.chatService.searchSessions(query).then(sessions => {
+						this._header.setSessions(
+							sessions.map(s => ({
+								id: s.id,
+								title: s.title,
+								updated_at: s.date,
+								pinned: s.pinned
+							}))
+						);
+					});
+				} else {
 					this._fetchSessions();
-					break;
+				}
+			})
+		);
 
-				case 'archive':
-					await this.chatService.archiveSession(sessionId, true);
-					this._fetchSessions();
-					break;
-
-				case 'delete':
-					if (confirm("Are you sure you want to delete this chat session?")) {
-						await this.chatService.deleteSession(sessionId);
-						if (this.chatService.sessionId === sessionId) {
-							this._renderedMessageCount = 0;
-							this.chatService.clearMessages();
-						}
-						this._fetchSessions();
-					}
-					break;
-
-				case 'rename':
-					const newTitle = prompt("Rename Chat", session.title);
-					if (newTitle && newTitle.trim() !== '') {
-						await this.chatService.renameSession(sessionId, newTitle.trim());
-						this._fetchSessions();
-					}
-					break;
-			}
-		}));
-
-		this._viewDisposables.add(this._header.onMenuAction(action => {
-			if (action === 'export') {
-				this._exportChat();
-			} else if (action === 'clear_all') {
+		this._viewDisposables.add(
+			this._header.onSelectSession(sessionId => {
 				this._renderedMessageCount = 0;
-				this.chatService.clearMessages();
-			} else if (action === 'open_browser') {
-				// Open VS Code's native simple browser tab with a blank/default page
-				this.commandService.executeCommand('simpleBrowser.show', 'https://google.com');
-			} else if (action === 'configure_rules') {
-				const folders = this.contextService.getWorkspace().folders;
-				if (folders.length > 0) {
-					const rulesUri = URI.joinPath(folders[0].uri, '.sidexrules');
-					this.editorService.openEditor({ resource: rulesUri, options: { pinned: true } });
+				this.chatService.loadSession(sessionId);
+			})
+		);
+
+		this._viewDisposables.add(
+			this._header.onSessionAction(async ({ sessionId, action }) => {
+				const sessions = await this.chatService.getSavedSessionsAsync();
+				const session = sessions.find(s => s.id === sessionId);
+				if (!session) {
+					return;
 				}
-			} else if (action === 'configure_skills' || action === 'edit_memories' || action === 'sidex.profile.settings' || action === 'usage') {
-				import('./settings/sidexSettingsPanel.js').then(({ SidexSettingsPanel }) => {
-					SidexSettingsPanel.getInstance().toggle();
-				}).catch(() => {});
-			} else if (action === 'download_diagnostics') {
-				const diagnostics = {
-					version: '0.1.3',
-					platform: navigator.userAgent,
-					timestamp: new Date().toISOString(),
-					workspace: this.contextService.getWorkspace().folders[0]?.uri.fsPath || 'None',
-					active_model: this.chatService.serverModel,
-					local_index_active: this.chatService.maxMode,
-				};
-				const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
-				const url = URL.createObjectURL(blob);
-				const a = document.createElement('a');
-				a.href = url;
-				a.download = `sidex-diagnostics-${Date.now()}.json`;
-				a.click();
-				URL.revokeObjectURL(url);
-			} else if (action.startsWith('vscode.open::')) {
-				const url = action.split('::')[1];
-				if (url) {
-					this.commandService.executeCommand('vscode.open', URI.parse(url));
+
+				switch (action) {
+					case 'pin':
+						await this.chatService.pinSession(sessionId, !session.pinned);
+						this._fetchSessions();
+						break;
+
+					case 'archive':
+						await this.chatService.archiveSession(sessionId, true);
+						this._fetchSessions();
+						break;
+
+					case 'delete':
+						if (confirm('Are you sure you want to delete this chat session?')) {
+							await this.chatService.deleteSession(sessionId);
+							if (this.chatService.sessionId === sessionId) {
+								this._renderedMessageCount = 0;
+								this.chatService.clearMessages();
+							}
+							this._fetchSessions();
+						}
+						break;
+
+					case 'rename':
+						const newTitle = prompt('Rename Chat', session.title);
+						if (newTitle && newTitle.trim() !== '') {
+							await this.chatService.renameSession(sessionId, newTitle.trim());
+							this._fetchSessions();
+						}
+						break;
 				}
-			}
-		}));
+			})
+		);
+
+		this._viewDisposables.add(
+			this._header.onMenuAction(action => {
+				if (action === 'export') {
+					this._exportChat();
+				} else if (action === 'clear_all') {
+					this._renderedMessageCount = 0;
+					this.chatService.clearMessages();
+				} else if (action === 'open_browser') {
+					// Open VS Code's native simple browser tab with a blank/default page
+					this.commandService.executeCommand('simpleBrowser.show', 'https://google.com');
+				} else if (action === 'configure_rules') {
+					const folders = this.contextService.getWorkspace().folders;
+					if (folders.length > 0) {
+						const rulesUri = URI.joinPath(folders[0].uri, '.sidexrules');
+						this.editorService.openEditor({ resource: rulesUri, options: { pinned: true } });
+					}
+				} else if (
+					action === 'configure_skills' ||
+					action === 'edit_memories' ||
+					action === 'sidex.profile.settings' ||
+					action === 'usage'
+				) {
+					import('./settings/sidexSettingsPanel.js')
+						.then(({ SidexSettingsPanel }) => {
+							SidexSettingsPanel.getInstance().toggle();
+						})
+						.catch(() => {});
+				} else if (action === 'download_diagnostics') {
+					const diagnostics = {
+						version: '0.1.3',
+						platform: navigator.userAgent,
+						timestamp: new Date().toISOString(),
+						workspace: this.contextService.getWorkspace().folders[0]?.uri.fsPath || 'None',
+						active_model: this.chatService.serverModel,
+						local_index_active: this.chatService.maxMode
+					};
+					const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `sidex-diagnostics-${Date.now()}.json`;
+					a.click();
+					URL.revokeObjectURL(url);
+				} else if (action.startsWith('vscode.open::')) {
+					const url = action.split('::')[1];
+					if (url) {
+						this.commandService.executeCommand('vscode.open', URI.parse(url));
+					}
+				}
+			})
+		);
 
 		this._viewDisposables.add(this.chatService.onDidChangeMessages(msgs => this._scheduleRender(msgs)));
-		this._viewDisposables.add(this.chatService.onDidChangeStreaming(s => {
-			this._input.setStreaming(s);
-			if (s) {
-				this._messagesEl.style.scrollBehavior = 'auto';
-			} else {
-				this._messagesEl.style.scrollBehavior = '';
-			}
-		}));
-
-		this._viewDisposables.add(this.chatService.onDidChangeConnectionState(() => {
-			if (this.chatService.connectionState === 'connected') {
-				if (this.chatService.serverModel) {
-					this._input.setModel(this.chatService.serverModel);
+		this._viewDisposables.add(
+			this.chatService.onDidChangeStreaming(s => {
+				this._input.setStreaming(s);
+				if (s) {
+					this._messagesEl.style.scrollBehavior = 'auto';
+				} else {
+					this._messagesEl.style.scrollBehavior = '';
 				}
-				this._fetchSessions();
-			}
-		}));
+			})
+		);
 
-		this._viewDisposables.add(this.chatService.onDidChangeModels(models => {
-			this._input.setAvailableModels(models);
-			// Show the current model and mark it active in the dropdown
-			const currentModel = this.chatService.serverModel;
-			if (currentModel) {
-				this._input.setModel(currentModel);
-			}
-		}));
+		this._viewDisposables.add(
+			this.chatService.onDidChangeConnectionState(() => {
+				if (this.chatService.connectionState === 'connected') {
+					if (this.chatService.serverModel) {
+						this._input.setModel(this.chatService.serverModel);
+					}
+					this._fetchSessions();
+				}
+			})
+		);
 
-		this._viewDisposables.add(this._input.onModelChange(modelId => {
-			this.chatService.setSelectedModel(modelId);
-		}));
+		this._viewDisposables.add(
+			this.chatService.onDidChangeModels(models => {
+				this._input.setAvailableModels(models);
+				// Show the current model and mark it active in the dropdown
+				const currentModel = this.chatService.serverModel;
+				if (currentModel) {
+					this._input.setModel(currentModel);
+				}
+			})
+		);
+
+		this._viewDisposables.add(
+			this._input.onModelChange(modelId => {
+				this.chatService.setSelectedModel(modelId);
+			})
+		);
 
 		// Set model immediately from saved/default (before connection)
 		if (this.chatService.serverModel) {
 			this._input.setModel(this.chatService.serverModel);
 		}
 
-		this._viewDisposables.add(this.chatService.onDidReceiveChunk(chunk => {
-			if (chunk.type === 'brief' && chunk.content) {
-				const text = chunk.content.startsWith('BRIEF:') ? chunk.content.slice(6) : chunk.content;
-				this._header.showBrief(text);
-			}
-			if (chunk.type === 'mode_change' && chunk.mode) {
-				this._input.setMode(chunk.mode as 'agent' | 'plan' | 'ask');
-			}
-			if (chunk.type === 'thinking' && chunk.content) {
-				const comp = this._currentAssistantComp;
-				if (comp?.thinkingBlock) {
-					comp.thinkingBlock.appendContent(chunk.content);
+		this._viewDisposables.add(
+			this.chatService.onDidReceiveChunk(chunk => {
+				if (chunk.type === 'brief' && chunk.content) {
+					const text = chunk.content.startsWith('BRIEF:') ? chunk.content.slice(6) : chunk.content;
+					this._header.showBrief(text);
 				}
-			}
-			if (chunk.type === 'thinking_done') {
-				const comp = this._currentAssistantComp;
-				if (comp?.thinkingBlock) {
-					comp.thinkingBlock.stopStreaming();
+				if (chunk.type === 'mode_change' && chunk.mode) {
+					this._input.setMode(chunk.mode as 'agent' | 'plan' | 'ask');
 				}
-			}
-			if (chunk.type === 'permission_request' && chunk.tool_call_id && chunk.tool_name) {
-				this._showPermissionDialog({
-					toolCallId: chunk.tool_call_id,
-					toolName: chunk.tool_name,
-					args: chunk.args,
-				});
-			}
-			if (chunk.type === 'notice' && chunk.content) {
-				this._showNotice(chunk.content);
-			}
-			if (chunk.type === 'error' && chunk.content) {
-				this._showErrorBanner(chunk.content);
-			}
-			if (chunk.type === 'subagent_spawned' && chunk.subagent_id) {
-				this._showSubagentCard({
-					id: chunk.subagent_id,
-					description: chunk.subagent_description || 'Subagent',
-					model: chunk.subagent_model || '',
-					status: 'running',
-					prompt: chunk.subagent_prompt || '',
-					toolCalls: [],
-					output: '',
-					startedAt: Date.now(),
-				});
-			}
-			if ((chunk.type === 'subagent_complete' || chunk.type === 'subagent_update') && chunk.subagent_id) {
-				const card = this._subagentCards.get(chunk.subagent_id);
-				if (card) {
-					card.update({
-						status: chunk.subagent_status,
-						output: chunk.subagent_output,
-						toolCalls: chunk.subagent_tools?.map(t => ({ ...t, output: undefined })),
+				if (chunk.type === 'thinking' && chunk.content) {
+					const comp = this._currentAssistantComp;
+					if (comp?.thinkingBlock) {
+						comp.thinkingBlock.appendContent(chunk.content);
+					}
+				}
+				if (chunk.type === 'thinking_done') {
+					const comp = this._currentAssistantComp;
+					if (comp?.thinkingBlock) {
+						comp.thinkingBlock.stopStreaming();
+					}
+				}
+				if (chunk.type === 'permission_request' && chunk.tool_call_id && chunk.tool_name) {
+					this._showPermissionDialog({
+						toolCallId: chunk.tool_call_id,
+						toolName: chunk.tool_name,
+						args: chunk.args
 					});
 				}
-			}
-			if (chunk.type === 'ask_question' && chunk.question_options) {
-				this._showQuestionDialog({
-					toolCallId: chunk.tool_call_id || chunk.question_id || '',
-					title: chunk.question_title,
-					prompt: chunk.question_prompt || '',
-					options: chunk.question_options,
-					allowMultiple: chunk.question_allow_multiple || false,
-				});
-			}
-		}));
+				if (chunk.type === 'notice' && chunk.content) {
+					this._showNotice(chunk.content);
+				}
+				if (chunk.type === 'error' && chunk.content) {
+					this._showErrorBanner(chunk.content);
+				}
+				if (chunk.type === 'subagent_spawned' && chunk.subagent_id) {
+					this._showSubagentCard({
+						id: chunk.subagent_id,
+						description: chunk.subagent_description || 'Subagent',
+						model: chunk.subagent_model || '',
+						status: 'running',
+						prompt: chunk.subagent_prompt || '',
+						toolCalls: [],
+						output: '',
+						startedAt: Date.now()
+					});
+				}
+				if ((chunk.type === 'subagent_complete' || chunk.type === 'subagent_update') && chunk.subagent_id) {
+					const card = this._subagentCards.get(chunk.subagent_id);
+					if (card) {
+						card.update({
+							status: chunk.subagent_status,
+							output: chunk.subagent_output,
+							toolCalls: chunk.subagent_tools?.map(t => ({ ...t, output: undefined }))
+						});
+					}
+				}
+				if (chunk.type === 'ask_question' && chunk.question_options) {
+					this._showQuestionDialog({
+						toolCallId: chunk.tool_call_id || chunk.question_id || '',
+						title: chunk.question_title,
+						prompt: chunk.question_prompt || '',
+						options: chunk.question_options,
+						allowMultiple: chunk.question_allow_multiple || false
+					});
+				}
+			})
+		);
 	}
 
 	private _currentAssistantComp: AssistantMessage | null = null;
@@ -478,7 +558,9 @@ export class SidexChatViewPane extends ViewPane {
 
 	private _scheduleRender(messages: readonly IChatMessage[]): void {
 		this._pendingMessages = messages;
-		if (this._renderPending) { return; }
+		if (this._renderPending) {
+			return;
+		}
 		this._renderPending = true;
 
 		// During streaming, throttle re-renders to max ~15fps (66ms)
@@ -505,7 +587,9 @@ export class SidexChatViewPane extends ViewPane {
 	private _currentSessionId: string | null = null;
 
 	private _renderMessages(messages: readonly IChatMessage[]): void {
-		if (!this._messagesEl) { return; }
+		if (!this._messagesEl) {
+			return;
+		}
 
 		// Check if we switched to a completely different chat session
 		if (this.chatService.sessionId !== this._currentSessionId) {
@@ -540,7 +624,9 @@ export class SidexChatViewPane extends ViewPane {
 			// Remove children from the end until we match the new message count
 			while (children.length > messages.length) {
 				const last = children[children.length - 1];
-				if (last === this._welcomeEl) { break; }
+				if (last === this._welcomeEl) {
+					break;
+				}
 				last.remove();
 			}
 			this._currentAssistantComp = null;
@@ -560,12 +646,22 @@ export class SidexChatViewPane extends ViewPane {
 		// to show the diff (since tool calls may be in ANY previous message)
 		if (messages.length === this._renderedMessageCount) {
 			const totalDoneEdits = messages.reduce((count, msg) => {
-				if (!msg.toolCalls) { return count; }
-				return count + msg.toolCalls.filter(tc =>
-					(tc.name === 'edit_file' || tc.name === 'write_file' || tc.name === 'multi_edit' ||
-					 tc.name === 'create_file' || tc.name === 'str_replace_editor') &&
-					tc.status === 'done' && tc.input
-				).length;
+				if (!msg.toolCalls) {
+					return count;
+				}
+				return (
+					count +
+					msg.toolCalls.filter(
+						tc =>
+							(tc.name === 'edit_file' ||
+								tc.name === 'write_file' ||
+								tc.name === 'multi_edit' ||
+								tc.name === 'create_file' ||
+								tc.name === 'str_replace_editor') &&
+							tc.status === 'done' &&
+							tc.input
+					).length
+				);
 			}, 0);
 
 			const existingDiffs = this._messagesEl.querySelectorAll('.sc-tool-call-diff, .ui-edit-tool-call').length;
@@ -591,14 +687,26 @@ export class SidexChatViewPane extends ViewPane {
 			} else if (msg.role === 'assistant') {
 				const duration = this._turnStartTime > 0 ? Date.now() - this._turnStartTime : 0;
 				const isThinking = this.chatService.isThinking && i === messages.length - 1;
-				const comp = new AssistantMessage(msg, duration, (filePath) => {
-					this._openFile(filePath);
-				}, isThinking, messages, this.languageService, this.modelService);
+				const comp = new AssistantMessage(
+					msg,
+					duration,
+					filePath => {
+						this._openFile(filePath);
+					},
+					isThinking,
+					messages,
+					this.languageService,
+					this.modelService
+				);
 				comp.appendTo(this._messagesEl);
 				this._viewDisposables.add(comp);
-				this._viewDisposables.add(comp.onCopy(text => {
-					navigator.clipboard.writeText(text).catch(() => { /* ignore */ });
-				}));
+				this._viewDisposables.add(
+					comp.onCopy(text => {
+						navigator.clipboard.writeText(text).catch(() => {
+							/* ignore */
+						});
+					})
+				);
 				this._currentAssistantComp = comp;
 			}
 		}
@@ -641,7 +749,9 @@ export class SidexChatViewPane extends ViewPane {
 				const cursor = document.createElement('span');
 				cursor.className = 'sc-streaming-cursor';
 				const lastBody = this._messagesEl.querySelector('.composer-rendered-message:last-child .markdown-root');
-				if (lastBody) { lastBody.appendChild(cursor); }
+				if (lastBody) {
+					lastBody.appendChild(cursor);
+				}
 			}
 		} else if (existing) {
 			existing.remove();
@@ -660,7 +770,9 @@ export class SidexChatViewPane extends ViewPane {
 		}
 
 		const reverted = this.chatService.revertedMessages;
-		if (reverted.length === 0) { return; }
+		if (reverted.length === 0) {
+			return;
+		}
 
 		// Redo checkpoint link (above the dimmed messages)
 		const redoLink = document.createElement('div');
@@ -680,25 +792,30 @@ export class SidexChatViewPane extends ViewPane {
 			const el = document.createElement('div');
 			if (msg.role === 'user') {
 				el.className = 'composer-rendered-message sc-reverted-msg';
-				el.style.cssText = 'display: block; outline: none; padding-top: 10px; margin-bottom: 6px; position: relative; width: 100%; opacity: 0.5;';
+				el.style.cssText =
+					'display: block; outline: none; padding-top: 10px; margin-bottom: 6px; position: relative; width: 100%; opacity: 0.5;';
 				const container = document.createElement('div');
-				container.style.cssText = 'display: flex; align-items: flex-start; gap: 8px; width: 100%; outline: none; border-radius: 12px;';
+				container.style.cssText =
+					'display: flex; align-items: flex-start; gap: 8px; width: 100%; outline: none; border-radius: 12px;';
 				const wrapper = document.createElement('div');
 				wrapper.style.cssText = 'display: flex; flex-direction: column; align-items: flex-end; width: 100%;';
 				const messageBox = document.createElement('div');
-				messageBox.style.cssText = 'background-color: color-mix(in srgb, var(--vscode-input-background) 90%, #181818); padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--vscode-foreground); word-wrap: break-word;';
+				messageBox.style.cssText =
+					'background-color: color-mix(in srgb, var(--vscode-input-background) 90%, #181818); padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--vscode-foreground); word-wrap: break-word;';
 				messageBox.textContent = msg.content;
 				wrapper.appendChild(messageBox);
 				container.appendChild(wrapper);
 				el.appendChild(container);
 			} else if (msg.role === 'assistant') {
 				el.className = 'composer-rendered-message sc-reverted-msg';
-				el.style.cssText = 'display: block; outline: none; padding-top: 0px; padding-bottom: 0px; background-color: var(--composer-pane-background); opacity: 0.5; z-index: 99; margin-bottom: 12px;';
+				el.style.cssText =
+					'display: block; outline: none; padding-top: 0px; padding-bottom: 0px; background-color: var(--composer-pane-background); opacity: 0.5; z-index: 99; margin-bottom: 12px;';
 				const bodyWrapper = document.createElement('div');
 				bodyWrapper.className = 'markdown-root';
 				bodyWrapper.style.cssText = 'font-size: 13px; line-height: 1.5; color: var(--vscode-foreground);';
 				const body = document.createElement('div');
-				body.style.cssText = 'display: flex; flex-direction: column; gap: 8px; white-space: normal; overflow-wrap: break-word;';
+				body.style.cssText =
+					'display: flex; flex-direction: column; gap: 8px; white-space: normal; overflow-wrap: break-word;';
 				body.innerHTML = renderMarkdown(msg.content);
 				bodyWrapper.appendChild(body);
 				el.appendChild(bodyWrapper);
@@ -726,19 +843,23 @@ export class SidexChatViewPane extends ViewPane {
 
 	private _fetchSessions(): void {
 		this.chatService.getSavedSessionsAsync().then(sessions => {
-			this._header.setSessions(sessions.map(s => ({
-				id: s.id,
-				title: s.title,
-				updated_at: s.date,
-				pinned: s.pinned,
-			})));
+			this._header.setSessions(
+				sessions.map(s => ({
+					id: s.id,
+					title: s.title,
+					updated_at: s.date,
+					pinned: s.pinned
+				}))
+			);
 		});
 	}
 
 	private _exportChat(): void {
 		const msgs = this.chatService.messages;
 		const text = msgs.map(m => `[${m.role}]\n${m.content}\n`).join('\n---\n\n');
-		navigator.clipboard.writeText(text).catch(() => { /* */ });
+		navigator.clipboard.writeText(text).catch(() => {
+			/* */
+		});
 	}
 
 	private _getOpenerService() {
@@ -747,23 +868,31 @@ export class SidexChatViewPane extends ViewPane {
 
 	private _openFile(filePath: string): void {
 		const uri = URI.file(filePath);
-		this.editorService.openEditor({ resource: uri }).then(undefined, () => { /* ignore */ });
+		this.editorService.openEditor({ resource: uri }).then(undefined, () => {
+			/* ignore */
+		});
 	}
 
 	private _showPermissionDialog(data: PermissionRequestData): void {
-		if (!this._messagesEl) { return; }
+		if (!this._messagesEl) {
+			return;
+		}
 		const dialog = new PermissionRequestDialog(data);
 		dialog.appendTo(this._messagesEl);
 		this._viewDisposables.add(dialog);
-		this._viewDisposables.add(dialog.onRespond(result => {
-			this.chatService.respondToPermission(result.toolCallId, result.approved);
-		}));
+		this._viewDisposables.add(
+			dialog.onRespond(result => {
+				this.chatService.respondToPermission(result.toolCallId, result.approved);
+			})
+		);
 		this._scrollToBottom();
 	}
 
 	private _showErrorBanner(text: string): void {
 		const existing = this._input.element.parentElement?.querySelector('.sc-error-banner');
-		if (existing) { existing.remove(); }
+		if (existing) {
+			existing.remove();
+		}
 
 		const requestId = crypto.randomUUID?.() || Math.random().toString(36).slice(2);
 
@@ -778,11 +907,12 @@ export class SidexChatViewPane extends ViewPane {
 		row1.appendChild(icon);
 		const title = document.createElement('span');
 		title.className = 'sc-error-banner-title';
-		title.textContent = text.includes('usage cap') || text.includes('Anthropic returned 429')
-			? 'Claude usage limit'
-			: text.includes('Anthropic blocked') || text.includes('Anthropic refused')
-				? 'Anthropic blocked this login'
-				: 'Unable to reach model';
+		title.textContent =
+			text.includes('usage cap') || text.includes('Anthropic returned 429')
+				? 'Claude usage limit'
+				: text.includes('Anthropic blocked') || text.includes('Anthropic refused')
+					? 'Anthropic blocked this login'
+					: 'Unable to reach model';
 		row1.appendChild(title);
 		banner.appendChild(row1);
 
@@ -834,11 +964,17 @@ export class SidexChatViewPane extends ViewPane {
 	}
 
 	private _showNotice(text: string): void {
-		if (!this._messagesEl) { return; }
-		if (this._noticeTimer) { clearTimeout(this._noticeTimer); }
+		if (!this._messagesEl) {
+			return;
+		}
+		if (this._noticeTimer) {
+			clearTimeout(this._noticeTimer);
+		}
 
 		const existing = this._messagesEl.querySelector('.sc-notice-toast');
-		if (existing) { existing.remove(); }
+		if (existing) {
+			existing.remove();
+		}
 
 		const toast = document.createElement('div');
 		toast.className = 'sc-notice-toast';
@@ -860,7 +996,9 @@ export class SidexChatViewPane extends ViewPane {
 	// ─── Orchestration ─────────────────────────────────────────────────────────
 
 	private _showSubagentCard(info: SubagentInfo): void {
-		if (!this._messagesEl) { return; }
+		if (!this._messagesEl) {
+			return;
+		}
 		const card = new SubagentCard(info);
 		card.appendTo(this._messagesEl);
 		this._viewDisposables.add(card);
@@ -868,14 +1006,24 @@ export class SidexChatViewPane extends ViewPane {
 		this._scrollToBottom();
 	}
 
-	private _showQuestionDialog(data: { toolCallId: string; title?: string; prompt: string; options: Array<{ id: string; label: string }>; allowMultiple: boolean }): void {
-		if (!this._messagesEl) { return; }
+	private _showQuestionDialog(data: {
+		toolCallId: string;
+		title?: string;
+		prompt: string;
+		options: Array<{ id: string; label: string }>;
+		allowMultiple: boolean;
+	}): void {
+		if (!this._messagesEl) {
+			return;
+		}
 		const dialog = new QuestionDialog(data);
 		dialog.appendTo(this._messagesEl);
 		this._viewDisposables.add(dialog);
-		this._viewDisposables.add(dialog.onRespond(result => {
-			this.chatService.respondToQuestion(result.toolCallId, result.selectedIds);
-		}));
+		this._viewDisposables.add(
+			dialog.onRespond(result => {
+				this.chatService.respondToQuestion(result.toolCallId, result.selectedIds);
+			})
+		);
 		this._scrollToBottom();
 	}
 
@@ -895,28 +1043,30 @@ export class SidexChatViewPane extends ViewPane {
 		this._orchView = new OrchestrationView();
 		this._orchView.appendTo(this._messagesEl);
 		this._viewDisposables.add(this._orchView);
-		this._viewDisposables.add(this._orchView.onCancel(() => {
-			this._orchestrator?.cancel('User cancelled from UI');
-		}));
+		this._viewDisposables.add(
+			this._orchView.onCancel(() => {
+				this._orchestrator?.cancel('User cancelled from UI');
+			})
+		);
 
 		// Stream events into the UI with RAF throttling
 		this._orchStream = new StreamConsumer(this._orchestrator.onEvent, {
-			throttleToFrame: true,
+			throttleToFrame: true
 		});
 		this._viewDisposables.add(this._orchStream);
 
 		// Pipe events to the view
-		this._viewDisposables.add(this._orchestrator.onEvent(event => {
-			this._orchView?.handleEvent(event);
-			if (!this._userHasScrolledUp) {
-				this._scrollToBottom();
-			}
-		}));
+		this._viewDisposables.add(
+			this._orchestrator.onEvent(event => {
+				this._orchView?.handleEvent(event);
+				if (!this._userHasScrolledUp) {
+					this._scrollToBottom();
+				}
+			})
+		);
 
 		// Kick off
-		const workspace = this.chatService.messages.length > 0
-			? '.'
-			: '.';
+		const workspace = this.chatService.messages.length > 0 ? '.' : '.';
 		this._orchestrator.orchestrate(goal, wsUrl, workspace).catch(() => {
 			// Orchestration failed
 		});

@@ -12,11 +12,7 @@ import { workbenchConfigurationNodeBase } from '../../../common/configuration.js
 import { registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { SidexUxPolishController } from './sidexUx.js';
 
-registerWorkbenchContribution2(
-	SidexUxPolishController.ID,
-	SidexUxPolishController,
-	WorkbenchPhase.AfterRestored
-);
+registerWorkbenchContribution2(SidexUxPolishController.ID, SidexUxPolishController, WorkbenchPhase.AfterRestored);
 
 Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).registerConfiguration({
 	...workbenchConfigurationNodeBase,

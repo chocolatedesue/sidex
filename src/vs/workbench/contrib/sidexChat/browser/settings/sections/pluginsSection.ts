@@ -56,7 +56,11 @@ export class PluginsSection implements SettingsSection {
 		const autoRow = this._createRow(card, 'Browser Automation', 'Choose browser automation framework');
 		this._addSelect(autoRow, ['Off', 'Playwright', 'Puppeteer'], 'Off', 'sidex.plugins.browserAutomation');
 
-		const localhostRow = this._createRow(card, 'Show Localhost Links in Browser', 'Auto open localhost links detected in output');
+		const localhostRow = this._createRow(
+			card,
+			'Show Localhost Links in Browser',
+			'Auto open localhost links detected in output'
+		);
 		this._addToggle(localhostRow, true, 'sidex.plugins.showLocalhostLinks');
 
 		container.appendChild(card);
@@ -95,16 +99,22 @@ export class PluginsSection implements SettingsSection {
 		let servers: McpServer[] = [];
 		if (this._invoke) {
 			try {
-				const data = await this._invoke('mcp_list_servers') as McpServer[] | null;
-				if (data) { servers = data; }
-			} catch { /* use empty */ }
+				const data = (await this._invoke('mcp_list_servers')) as McpServer[] | null;
+				if (data) {
+					servers = data;
+				}
+			} catch {
+				/* use empty */
+			}
 		}
 
 		this._renderServerList(servers);
 	}
 
 	private _renderServerList(servers: McpServer[]): void {
-		if (!this._mcpListEl) { return; }
+		if (!this._mcpListEl) {
+			return;
+		}
 		this._mcpListEl.innerHTML = '';
 
 		if (servers.length === 0) {
@@ -162,12 +172,14 @@ export class PluginsSection implements SettingsSection {
 			removeBtn.title = 'Remove server';
 			removeBtn.addEventListener('click', () => {
 				if (this._invoke) {
-					this._invoke('mcp_remove_server', { name: server.name }).then(() => {
-						if (this._container) {
-							this._container.innerHTML = '';
-							this.render(this._container);
-						}
-					}).catch(() => {});
+					this._invoke('mcp_remove_server', { name: server.name })
+						.then(() => {
+							if (this._container) {
+								this._container.innerHTML = '';
+								this.render(this._container);
+							}
+						})
+						.catch(() => {});
 				}
 			});
 			action.appendChild(removeBtn);
@@ -181,7 +193,7 @@ export class PluginsSection implements SettingsSection {
 		const fields = [
 			{ label: 'Server Name', placeholder: 'my-server', key: 'name' },
 			{ label: 'Command', placeholder: 'npx -y @modelcontextprotocol/server-...', key: 'command' },
-			{ label: 'Arguments', placeholder: '--port 3000', key: 'args' },
+			{ label: 'Arguments', placeholder: '--port 3000', key: 'args' }
 		];
 
 		for (const field of fields) {
@@ -230,9 +242,13 @@ export class PluginsSection implements SettingsSection {
 	}
 
 	private _toggleAddForm(): void {
-		if (!this._container) { return; }
+		if (!this._container) {
+			return;
+		}
 		const form = this._container.querySelector('[data-role="mcp-add-form"]') as HTMLElement | null;
-		if (!form) { return; }
+		if (!form) {
+			return;
+		}
 		this._addFormVisible = !this._addFormVisible;
 		form.style.display = this._addFormVisible ? '' : 'none';
 	}
@@ -245,19 +261,23 @@ export class PluginsSection implements SettingsSection {
 			values[el.dataset.field!] = el.value.trim();
 		});
 
-		if (!values.name || !values.command) { return; }
+		if (!values.name || !values.command) {
+			return;
+		}
 
 		if (this._invoke) {
 			this._invoke('mcp_add_server', {
 				name: values.name,
 				command: values.command,
-				args: values.args || '',
-			}).then(() => {
-				if (this._container) {
-					this._container.innerHTML = '';
-					this.render(this._container);
-				}
-			}).catch(() => {});
+				args: values.args || ''
+			})
+				.then(() => {
+					if (this._container) {
+						this._container.innerHTML = '';
+						this.render(this._container);
+					}
+				})
+				.catch(() => {});
 		}
 	}
 
@@ -292,17 +312,24 @@ export class PluginsSection implements SettingsSection {
 		toggle.className = 'sidex-settings-toggle' + (initialState ? ' on' : '');
 
 		if (this._invoke) {
-			this._invoke('settings_get', { section: settingKey }).then((val) => {
-				if (val === true) { toggle.classList.add('on'); }
-				else if (val === false) { toggle.classList.remove('on'); }
-			}).catch(() => {});
+			this._invoke('settings_get', { section: settingKey })
+				.then(val => {
+					if (val === true) {
+						toggle.classList.add('on');
+					} else if (val === false) {
+						toggle.classList.remove('on');
+					}
+				})
+				.catch(() => {});
 		}
 
 		toggle.addEventListener('click', () => {
 			toggle.classList.toggle('on');
 			const value = toggle.classList.contains('on');
 			if (this._invoke) {
-				this._invoke('settings_update', { key: settingKey, value: JSON.stringify(value), scope: 'user' }).catch(() => {});
+				this._invoke('settings_update', { key: settingKey, value: JSON.stringify(value), scope: 'user' }).catch(
+					() => {}
+				);
 			}
 		});
 		row.querySelector('.sidex-settings-row-action')!.appendChild(toggle);
@@ -310,16 +337,22 @@ export class PluginsSection implements SettingsSection {
 	}
 
 	private _addSelect(row: HTMLElement, options: string[], defaultValue: string, settingKey: string): HTMLElement {
-		const dropdown = createCustomDropdown(options, defaultValue, (newValue) => {
+		const dropdown = createCustomDropdown(options, defaultValue, newValue => {
 			if (this._invoke) {
-				this._invoke('settings_update', { key: settingKey, value: JSON.stringify(newValue), scope: 'user' }).catch(() => {});
+				this._invoke('settings_update', { key: settingKey, value: JSON.stringify(newValue), scope: 'user' }).catch(
+					() => {}
+				);
 			}
 		});
 
 		if (this._invoke) {
-			this._invoke('settings_get', { section: settingKey }).then((val) => {
-				if (val && typeof val === 'string') { (dropdown as any).setValue(val); }
-			}).catch(() => {});
+			this._invoke('settings_get', { section: settingKey })
+				.then(val => {
+					if (val && typeof val === 'string') {
+						(dropdown as any).setValue(val);
+					}
+				})
+				.catch(() => {});
 		}
 
 		row.querySelector('.sidex-settings-row-action')!.appendChild(dropdown);

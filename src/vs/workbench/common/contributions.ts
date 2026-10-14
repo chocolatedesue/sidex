@@ -89,9 +89,7 @@ function isOnEditorWorkbenchContributionInstantiation(
 }
 
 export type WorkbenchContributionInstantiation =
-	| WorkbenchPhase
-	| ILazyWorkbenchContributionInstantiation
-	| IOnEditorWorkbenchContributionInstantiation;
+	WorkbenchPhase | ILazyWorkbenchContributionInstantiation | IOnEditorWorkbenchContributionInstantiation;
 
 function toWorkbenchPhase(
 	phase: LifecyclePhase.Restored | LifecyclePhase.Eventually

@@ -44,7 +44,10 @@ function installInvoke(impl: Invoke): { calls: Array<{ cmd: string; args?: Recor
 function installWindow(): { events: Event[] } {
 	const events: Event[] = [];
 	(globalThis as any).window = {
-		dispatchEvent: (event: Event): boolean => { events.push(event); return true; }
+		dispatchEvent: (event: Event): boolean => {
+			events.push(event);
+			return true;
+		}
 	};
 	return { events };
 }
@@ -107,7 +110,12 @@ test('isServerEndpointResolved is true outside Tauri: the fallback is the final 
 
 test('isServerEndpointResolved is false until the Tauri bridge actually answers', async () => {
 	const mod = await loadModule();
-	installInvoke(() => new Promise(() => { /* never settles */ }));
+	installInvoke(
+		() =>
+			new Promise(() => {
+				/* never settles */
+			})
+	);
 	void mod.resolveServerEndpoint();
 	assert.equal(mod.isServerEndpointResolved(), false, 'a request in flight is not a resolution yet');
 });
@@ -176,7 +184,9 @@ test('a rejected IPC call is retried on the next call, leaving the cache untouch
 	let callCount = 0;
 	installInvoke(async () => {
 		callCount++;
-		if (callCount === 1) { throw new Error('IPC channel not ready'); }
+		if (callCount === 1) {
+			throw new Error('IPC channel not ready');
+		}
 		return endpoint({ running: true });
 	});
 
@@ -206,8 +216,15 @@ test('a malformed reply is retried rather than trusted', async () => {
 
 test('concurrent callers share a single in-flight request', async () => {
 	const mod = await loadModule();
-	let resolveInvoke: (value: IServerEndpoint) => void = () => { /* replaced below */ };
-	const { calls } = installInvoke(() => new Promise<IServerEndpoint>(resolve => { resolveInvoke = resolve; }));
+	let resolveInvoke: (value: IServerEndpoint) => void = () => {
+		/* replaced below */
+	};
+	const { calls } = installInvoke(
+		() =>
+			new Promise<IServerEndpoint>(resolve => {
+				resolveInvoke = resolve;
+			})
+	);
 
 	const a = mod.resolveServerEndpoint();
 	const b = mod.resolveServerEndpoint();
@@ -247,7 +264,9 @@ test('restartServer still signals reconnect when the respawn itself failed, sinc
 test('restartServer leaves the cache untouched and skips the reconnect signal when the IPC call itself fails', async () => {
 	const mod = await loadModule();
 	const { events } = installWindow();
-	installInvoke(async () => { throw new Error('command not found'); });
+	installInvoke(async () => {
+		throw new Error('command not found');
+	});
 
 	const before = mod.getServerEndpoint();
 	const result = await mod.restartServer();

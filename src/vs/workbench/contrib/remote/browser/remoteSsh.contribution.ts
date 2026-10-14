@@ -59,7 +59,9 @@ class SideXRemoteSshWorkbenchContribution extends Disposable implements IWorkben
 		if (this._providerRegistered) {
 			return;
 		}
-		this._register(this._fileService.registerProvider(Schemas.vscodeRemote, new SideXRemoteFileSystemProvider(this._remote)));
+		this._register(
+			this._fileService.registerProvider(Schemas.vscodeRemote, new SideXRemoteFileSystemProvider(this._remote))
+		);
 		this._providerRegistered = true;
 		this._log.info('[SideX Remote SSH] registered vscode-remote FileSystemProvider');
 	}
@@ -176,8 +178,6 @@ export async function afterSshConnected(options: {
 	try {
 		await workspaceEditing.createAndEnterWorkspace([{ uri: folderUri }]);
 	} catch (err) {
-		notifications.error(
-			localize('remote.ssh.openFailed', 'Failed to open remote folder: {0}', String(err))
-		);
+		notifications.error(localize('remote.ssh.openFailed', 'Failed to open remote folder: {0}', String(err)));
 	}
 }

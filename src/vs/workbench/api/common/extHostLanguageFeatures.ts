@@ -776,22 +776,20 @@ class DocumentPasteEditProvider {
 
 		const cacheId = this._editsCache.add(edits);
 
-		return edits.map(
-			(edit, i): extHostProtocol.IPasteEditDto => ({
-				_cacheId: [cacheId, i],
-				title:
-					edit.title ??
-					localize(
-						'defaultPasteLabel',
-						"Paste using '{0}' extension",
-						this._extension.displayName || this._extension.name
-					),
-				kind: edit.kind,
-				yieldTo: edit.yieldTo?.map(x => x.value),
-				insertText: typeof edit.insertText === 'string' ? edit.insertText : { snippet: edit.insertText.value },
-				additionalEdit: edit.additionalEdit ? typeConvert.WorkspaceEdit.from(edit.additionalEdit, undefined) : undefined
-			})
-		);
+		return edits.map((edit, i): extHostProtocol.IPasteEditDto => ({
+			_cacheId: [cacheId, i],
+			title:
+				edit.title ??
+				localize(
+					'defaultPasteLabel',
+					"Paste using '{0}' extension",
+					this._extension.displayName || this._extension.name
+				),
+			kind: edit.kind,
+			yieldTo: edit.yieldTo?.map(x => x.value),
+			insertText: typeof edit.insertText === 'string' ? edit.insertText : { snippet: edit.insertText.value },
+			additionalEdit: edit.additionalEdit ? typeConvert.WorkspaceEdit.from(edit.additionalEdit, undefined) : undefined
+		}));
 	}
 
 	async resolvePasteEdit(
@@ -2463,22 +2461,16 @@ class DocumentDropEditAdapter {
 		const editsArray = asArray(edits);
 		const cacheId = this._cache.add(editsArray);
 
-		return editsArray.map(
-			(edit, i): extHostProtocol.IDocumentDropEditDto => ({
-				_cacheId: [cacheId, i],
-				title:
-					edit.title ??
-					localize(
-						'defaultDropLabel',
-						"Drop using '{0}' extension",
-						this._extension.displayName || this._extension.name
-					),
-				kind: edit.kind?.value,
-				yieldTo: edit.yieldTo?.map(x => x.value),
-				insertText: typeof edit.insertText === 'string' ? edit.insertText : { snippet: edit.insertText.value },
-				additionalEdit: edit.additionalEdit ? typeConvert.WorkspaceEdit.from(edit.additionalEdit, undefined) : undefined
-			})
-		);
+		return editsArray.map((edit, i): extHostProtocol.IDocumentDropEditDto => ({
+			_cacheId: [cacheId, i],
+			title:
+				edit.title ??
+				localize('defaultDropLabel', "Drop using '{0}' extension", this._extension.displayName || this._extension.name),
+			kind: edit.kind?.value,
+			yieldTo: edit.yieldTo?.map(x => x.value),
+			insertText: typeof edit.insertText === 'string' ? edit.insertText : { snippet: edit.insertText.value },
+			additionalEdit: edit.additionalEdit ? typeConvert.WorkspaceEdit.from(edit.additionalEdit, undefined) : undefined
+		}));
 	}
 
 	async resolveDropEdit(

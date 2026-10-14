@@ -956,13 +956,11 @@ export abstract class AbstractExtensionManagementService
 				const existing = installed.find(e => areSameExtensions(e.identifier, extensionIdentifier));
 				for (const extension of manifest.extensionPack) {
 					// add only those extensions which are new in currently installed extension
-					if (
-						!(
-							existing &&
-							existing.manifest.extensionPack &&
-							existing.manifest.extensionPack.some(old => areSameExtensions({ id: old }, { id: extension }))
-						)
-					) {
+					if (!(
+						existing &&
+						existing.manifest.extensionPack &&
+						existing.manifest.extensionPack.some(old => areSameExtensions({ id: old }, { id: extension }))
+					)) {
 						if (dependenciesAndPackExtensions.every(e => !areSameExtensions({ id: e }, { id: extension }))) {
 							dependenciesAndPackExtensions.push(extension);
 						}

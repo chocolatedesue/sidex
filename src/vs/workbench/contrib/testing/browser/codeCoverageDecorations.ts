@@ -511,8 +511,7 @@ const countBadge = (count: number): InjectedTextOptions | undefined => {
 };
 
 type CoverageDetailsWithBranch =
-	| CoverageDetails
-	| { type: DetailType.Branch; branch: number; detail: IStatementCoverage };
+	CoverageDetails | { type: DetailType.Branch; branch: number; detail: IStatementCoverage };
 type DetailRange = {
 	range: Range;
 	primary: boolean;

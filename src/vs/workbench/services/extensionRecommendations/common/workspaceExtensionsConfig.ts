@@ -390,8 +390,7 @@ export class WorkspaceExtensionsConfigService extends Disposable implements IWor
 		}
 
 		const folderPicks: (
-			| (IQuickPickItem & { workspaceOrFolder: IWorkspace | IWorkspaceFolder })
-			| IQuickPickSeparator
+			(IQuickPickItem & { workspaceOrFolder: IWorkspace | IWorkspaceFolder }) | IQuickPickSeparator
 		)[] = workspaceFolders.map(workspaceFolder => {
 			return {
 				label: workspaceFolder.name,

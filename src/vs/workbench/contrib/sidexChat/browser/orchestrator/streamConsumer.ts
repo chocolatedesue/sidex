@@ -45,44 +45,45 @@ export class StreamConsumer extends Disposable implements AsyncIterable<Orchestr
 	private readonly _onBackpressure = this._register(new Emitter<number>());
 	readonly onBackpressure: Event<number> = this._onBackpressure.event;
 
-	constructor(
-		source: Event<OrchestratorEvent>,
-		options?: StreamConsumerOptions,
-	) {
+	constructor(source: Event<OrchestratorEvent>, options?: StreamConsumerOptions) {
 		super();
 		this._options = {
 			filter: options?.filter ?? [],
 			throttleToFrame: options?.throttleToFrame ?? false,
-			bufferSize: options?.bufferSize ?? 1000,
+			bufferSize: options?.bufferSize ?? 1000
 		};
 
-		this._register(source((event) => {
-			if (this._done) { return; }
-			if (this._options.filter.length > 0 && !this._options.filter.includes(event.type)) {
-				return;
-			}
-
-			if (this._options.throttleToFrame) {
-				this._frameBuffer.push(event);
-				if (!this._frameQueued) {
-					this._frameQueued = true;
-					requestAnimationFrame(() => {
-						this._frameQueued = false;
-						// Deliver only the latest event of each type per frame
-						const byType = new Map<string, OrchestratorEvent>();
-						for (const e of this._frameBuffer) {
-							byType.set(e.type, e);
-						}
-						this._frameBuffer = [];
-						for (const e of byType.values()) {
-							this._push(e);
-						}
-					});
+		this._register(
+			source(event => {
+				if (this._done) {
+					return;
 				}
-			} else {
-				this._push(event);
-			}
-		}));
+				if (this._options.filter.length > 0 && !this._options.filter.includes(event.type)) {
+					return;
+				}
+
+				if (this._options.throttleToFrame) {
+					this._frameBuffer.push(event);
+					if (!this._frameQueued) {
+						this._frameQueued = true;
+						requestAnimationFrame(() => {
+							this._frameQueued = false;
+							// Deliver only the latest event of each type per frame
+							const byType = new Map<string, OrchestratorEvent>();
+							for (const e of this._frameBuffer) {
+								byType.set(e.type, e);
+							}
+							this._frameBuffer = [];
+							for (const e of byType.values()) {
+								this._push(e);
+							}
+						});
+					}
+				} else {
+					this._push(event);
+				}
+			})
+		);
 	}
 
 	private _push(event: OrchestratorEvent): void {
@@ -106,8 +107,12 @@ export class StreamConsumer extends Disposable implements AsyncIterable<Orchestr
 		}
 	}
 
-	get buffered(): number { return this._buffer.length; }
-	get isDone(): boolean { return this._done; }
+	get buffered(): number {
+		return this._buffer.length;
+	}
+	get isDone(): boolean {
+		return this._done;
+	}
 
 	[Symbol.asyncIterator](): AsyncIterator<OrchestratorEvent> {
 		return {
@@ -122,14 +127,14 @@ export class StreamConsumer extends Disposable implements AsyncIterable<Orchestr
 				if (this._done) {
 					return Promise.resolve({ value: undefined as unknown as OrchestratorEvent, done: true });
 				}
-				return new Promise<IteratorResult<OrchestratorEvent>>((resolve) => {
+				return new Promise<IteratorResult<OrchestratorEvent>>(resolve => {
 					this._resolve = resolve;
 				});
 			},
 			return: () => {
 				this.cancel();
 				return Promise.resolve({ value: undefined as unknown as OrchestratorEvent, done: true });
-			},
+			}
 		};
 	}
 }
@@ -140,7 +145,7 @@ export class StreamConsumer extends Disposable implements AsyncIterable<Orchestr
  */
 export async function collectStream(
 	source: Event<OrchestratorEvent>,
-	until: (event: OrchestratorEvent) => boolean,
+	until: (event: OrchestratorEvent) => boolean
 ): Promise<OrchestratorEvent[]> {
 	const events: OrchestratorEvent[] = [];
 	const stream = new StreamConsumer(source);
@@ -163,9 +168,9 @@ export async function collectStream(
 export function waitForEvent<T extends OrchestratorEvent>(
 	source: Event<OrchestratorEvent>,
 	type: T['type'],
-	timeoutMs = 30_000,
+	timeoutMs = 30_000
 ): Promise<T | null> {
-	return new Promise((resolve) => {
+	return new Promise(resolve => {
 		const stream = new StreamConsumer(source, { filter: [type] });
 		const timer = setTimeout(() => {
 			stream.cancel();

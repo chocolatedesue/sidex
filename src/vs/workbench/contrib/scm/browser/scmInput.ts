@@ -990,7 +990,7 @@ export class SCMInputWidget {
 
 		return this.toolbar.dropdownActions.length === 0
 			? 26 /* 22px action + 4px margin */
-			: 39 /* 35px action + 4px margin */;
+			: 39; /* 35px action + 4px margin */
 	}
 
 	clearValidation(): void {

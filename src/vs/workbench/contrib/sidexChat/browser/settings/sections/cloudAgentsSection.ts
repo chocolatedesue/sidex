@@ -27,7 +27,7 @@ export class CloudAgentsSection implements SettingsSection {
 	// Accepted for constructor-shape parity with every other section (they're
 	// all built as `new XSection(this._getTauriInvoke())`) even though there
 	// is nothing here to fetch or save.
-	constructor(_invoke: TauriInvoke) { }
+	constructor(_invoke: TauriInvoke) {}
 
 	async render(container: HTMLElement): Promise<void> {
 		this._container = container;
@@ -53,7 +53,8 @@ export class CloudAgentsSection implements SettingsSection {
 
 		const text = document.createElement('div');
 		text.style.cssText = 'font-size:12px;color:var(--vscode-editor-foreground);line-height:1.5;';
-		text.textContent = 'SideX has no hosted infrastructure to run agents on — there\'s no remote environment, timeout, or queue to configure here. Every agent runs on this machine, using whichever providers and models you\'ve set up under Models.';
+		text.textContent =
+			"SideX has no hosted infrastructure to run agents on — there's no remote environment, timeout, or queue to configure here. Every agent runs on this machine, using whichever providers and models you've set up under Models.";
 		infoCol.appendChild(text);
 
 		row.appendChild(infoCol);

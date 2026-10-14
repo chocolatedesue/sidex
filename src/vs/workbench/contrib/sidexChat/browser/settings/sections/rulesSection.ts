@@ -48,9 +48,13 @@ export class RulesSection implements SettingsSection {
 
 		if (this._invoke) {
 			try {
-				const env = await this._invoke('get_env', { name: 'SIDEX_WORKSPACE' }) as string | null;
-				if (env) { this._workspacePath = env; }
-			} catch { /* use default */ }
+				const env = (await this._invoke('get_env', { name: 'SIDEX_WORKSPACE' })) as string | null;
+				if (env) {
+					this._workspacePath = env;
+				}
+			} catch {
+				/* use default */
+			}
 		}
 
 		container.innerHTML = '';
@@ -78,7 +82,9 @@ export class RulesSection implements SettingsSection {
 	}
 
 	private async _renderDynamicContent(): Promise<void> {
-		if (!this._dynamicCardsWrapper) { return; }
+		if (!this._dynamicCardsWrapper) {
+			return;
+		}
 
 		// 1. Load data asynchronously first
 		await this._loadData();
@@ -94,7 +100,7 @@ export class RulesSection implements SettingsSection {
 			items: filteredRules,
 			emptyText: 'No Rules Yet',
 			newButtonText: 'New Rule',
-			newAction: () => this._createNewRule(),
+			newAction: () => this._createNewRule()
 		});
 
 		// Render Skills Card
@@ -105,7 +111,7 @@ export class RulesSection implements SettingsSection {
 			items: filteredSkills,
 			emptyText: 'No Skills Yet',
 			newButtonText: 'New Skill',
-			newAction: () => this._createNewSkill(),
+			newAction: () => this._createNewSkill()
 		});
 
 		// Render Hooks Card
@@ -113,14 +119,18 @@ export class RulesSection implements SettingsSection {
 	}
 
 	private async _loadData(): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 
 		this._rules = [];
 		this._skills = [];
 
 		// Load rules from .sidex/rules/ directory
 		try {
-			const rulesDir = await this._invoke('read_dir', { path: this._workspacePath + '/.sidex/rules' }) as { entries: { name: string; is_dir: boolean }[] } | null;
+			const rulesDir = (await this._invoke('read_dir', { path: this._workspacePath + '/.sidex/rules' })) as {
+				entries: { name: string; is_dir: boolean }[];
+			} | null;
 			if (rulesDir && rulesDir.entries) {
 				this._rules = rulesDir.entries
 					.filter(e => !e.is_dir && (e.name.endsWith('.md') || e.name.endsWith('.mdc')))
@@ -128,14 +138,18 @@ export class RulesSection implements SettingsSection {
 						id: e.name,
 						name: e.name.replace(/\.(md|mdc)$/, ''),
 						scope: 'project' as const,
-						enabled: true,
+						enabled: true
 					}));
 			}
-		} catch { /* no rules dir */ }
+		} catch {
+			/* no rules dir */
+		}
 
 		// Also check user-level rules
 		try {
-			const homeRules = await this._invoke('read_dir', { path: '~/.sidex/rules' }) as { entries: { name: string; is_dir: boolean }[] } | null;
+			const homeRules = (await this._invoke('read_dir', { path: '~/.sidex/rules' })) as {
+				entries: { name: string; is_dir: boolean }[];
+			} | null;
 			if (homeRules && homeRules.entries) {
 				const userRules = homeRules.entries
 					.filter(e => !e.is_dir && (e.name.endsWith('.md') || e.name.endsWith('.mdc')))
@@ -143,31 +157,41 @@ export class RulesSection implements SettingsSection {
 						id: '~/.sidex/rules/' + e.name,
 						name: e.name.replace(/\.(md|mdc)$/, ''),
 						scope: 'user' as const,
-						enabled: true,
+						enabled: true
 					}));
 				this._rules = [...this._rules, ...userRules];
 			}
-		} catch { /* no user rules */ }
+		} catch {
+			/* no user rules */
+		}
 
 		// Load skills from .sidex/skills/ directory
 		try {
-			const skillsDir = await this._invoke('read_dir', { path: this._workspacePath + '/.sidex/skills' }) as { entries: { name: string; is_dir: boolean }[] } | null;
+			const skillsDir = (await this._invoke('read_dir', { path: this._workspacePath + '/.sidex/skills' })) as {
+				entries: { name: string; is_dir: boolean }[];
+			} | null;
 			if (skillsDir && skillsDir.entries) {
 				this._skills = skillsDir.entries
 					.filter(e => !e.is_dir || e.name !== '__pycache__')
 					.map(e => ({
 						id: e.name,
 						name: e.name.replace(/\.(md|mdc)$/, ''),
-						scope: 'project' as const,
+						scope: 'project' as const
 					}));
 			}
-		} catch { /* no skills dir */ }
+		} catch {
+			/* no skills dir */
+		}
 
 		// Load hooks via hooks_list
 		try {
-			const hooksData = await this._invoke('hooks_list') as HookItem[] | null;
-			if (hooksData) { this._hooks = hooksData; }
-		} catch { /* no hooks */ }
+			const hooksData = (await this._invoke('hooks_list')) as HookItem[] | null;
+			if (hooksData) {
+				this._hooks = hooksData;
+			}
+		} catch {
+			/* no hooks */
+		}
 	}
 
 	private _renderScopeCard(container: HTMLElement): void {
@@ -179,7 +203,11 @@ export class RulesSection implements SettingsSection {
 		this._addScopeSegmentedControl(scopeRow);
 
 		// Row 2: Include third-party integrations
-		const integrateRow = this._createRow(card, 'Include third-party Plugins, Skills, and other configs', 'Auto import from other tools');
+		const integrateRow = this._createRow(
+			card,
+			'Include third-party Plugins, Skills, and other configs',
+			'Auto import from other tools'
+		);
 		this._addToggle(integrateRow, true, 'sidex.rules.includeThirdParty');
 
 		container.appendChild(card);
@@ -192,7 +220,7 @@ export class RulesSection implements SettingsSection {
 		const tabs: { id: TabFilter; label: string }[] = [
 			{ id: 'all', label: 'All' },
 			{ id: 'user', label: 'User' },
-			{ id: 'project', label: 'Project' },
+			{ id: 'project', label: 'Project' }
 		];
 
 		for (const tab of tabs) {
@@ -206,7 +234,7 @@ export class RulesSection implements SettingsSection {
 
 			btn.addEventListener('click', () => {
 				this._activeTab = tab.id;
-				
+
 				// Update active button styles on the fly without re-creating Card 1!
 				const buttons = control.querySelectorAll('.sidex-settings-segment-btn');
 				buttons.forEach(b => {
@@ -222,14 +250,17 @@ export class RulesSection implements SettingsSection {
 		row.querySelector('.sidex-settings-row-action')!.appendChild(control);
 	}
 
-	private _renderSubsectionCard(container: HTMLElement, opts: {
-		title: string;
-		description: string;
-		items: { id: string; name: string }[];
-		emptyText: string;
-		newButtonText?: string;
-		newAction?: () => void;
-	}): void {
+	private _renderSubsectionCard(
+		container: HTMLElement,
+		opts: {
+			title: string;
+			description: string;
+			items: { id: string; name: string }[];
+			emptyText: string;
+			newButtonText?: string;
+			newAction?: () => void;
+		}
+	): void {
 		const card = document.createElement('div');
 		card.className = 'sidex-settings-card';
 
@@ -294,47 +325,59 @@ export class RulesSection implements SettingsSection {
 	}
 
 	private _filterItems<T extends { scope: string }>(items: T[]): T[] {
-		if (this._activeTab === 'all') { return items; }
+		if (this._activeTab === 'all') {
+			return items;
+		}
 		return items.filter(i => i.scope === this._activeTab);
 	}
 
 	private _createNewRule(): void {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		const filename = `new-rule-${Date.now()}.md`;
 		const scope = this._activeTab === 'user' ? 'user' : 'project';
-		const parentDir = scope === 'project'
-			? `${this._workspacePath}/.sidex/rules`
-			: `~/.sidex/rules`;
+		const parentDir = scope === 'project' ? `${this._workspacePath}/.sidex/rules` : `~/.sidex/rules`;
 		const path = `${parentDir}/${filename}`;
 
 		const template = `---\ndescription: New rule\nglobs: \n---\n\n# Rule Name\n\nDescribe your rule here.\n`;
 
-		this._invoke('mkdir', { path: parentDir, recursive: true }).then(() => {
-			if (this._invoke) {
-				this._invoke('write_file', { path, contents: template }).then(() => {
-					window.dispatchEvent(new CustomEvent('sidex-open-file', { detail: { path } }));
-					this._renderDynamicContent();
-				}).catch(() => {});
-			}
-		}).catch(() => {});
+		this._invoke('mkdir', { path: parentDir, recursive: true })
+			.then(() => {
+				if (this._invoke) {
+					this._invoke('write_file', { path, contents: template })
+						.then(() => {
+							window.dispatchEvent(new CustomEvent('sidex-open-file', { detail: { path } }));
+							this._renderDynamicContent();
+						})
+						.catch(() => {});
+				}
+			})
+			.catch(() => {});
 	}
 
 	private _createNewSkill(): void {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		const filename = `new-skill-${Date.now()}.md`;
 		const parentDir = `${this._workspacePath}/.sidex/skills`;
 		const path = `${parentDir}/${filename}`;
 
 		const template = `# Skill Name\n\nDescribe what this skill does and when to use it.\n`;
 
-		this._invoke('mkdir', { path: parentDir, recursive: true }).then(() => {
-			if (this._invoke) {
-				this._invoke('write_file', { path, contents: template }).then(() => {
-					window.dispatchEvent(new CustomEvent('sidex-open-file', { detail: { path } }));
-					this._renderDynamicContent();
-				}).catch(() => {});
-			}
-		}).catch(() => {});
+		this._invoke('mkdir', { path: parentDir, recursive: true })
+			.then(() => {
+				if (this._invoke) {
+					this._invoke('write_file', { path, contents: template })
+						.then(() => {
+							window.dispatchEvent(new CustomEvent('sidex-open-file', { detail: { path } }));
+							this._renderDynamicContent();
+						})
+						.catch(() => {});
+				}
+			})
+			.catch(() => {});
 	}
 
 	private _createRow(parent: HTMLElement, label: string, description?: string): HTMLElement {
@@ -368,17 +411,24 @@ export class RulesSection implements SettingsSection {
 		toggle.className = 'sidex-settings-toggle' + (initialState ? ' on' : '');
 
 		if (this._invoke) {
-			this._invoke('settings_get', { section: settingKey }).then((val) => {
-				if (val === true) { toggle.classList.add('on'); }
-				else if (val === false) { toggle.classList.remove('on'); }
-			}).catch(() => {});
+			this._invoke('settings_get', { section: settingKey })
+				.then(val => {
+					if (val === true) {
+						toggle.classList.add('on');
+					} else if (val === false) {
+						toggle.classList.remove('on');
+					}
+				})
+				.catch(() => {});
 		}
 
 		toggle.addEventListener('click', () => {
 			toggle.classList.toggle('on');
 			const value = toggle.classList.contains('on');
 			if (this._invoke) {
-				this._invoke('settings_update', { key: settingKey, value: JSON.stringify(value), scope: 'user' }).catch(() => {});
+				this._invoke('settings_update', { key: settingKey, value: JSON.stringify(value), scope: 'user' }).catch(
+					() => {}
+				);
 			}
 		});
 		row.querySelector('.sidex-settings-row-action')!.appendChild(toggle);

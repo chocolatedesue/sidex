@@ -125,7 +125,7 @@ class ContextAssembler {
 				included.push({
 					name: source.name,
 					priority: source.priority,
-					content: source.content.slice(0, charBudget),
+					content: source.content.slice(0, charBudget)
 				});
 				usedTokens += remaining;
 			}
@@ -146,7 +146,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 		@IModelService private readonly _modelService: IModelService,
 		@IWorkspaceContextService private readonly _workspaceContext: IWorkspaceContextService,
 		@IFileService private readonly _fileService: IFileService,
-		@IRecentEditTracker private readonly _editTracker: IRecentEditTracker,
+		@IRecentEditTracker private readonly _editTracker: IRecentEditTracker
 	) {
 		super();
 	}
@@ -164,7 +164,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 		const [openFilePointers, symbolNames, recentEditSummary] = await Promise.all([
 			this._gatherOpenFilePointers(document),
 			this._gatherSymbolNames(document, position, token),
-			this._gatherRecentEditSummary(),
+			this._gatherRecentEditSummary()
 		]);
 
 		const workspace = this._workspaceContext.getWorkspace();
@@ -178,7 +178,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 			openFilePointers,
 			symbolNames,
 			recentEditSummary,
-			fileTreeRoot,
+			fileTreeRoot
 		};
 	}
 
@@ -199,7 +199,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 			this._gatherOpenFiles(document),
 			this._gatherRecentEdits(),
 			this._gatherImportContext(document),
-			this._gatherFileTree(),
+			this._gatherFileTree()
 		]);
 
 		// Build prioritised source list — reserve budget for prefix/suffix first.
@@ -210,7 +210,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 			...lspContext.map((c, i) => ({ name: `lsp-${i}`, priority: 90 - i, content: c })),
 			...openFiles.map((f, i) => ({ name: `open-${i}`, priority: 70 - i * 2, content: `// ${f.path}\n${f.content}` })),
 			...recentEdits.map((e, i) => ({ name: `edit-${i}`, priority: 60 - i, content: e })),
-			...importContext.map((c, i) => ({ name: `import-${i}`, priority: 50 - i, content: c })),
+			...importContext.map((c, i) => ({ name: `import-${i}`, priority: 50 - i, content: c }))
 		];
 
 		if (fileTree) {
@@ -219,9 +219,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 
 		const included = ContextAssembler.assemble(sources, sourceBudget);
 
-		const pick = (prefix: string) => included
-			.filter(s => s.name.startsWith(prefix))
-			.map(s => s.content);
+		const pick = (prefix: string) => included.filter(s => s.name.startsWith(prefix)).map(s => s.content);
 
 		return {
 			prefix,
@@ -234,12 +232,12 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 					const newline = s.content.indexOf('\n');
 					return {
 						path: s.content.slice(3, newline),
-						content: s.content.slice(newline + 1),
+						content: s.content.slice(newline + 1)
 					};
 				}),
 			recentEdits: pick('edit-'),
 			lspContext: pick('lsp-').concat(pick('import-')),
-			fileTree: included.find(s => s.name === 'fileTree')?.content ?? '',
+			fileTree: included.find(s => s.name === 'fileTree')?.content ?? ''
 		};
 	}
 
@@ -278,11 +276,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 		return Promise.resolve(result);
 	}
 
-	private async _gatherSymbolNames(
-		model: ITextModel,
-		position: Position,
-		token: CancellationToken,
-	): Promise<string[]> {
+	private async _gatherSymbolNames(model: ITextModel, position: Position, token: CancellationToken): Promise<string[]> {
 		const names: string[] = [];
 
 		try {
@@ -310,10 +304,12 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 			if (edits.length === 0) {
 				return Promise.resolve('');
 			}
-			const summary = edits.map(e => {
-				const firstLine = e.split('\n')[0];
-				return firstLine.length > 80 ? firstLine.slice(0, 80) + '...' : firstLine;
-			}).join('; ');
+			const summary = edits
+				.map(e => {
+					const firstLine = e.split('\n')[0];
+					return firstLine.length > 80 ? firstLine.slice(0, 80) + '...' : firstLine;
+				})
+				.join('; ');
 			return Promise.resolve(summary);
 		} catch {
 			return Promise.resolve('');
@@ -322,11 +318,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 
 	// ── Source 2: LSP Definitions / Hover Info ──────────────────────────
 
-	private async _gatherLspContext(
-		model: ITextModel,
-		position: Position,
-		token: CancellationToken,
-	): Promise<string[]> {
+	private async _gatherLspContext(model: ITextModel, position: Position, token: CancellationToken): Promise<string[]> {
 		const results: string[] = [];
 
 		try {
@@ -350,11 +342,11 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 			}
 
 			const provider = hoverProviders[0];
-			const hoverPromises = capped.map(async (pos) => {
+			const hoverPromises = capped.map(async pos => {
 				try {
 					const hover = await Promise.race([
 						provider.provideHover(model, pos, token),
-						new Promise<null>((resolve) => setTimeout(() => resolve(null), 200)),
+						new Promise<null>(resolve => setTimeout(() => resolve(null), 200))
 					]);
 
 					if (!hover || token.isCancellationRequested) {
@@ -406,7 +398,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 
 				result.push({
 					path: resource.fsPath,
-					content: model.getValue().slice(0, MAX_OPEN_FILE_CHARS),
+					content: model.getValue().slice(0, MAX_OPEN_FILE_CHARS)
 				});
 				count++;
 			}
@@ -434,7 +426,7 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 
 		try {
 			const first50Lines = model.getValueInRange(
-				new Range(1, 1, Math.min(50, model.getLineCount()), model.getLineMaxColumn(Math.min(50, model.getLineCount()))),
+				new Range(1, 1, Math.min(50, model.getLineCount()), model.getLineMaxColumn(Math.min(50, model.getLineCount())))
 			);
 
 			let match: RegExpExecArray | null;
@@ -466,7 +458,10 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 		return Promise.resolve(results);
 	}
 
-	private _resolveRelativeImport(model: ITextModel, importPath: string): import('../../../../base/common/uri.js').URI | null {
+	private _resolveRelativeImport(
+		model: ITextModel,
+		importPath: string
+	): import('../../../../base/common/uri.js').URI | null {
 		try {
 			const base = model.uri;
 			const dir = base.with({ path: base.path.slice(0, base.path.lastIndexOf('/')) });
@@ -520,7 +515,12 @@ export class SidexContextEngine extends Disposable implements ISidexContextEngin
 		}
 	}
 
-	private async _walkTree(uri: import('../../../../base/common/uri.js').URI, prefix: string, depth: number, lines: string[]): Promise<void> {
+	private async _walkTree(
+		uri: import('../../../../base/common/uri.js').URI,
+		prefix: string,
+		depth: number,
+		lines: string[]
+	): Promise<void> {
 		if (depth > MAX_FILE_TREE_DEPTH || lines.length >= MAX_FILE_TREE_ENTRIES) {
 			return;
 		}

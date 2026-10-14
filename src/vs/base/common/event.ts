@@ -647,8 +647,7 @@ export namespace Event {
 		// Dev-only leak detection: track when buffer was created and warn
 		// if events accumulate without ever being consumed.
 		let bufferLeakWarningData:
-			| { stack: Stacktrace; timerId: ReturnType<typeof setTimeout>; warned: boolean }
-			| undefined;
+			{ stack: Stacktrace; timerId: ReturnType<typeof setTimeout>; warned: boolean } | undefined;
 		if (_isBufferLeakWarningEnabled()) {
 			bufferLeakWarningData = {
 				stack: Stacktrace.create(),

@@ -2514,6 +2514,5 @@ function taskShellIntegrationWaitOnExitSequence(message: string): (exitCode: num
 
 function getReconnectionData(terminal: ITerminalInstance): IReconnectionTaskData | undefined {
 	return terminal.shellLaunchConfig.attachPersistentProcess?.reconnectionProperties?.data as
-		| IReconnectionTaskData
-		| undefined;
+		IReconnectionTaskData | undefined;
 }

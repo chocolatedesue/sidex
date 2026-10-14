@@ -173,7 +173,6 @@ registerWorkbenchContribution2(
 	WorkbenchPhase.BlockStartup
 );
 
-
 /**
  * VS Code "Markdown Editor" (WYSIWYG) — same viewType `vscode.markdown.editor`
  * as markdown-language-features. Hosted in-workbench because the SideX
@@ -209,15 +208,12 @@ class MarkdownWysiwygEditorContribution extends Disposable implements IWorkbench
 						}
 						return { editor };
 					},
-					createDiffEditorInput: async (diff) => {
+					createDiffEditorInput: async diff => {
 						if (!_editorManager) {
 							_editorManager = this._instantiationService.createInstance(MarkdownEditorManager);
 						}
 						if (!_diffEditorManager) {
-							_diffEditorManager = this._instantiationService.createInstance(
-								MarkdownDiffEditorManager,
-								_editorManager
-							);
+							_diffEditorManager = this._instantiationService.createInstance(MarkdownDiffEditorManager, _editorManager);
 						}
 						const editor = await _diffEditorManager.createDiffEditorInput(diff);
 						if (!editor) {
@@ -389,8 +385,14 @@ CommandsRegistry.registerCommand('markdown.editor.showSource', accessor => {
 
 const markdownEditorPaletteCommands: { id: string; title: string }[] = [
 	{ id: 'markdown.openMarkdownEditor', title: localize2('mdOpenEditor', 'Open Markdown Editor').value },
-	{ id: 'markdown.openMarkdownEditorToSide', title: localize2('mdOpenEditorToSide', 'Open Markdown Editor to the Side').value },
-	{ id: 'markdown.editor.toggleReadonly', title: localize2('mdEditorToggleLock', 'Markdown Editor: Toggle Lock').value },
+	{
+		id: 'markdown.openMarkdownEditorToSide',
+		title: localize2('mdOpenEditorToSide', 'Open Markdown Editor to the Side').value
+	},
+	{
+		id: 'markdown.editor.toggleReadonly',
+		title: localize2('mdEditorToggleLock', 'Markdown Editor: Toggle Lock').value
+	},
 	{ id: 'markdown.editor.refresh', title: localize2('mdEditorRefresh', 'Markdown Editor: Refresh').value },
 	{ id: 'markdown.editor.showSource', title: localize2('mdEditorShowSource', 'Markdown Editor: Show Source').value }
 ];
@@ -426,7 +428,6 @@ MenuRegistry.appendMenuItem(MenuId.EditorTitle, {
 		ContextKeyExpr.equals('resourceExtname', '.md')
 	)
 });
-
 
 CommandsRegistry.registerCommand('markdown.openMarkdownDiffEditor', accessor => {
 	void getOrCreateDiffEditorManager(accessor).openFromActiveDiff();
@@ -488,4 +489,3 @@ Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration).regis
 		}
 	}
 });
-

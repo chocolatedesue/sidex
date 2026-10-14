@@ -31,7 +31,11 @@ import {
 } from '../../../../platform/terminal/common/terminal.js';
 import type { IProcessDetails } from '../../../../platform/terminal/common/terminalProcess.js';
 import type { IProcessEnvironment } from '../../../../base/common/platform.js';
-import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
+import {
+	IWorkbenchContribution,
+	registerWorkbenchContribution2,
+	WorkbenchPhase
+} from '../../../common/contributions.js';
 import { ITerminalInstanceService, ITerminalService } from './terminal.js';
 import { ISideXRemoteService } from '../../../../platform/sidex/browser/sidexRemoteService.js';
 import { ILogService } from '../../../../platform/log/common/log.js';

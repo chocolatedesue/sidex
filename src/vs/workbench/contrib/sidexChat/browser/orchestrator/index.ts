@@ -19,6 +19,6 @@ export type {
 	OrchestratorEvent,
 	OrchestratorConfig,
 	SpawnTaskRequest,
-	VerifierVerdict,
+	VerifierVerdict
 } from './types.js';
 export { DEFAULT_ORCHESTRATOR_CONFIG } from './types.js';

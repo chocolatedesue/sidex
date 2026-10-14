@@ -422,12 +422,10 @@ export class RangePriorityQueueImpl implements RangePriorityQueue {
 
 	public addRangeAndResize(range: OffsetRange, newLength: number): void {
 		let idxFirstMightBeIntersecting = 0;
-		while (
-			!(
-				idxFirstMightBeIntersecting >= this._ranges.length ||
-				range.start <= this._ranges[idxFirstMightBeIntersecting].endExclusive
-			)
-		) {
+		while (!(
+			idxFirstMightBeIntersecting >= this._ranges.length ||
+			range.start <= this._ranges[idxFirstMightBeIntersecting].endExclusive
+		)) {
 			idxFirstMightBeIntersecting++;
 		}
 		let idxFirstIsAfter = idxFirstMightBeIntersecting;

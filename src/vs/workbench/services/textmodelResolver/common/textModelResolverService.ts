@@ -215,8 +215,8 @@ export class TextModelResolverService extends Disposable implements ITextModelSe
 	declare readonly _serviceBrand: undefined;
 
 	private _resourceModelCollection:
-		| (ResourceModelCollection & ReferenceCollection<Promise<IResolvedTextEditorModel>>) /* TS Fail */
-		| undefined = undefined;
+		(ResourceModelCollection & ReferenceCollection<Promise<IResolvedTextEditorModel>>) /* TS Fail */ | undefined =
+		undefined;
 	private get resourceModelCollection() {
 		if (!this._resourceModelCollection) {
 			this._resourceModelCollection = this.instantiationService.createInstance(ResourceModelCollection);

@@ -1367,13 +1367,11 @@ class MultiRunTestDecoration extends RunTestDecoration implements ITestDecoratio
 
 		disposable.add(toDisposable(() => allActions.forEach(a => a.dispose())));
 
-		const testItems = this.tests.map(
-			(testItem): IMultiRunTest => ({
-				currentLabel: testItem.test.item.label,
-				testItem,
-				parent: TestId.fromString(testItem.test.item.extId).parentId
-			})
-		);
+		const testItems = this.tests.map((testItem): IMultiRunTest => ({
+			currentLabel: testItem.test.item.label,
+			testItem,
+			parent: TestId.fromString(testItem.test.item.extId).parentId
+		}));
 
 		const getLabelConflicts = (tests: typeof testItems) => {
 			const labelCount = new Map<string, number>();

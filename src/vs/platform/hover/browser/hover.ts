@@ -50,8 +50,7 @@ export class WorkbenchHoverDelegate extends Disposable implements IHoverDelegate
 		public readonly placement: 'mouse' | 'element',
 		private readonly hoverOptions: IHoverDelayOptions | undefined,
 		private overrideOptions:
-			| Partial<IHoverOptions>
-			| ((options: IHoverDelegateOptions, focus?: boolean) => Partial<IHoverOptions>) = {},
+			Partial<IHoverOptions> | ((options: IHoverDelegateOptions, focus?: boolean) => Partial<IHoverOptions>) = {},
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IHoverService private readonly hoverService: IHoverService
 	) {

@@ -13,9 +13,7 @@ import { TextureAtlasShelfAllocator } from './textureAtlasShelfAllocator.js';
 import { TextureAtlasSlabAllocator } from './textureAtlasSlabAllocator.js';
 
 export type AllocatorType =
-	| 'shelf'
-	| 'slab'
-	| ((canvas: OffscreenCanvas, textureIndex: number) => ITextureAtlasAllocator);
+	'shelf' | 'slab' | ((canvas: OffscreenCanvas, textureIndex: number) => ITextureAtlasAllocator);
 
 export class TextureAtlasPage extends Disposable implements IReadableTextureAtlasPage {
 	private _version: number = 0;

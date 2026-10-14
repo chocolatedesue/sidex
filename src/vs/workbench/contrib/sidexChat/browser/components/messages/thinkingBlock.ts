@@ -21,26 +21,30 @@ export class ThinkingBlock extends Component {
 		this._headerEl.setAttribute('role', 'button');
 		this._headerEl.setAttribute('aria-expanded', 'false');
 		this._headerEl.tabIndex = 0;
-		this._headerEl.style.cssText = 'cursor: pointer; opacity: 1; display: flex; align-items: center; gap: 6px; padding: 4px 0; margin-bottom: 6px;';
+		this._headerEl.style.cssText =
+			'cursor: pointer; opacity: 1; display: flex; align-items: center; gap: 6px; padding: 4px 0; margin-bottom: 6px;';
 		const action = DOM.append(this._headerEl, $('span.ui-collapsible-action'));
 		action.style.cssText = 'font-weight: 400; color: var(--vscode-descriptionForeground); flex-shrink: 0;';
 		action.textContent = 'Thought';
 
 		this._elapsedEl = DOM.append(this._headerEl, $('span.ui-collapsible-details'));
-		this._elapsedEl.style.cssText = 'color: var(--vscode-descriptionForeground); opacity: 0.6; overflow: hidden; text-overflow: ellipsis;';
+		this._elapsedEl.style.cssText =
+			'color: var(--vscode-descriptionForeground); opacity: 0.6; overflow: hidden; text-overflow: ellipsis;';
 		this._elapsedEl.textContent = 'for 0s';
 
 		this._chevronEl = document.createElement('i');
 		this._chevronEl.className = 'cursor-icon ui-icon ui-collapsible-chevron';
 		this._chevronEl.setAttribute('data-icon-name', 'chevron-right');
 		this._chevronEl.setAttribute('aria-hidden', 'true');
-		this._chevronEl.style.cssText = '--cursor-icon-content: ""; --icon-size: 10px; transition: transform 0.15s ease; margin-left: 4px;';
+		this._chevronEl.style.cssText =
+			'--cursor-icon-content: ""; --icon-size: 10px; transition: transform 0.15s ease; margin-left: 4px;';
 		this._headerEl.appendChild(this._chevronEl);
 
 		this._indicatorEl = document.createElement('span');
 
 		this._contentEl = this.append('div', 'sc-thinking-content');
-		this._contentEl.style.cssText = 'display: none; padding: 8px 12px; margin-bottom: 8px; border-left: 2px solid var(--vscode-widget-border, rgba(255,255,255,0.1)); font-size: 12px; color: var(--vscode-descriptionForeground); opacity: 0.8; font-family: monospace; white-space: pre-wrap; word-break: break-all;';
+		this._contentEl.style.cssText =
+			'display: none; padding: 8px 12px; margin-bottom: 8px; border-left: 2px solid var(--vscode-widget-border, rgba(255,255,255,0.1)); font-size: 12px; color: var(--vscode-descriptionForeground); opacity: 0.8; font-family: monospace; white-space: pre-wrap; word-break: break-all;';
 
 		this.on(this._headerEl, 'click', () => this._toggle());
 	}

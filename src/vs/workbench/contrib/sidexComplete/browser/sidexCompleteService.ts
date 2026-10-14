@@ -31,13 +31,12 @@ const STREAM_TIMEOUT_MS = 8_000;
 const STOP_TOKENS = ['<|endoftext|>', '\n\n\n'];
 
 export class SidexCompleteService {
-
 	/**
 	 * Resolved per request rather than captured: the local agent server picks a
 	 * fresh port every time it restarts, so a URL captured at construction goes
 	 * stale the first time credentials change.
 	 */
-	constructor(private readonly _baseUrl: () => string) { }
+	constructor(private readonly _baseUrl: () => string) {}
 
 	private async _proxyPost(url: string, body: string, signal?: AbortSignal): Promise<string | null> {
 		if (isTauri()) {
@@ -46,7 +45,7 @@ export class SidexCompleteService {
 					url,
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body,
+					body
 				});
 				return result;
 			} catch (e) {
@@ -57,7 +56,7 @@ export class SidexCompleteService {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body,
-			signal,
+			signal
 		});
 		if (!resp.ok) {
 			console.warn('[sidex-complete] fetch failed:', resp.status);
@@ -85,7 +84,7 @@ export class SidexCompleteService {
 				max_tokens: request.maxTokens,
 				temperature: 0,
 				stop: STOP_TOKENS,
-				logprobs: 5,
+				logprobs: 5
 			});
 
 			const rawJson = await this._proxyPost(url, body, controller.signal);
@@ -108,7 +107,7 @@ export class SidexCompleteService {
 	async completeStreaming(
 		request: ICompletionRequest,
 		callback: IStreamingCallback,
-		signal?: AbortSignal,
+		signal?: AbortSignal
 	): Promise<ICompletionResponse | null> {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
@@ -128,7 +127,7 @@ export class SidexCompleteService {
 				temperature: 0,
 				stop: STOP_TOKENS,
 				logprobs: 5,
-				stream: true,
+				stream: true
 			});
 
 			// Tauri invoke cannot stream, so fall back to non-streaming via proxy
@@ -139,7 +138,7 @@ export class SidexCompleteService {
 					max_tokens: request.maxTokens,
 					temperature: 0,
 					stop: STOP_TOKENS,
-					logprobs: 5,
+					logprobs: 5
 				});
 				const rawJson = await this._proxyPost(url, nonStreamBody, controller.signal);
 				if (!rawJson) {
@@ -163,7 +162,7 @@ export class SidexCompleteService {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: bodyPayload,
-				signal: controller.signal,
+				signal: controller.signal
 			});
 
 			if (!resp.ok) {
@@ -246,7 +245,7 @@ export class SidexCompleteService {
 			return {
 				text,
 				finishReason,
-				logprobs: allLogprobs.length > 0 ? allLogprobs : undefined,
+				logprobs: allLogprobs.length > 0 ? allLogprobs : undefined
 			};
 		} catch {
 			return null;
@@ -283,7 +282,7 @@ export class SidexCompleteService {
 		return {
 			text,
 			finishReason: choice.finish_reason ?? 'stop',
-			logprobs: choice.logprobs?.token_logprobs,
+			logprobs: choice.logprobs?.token_logprobs
 		};
 	}
 

@@ -63,9 +63,7 @@ export class ConfigurationModel implements IConfigurationModel {
 		private readonly _keys: string[],
 		private readonly _overrides: IOverrides[],
 		private readonly _raw:
-			| IStringDictionary<unknown>
-			| ReadonlyArray<IStringDictionary<unknown> | ConfigurationModel>
-			| undefined,
+			IStringDictionary<unknown> | ReadonlyArray<IStringDictionary<unknown> | ConfigurationModel> | undefined,
 		private readonly logService: ILogService
 	) {}
 

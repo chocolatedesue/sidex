@@ -56,12 +56,12 @@ export class SidexTelemetryService extends Disposable implements ISidexTelemetry
 	private _idCounter = 0;
 	private _flushing = false;
 
-	constructor(
-		@IConfigurationService configurationService: IConfigurationService,
-	) {
+	constructor(@IConfigurationService configurationService: IConfigurationService) {
 		super();
 		this._serverUrl = configurationService.getValue<string>('sidex.complete.serverUrl') || '';
-		this._flushTimer = setInterval(() => { this._backgroundFlush(); }, FLUSH_INTERVAL_MS);
+		this._flushTimer = setInterval(() => {
+			this._backgroundFlush();
+		}, FLUSH_INTERVAL_MS);
 	}
 
 	// ------------------------------------------------------------------
@@ -83,7 +83,12 @@ export class SidexTelemetryService extends Disposable implements ISidexTelemetry
 		this._buffer.push(entry);
 		this._idIndex.set(id, entry);
 
-		console.log('[sidex-telemetry] shown', { id, language: entry.prompt.language, latencyMs: entry.latencyMs, confidence: entry.confidence });
+		console.log('[sidex-telemetry] shown', {
+			id,
+			language: entry.prompt.language,
+			latencyMs: entry.latencyMs,
+			confidence: entry.confidence
+		});
 		return id;
 	}
 
@@ -153,7 +158,7 @@ export class SidexTelemetryService extends Disposable implements ISidexTelemetry
 			const resp = await fetch(`${this._serverUrl}/v1/telemetry`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ events }),
+				body: JSON.stringify({ events })
 			});
 			if (!resp.ok) {
 				throw new Error(`telemetry flush failed: ${resp.status}`);

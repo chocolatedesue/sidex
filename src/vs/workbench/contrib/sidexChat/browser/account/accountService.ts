@@ -43,7 +43,7 @@ const FALLBACK_PROFILE: IUserProfile = {
 	id: 'local',
 	email: '',
 	name: 'You',
-	picture: null,
+	picture: null
 };
 
 export const IAccountService = createDecorator<IAccountService>('accountService');
@@ -74,7 +74,7 @@ export class AccountService extends Disposable implements IAccountService {
 			accessToken: '',
 			refreshToken: null,
 			expiresAt: 0,
-			user: FALLBACK_PROFILE,
+			user: FALLBACK_PROFILE
 		};
 		void this._loadProfile();
 	}
@@ -107,7 +107,7 @@ export class AccountService extends Disposable implements IAccountService {
 			return;
 		}
 		try {
-			const session = await invoke('auth_get_session') as IAuthSession | null;
+			const session = (await invoke('auth_get_session')) as IAuthSession | null;
 			if (session?.user) {
 				this._session = session;
 				this._onDidChangeSession.fire(session);

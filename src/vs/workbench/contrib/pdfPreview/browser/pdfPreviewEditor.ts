@@ -150,9 +150,8 @@ export class PdfPreviewEditor extends EditorPane {
 		if (!this._embedPdf) {
 			const mod: any = await import('@embedpdf/snippet');
 			const api = mod?.default ?? mod;
-			const init: EmbedPdfInit | undefined = typeof api?.init === 'function'
-				? api.init.bind(api)
-				: (typeof mod?.init === 'function' ? mod.init : undefined);
+			const init: EmbedPdfInit | undefined =
+				typeof api?.init === 'function' ? api.init.bind(api) : typeof mod?.init === 'function' ? mod.init : undefined;
 			if (typeof init !== 'function') {
 				throw new Error('@embedpdf/snippet did not export EmbedPDF.init');
 			}
@@ -216,7 +215,7 @@ export class PdfPreviewEditor extends EditorPane {
 				disabledCategories: ['print', 'export', 'redaction', 'document'],
 				annotations: { autoOpenLinks: false },
 				zoom: { defaultZoomLevel: 'page-width' },
-				spread: { defaultSpreadMode: 'odd' },
+				spread: { defaultSpreadMode: 'odd' }
 			});
 
 			if (!this._viewer) {
@@ -238,7 +237,7 @@ function resolveWasmUrl(): string {
 	if (typeof pdfiumWasmUrl === 'string' && pdfiumWasmUrl.length > 0) {
 		return pdfiumWasmUrl;
 	}
-	const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI : '/';
+	const base = typeof document !== 'undefined' && document.baseURI ? document.baseURI : '/';
 	try {
 		return new URL('pdfium.wasm', base).href;
 	} catch {

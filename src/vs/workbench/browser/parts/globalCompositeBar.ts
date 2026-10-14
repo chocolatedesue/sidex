@@ -220,8 +220,7 @@ abstract class AbstractGlobalActivityActionViewItem extends CompositeBarActionVi
 		options: ICompositeBarActionViewItemOptions,
 		private readonly contextMenuActionsProvider: () => IAction[],
 		private readonly contextMenuAlignmentOptions: () =>
-			| Readonly<{ anchorAlignment: AnchorAlignment; anchorAxisAlignment: AnchorAxisAlignment }>
-			| undefined,
+			Readonly<{ anchorAlignment: AnchorAlignment; anchorAxisAlignment: AnchorAxisAlignment }> | undefined,
 		@IThemeService themeService: IThemeService,
 		@IHoverService hoverService: IHoverService,
 		@IMenuService private readonly menuService: IMenuService,
@@ -349,8 +348,7 @@ export class AccountsActivityActionViewItem extends AbstractGlobalActivityAction
 		contextMenuActionsProvider: () => IAction[],
 		options: ICompositeBarActionViewItemOptions,
 		contextMenuAlignmentOptions: () =>
-			| Readonly<{ anchorAlignment: AnchorAlignment; anchorAxisAlignment: AnchorAxisAlignment }>
-			| undefined,
+			Readonly<{ anchorAlignment: AnchorAlignment; anchorAxisAlignment: AnchorAxisAlignment }> | undefined,
 		private readonly fillContextMenuActions: (actions: IAction[]) => void,
 		@IThemeService themeService: IThemeService,
 		@ILifecycleService private readonly lifecycleService: ILifecycleService,
@@ -706,8 +704,7 @@ export class GlobalActivityActionViewItem extends AbstractGlobalActivityActionVi
 		contextMenuActionsProvider: () => IAction[],
 		options: ICompositeBarActionViewItemOptions,
 		contextMenuAlignmentOptions: () =>
-			| Readonly<{ anchorAlignment: AnchorAlignment; anchorAxisAlignment: AnchorAxisAlignment }>
-			| undefined,
+			Readonly<{ anchorAlignment: AnchorAlignment; anchorAxisAlignment: AnchorAxisAlignment }> | undefined,
 		@IUserDataProfileService private readonly userDataProfileService: IUserDataProfileService,
 		@IThemeService themeService: IThemeService,
 		@IHoverService hoverService: IHoverService,

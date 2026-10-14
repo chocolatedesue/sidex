@@ -55,9 +55,7 @@ else if (globalThis._VSCODE_PRODUCT_JSON && globalThis._VSCODE_PACKAGE_JSON) {
 // Web environment or unknown
 else {
 	// Built time configuration (do NOT modify)
-	product = {
-		/*BUILD->INSERT_PRODUCT_CONFIGURATION*/
-	} as unknown as IProductConfiguration;
+	product = {/*BUILD->INSERT_PRODUCT_CONFIGURATION*/} as unknown as IProductConfiguration;
 
 	// Running out of sources
 	if (Object.keys(product).length === 0) {
@@ -73,12 +71,7 @@ else {
 			licenseUrl: 'https://github.com/Sidenai/sidex/blob/main/LICENSE',
 			serverLicenseUrl: 'https://github.com/Sidenai/sidex/blob/main/LICENSE',
 			extensionEnabledApiProposals: {
-				'jeanp413.open-remote-ssh': [
-					'resolvers',
-					'tunnels',
-					'contribRemoteHelp',
-					'contribViewsRemote'
-				],
+				'jeanp413.open-remote-ssh': ['resolvers', 'tunnels', 'contribRemoteHelp', 'contribViewsRemote'],
 				'ms-vscode-remote.remote-ssh': ['resolvers', 'tunnels', 'contribRemoteHelp', 'contribViewsRemote'],
 				'ms-vscode-remote.remote-ssh-edit': ['resolvers', 'contribViewsRemote']
 			},

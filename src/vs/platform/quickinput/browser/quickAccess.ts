@@ -136,7 +136,7 @@ export class QuickAccessController extends Disposable implements IQuickAccessCon
 		picker.quickNavigate = options?.quickNavigateConfiguration;
 		picker.hideInput = !!picker.quickNavigate && !visibleQuickAccess; // only hide input if there was no picker opened already
 		if (typeof options?.itemActivation === 'number' || options?.quickNavigateConfiguration) {
-			picker.itemActivation = options?.itemActivation ?? ItemActivation.SECOND /* quick nav is always second */;
+			picker.itemActivation = options?.itemActivation ?? ItemActivation.SECOND; /* quick nav is always second */
 		}
 		picker.contextKey = descriptor?.contextKey;
 		picker.filterValue = (value: string) => value.substring(descriptor ? descriptor.prefix.length : 0);

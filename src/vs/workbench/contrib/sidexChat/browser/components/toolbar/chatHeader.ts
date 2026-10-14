@@ -86,7 +86,7 @@ export class ChatHeader extends Component {
 			{ id: 'archive', label: 'Archive', codicon: Codicon.archive },
 			{ id: 'separator', label: '', codicon: Codicon.dash },
 			{ id: 'rename', label: 'Rename', codicon: Codicon.edit },
-			{ id: 'delete', label: 'Delete', codicon: Codicon.trashcan },
+			{ id: 'delete', label: 'Delete', codicon: Codicon.trashcan }
 		];
 		for (const action of contextActions) {
 			if (action.id === 'separator') {
@@ -99,9 +99,11 @@ export class ChatHeader extends Component {
 			label.textContent = action.label;
 			row.dataset.action = action.id;
 		}
-		this.on(this._itemContextMenu, 'click', (e) => {
+		this.on(this._itemContextMenu, 'click', e => {
 			const target = (e.target as HTMLElement).closest('.sc-context-item') as HTMLElement | null;
-			if (!target) { return; }
+			if (!target) {
+				return;
+			}
 			const sessionId = this._itemContextMenu.dataset.sessionId || '';
 			const action = target.dataset.action as ISessionAction['action'];
 			if (sessionId && action) {
@@ -129,7 +131,7 @@ export class ChatHeader extends Component {
 		});
 
 		// Close on Escape
-		this.on(this._searchInput, 'keydown', (e) => {
+		this.on(this._searchInput, 'keydown', e => {
 			if ((e as KeyboardEvent).key === 'Escape') {
 				this._searchInput.value = '';
 				this._searchInput.blur();
@@ -152,7 +154,7 @@ export class ChatHeader extends Component {
 			{ id: 'separator', label: '', codicon: Codicon.dash },
 			{ id: 'configure_rules', label: 'Configure Rules', codicon: Codicon.notebook },
 			{ id: 'configure_skills', label: 'Configure Skills', codicon: Codicon.book },
-			{ id: 'edit_memories', label: 'Edit Memories', codicon: Codicon.lightbulb },
+			{ id: 'edit_memories', label: 'Edit Memories', codicon: Codicon.lightbulb }
 		];
 		for (const item of menuItems) {
 			if (item.id === 'separator') {
@@ -166,10 +168,10 @@ export class ChatHeader extends Component {
 			row.appendChild(icon(item.codicon));
 			const label = DOM.append(row, $('span'));
 			label.textContent = item.label;
-			
+
 			if (item.disabled) {
 				// Prevent clicking disabled coming-soon items
-				this.on(row, 'click', (e) => e.stopPropagation());
+				this.on(row, 'click', e => e.stopPropagation());
 				continue;
 			}
 
@@ -188,7 +190,7 @@ export class ChatHeader extends Component {
 		const gearBtn = DOM.append(mcpRight, $('button.sc-menu-mcp-btn'));
 		gearBtn.title = 'Configure MCP Servers';
 		gearBtn.appendChild(icon(Codicon.settingsGear));
-		this.on(gearBtn, 'click', (e) => {
+		this.on(gearBtn, 'click', e => {
 			e.stopPropagation();
 			this._closeMenu();
 			this._onMenuAction.fire('sidex.profile.settings');
@@ -199,15 +201,23 @@ export class ChatHeader extends Component {
 			const g = globalThis as any;
 			const invoke = g.__TAURI_INVOKE__ ?? g.__TAI_INTERNALS__?.invoke ?? g.__TAURI_INTERNALS__?.invoke;
 			if (invoke) {
-				invoke('mcp_list_servers').then((servers: any) => {
-					const count = Array.isArray(servers) ? servers.length : typeof servers === 'object' && servers ? Object.keys(servers).length : 0;
-					mcpLeft.textContent = `${count} MCPs`;
-				}).catch(() => {});
+				invoke('mcp_list_servers')
+					.then((servers: any) => {
+						const count = Array.isArray(servers)
+							? servers.length
+							: typeof servers === 'object' && servers
+								? Object.keys(servers).length
+								: 0;
+						mcpLeft.textContent = `${count} MCPs`;
+					})
+					.catch(() => {});
 			}
-		} catch { /* ignore */ }
+		} catch {
+			/* ignore */
+		}
 
 		// Close panels on outside click
-		this.on(document.body, 'click', (e) => {
+		this.on(document.body, 'click', e => {
 			if (!this.element.contains(e.target as Node)) {
 				this._closeHistory();
 				this._closeMenu();
@@ -222,7 +232,9 @@ export class ChatHeader extends Component {
 	}
 
 	showBrief(text: string): void {
-		if (this._briefTimer) { clearTimeout(this._briefTimer); }
+		if (this._briefTimer) {
+			clearTimeout(this._briefTimer);
+		}
 		this._briefEl.textContent = text;
 		this._briefEl.classList.add('visible');
 		this._briefTimer = setTimeout(() => {
@@ -255,20 +267,22 @@ export class ChatHeader extends Component {
 			const pinBtn = DOM.append(actions, $('button.sc-history-action-btn'));
 			pinBtn.title = 'Pin';
 			pinBtn.appendChild(icon(Codicon.pin));
-			if (s.pinned) { pinBtn.classList.add('active'); }
+			if (s.pinned) {
+				pinBtn.classList.add('active');
+			}
 			const archiveBtn = DOM.append(actions, $('button.sc-history-action-btn'));
 			archiveBtn.title = 'Archive';
 			archiveBtn.appendChild(icon(Codicon.archive));
 
-			this.on(pinBtn, 'click', (e) => {
+			this.on(pinBtn, 'click', e => {
 				e.stopPropagation();
 				this._onSessionAction.fire({ sessionId: s.id, action: 'pin' });
 			});
-			this.on(archiveBtn, 'click', (e) => {
+			this.on(archiveBtn, 'click', e => {
 				e.stopPropagation();
 				this._onSessionAction.fire({ sessionId: s.id, action: 'archive' });
 			});
-			this.on(moreBtn, 'click', (e) => {
+			this.on(moreBtn, 'click', e => {
 				e.stopPropagation();
 				this._showItemContextMenu(s.id, moreBtn);
 			});
@@ -339,5 +353,4 @@ export class ChatHeader extends Component {
 			el.style.display = !q || title.includes(q) ? '' : 'none';
 		}
 	}
-
 }

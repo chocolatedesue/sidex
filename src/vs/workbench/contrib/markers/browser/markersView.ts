@@ -112,8 +112,7 @@ export interface IProblemsWidget {
 	get contextKeyService(): IContextKeyService;
 
 	get onContextMenu():
-		| Event<ITreeContextMenuEvent<MarkerElement | null>>
-		| Event<ITableContextMenuEvent<MarkerTableItem>>;
+		Event<ITreeContextMenuEvent<MarkerElement | null>> | Event<ITableContextMenuEvent<MarkerTableItem>>;
 	get onDidChangeFocus(): Event<ITreeEvent<MarkerElement | null>> | Event<ITableEvent<MarkerTableItem>>;
 	get onDidChangeSelection(): Event<ITreeEvent<MarkerElement | null>> | Event<ITableEvent<MarkerTableItem>>;
 	get onDidOpen(): Event<IOpenEvent<MarkerElement | MarkerTableItem | undefined>>;

@@ -519,16 +519,14 @@ export class CodeActionController extends Disposable implements IEditorContribut
 			return [];
 		}
 
-		const resultActions = actions.documentation.map(
-			(command): IAction => ({
-				id: command.id,
-				label: command.title,
-				tooltip: command.tooltip ?? '',
-				class: undefined,
-				enabled: true,
-				run: () => this._commandService.executeCommand(command.id, ...(command.arguments ?? []))
-			})
-		);
+		const resultActions = actions.documentation.map((command): IAction => ({
+			id: command.id,
+			label: command.title,
+			tooltip: command.tooltip ?? '',
+			class: undefined,
+			enabled: true,
+			run: () => this._commandService.executeCommand(command.id, ...(command.arguments ?? []))
+		}));
 
 		if (
 			options.includeDisabledActions &&

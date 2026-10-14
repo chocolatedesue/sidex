@@ -481,7 +481,7 @@ export function decodeHex(hex: string): VSBuffer {
 		throw new SyntaxError('Hex string must have an even length');
 	}
 	const out = new Uint8Array(hex.length >> 1);
-	for (let i = 0; i < hex.length; ) {
+	for (let i = 0; i < hex.length;) {
 		out[i >> 1] = (decodeHexChar(hex, i++) << 4) | decodeHexChar(hex, i++);
 	}
 	return VSBuffer.wrap(out);

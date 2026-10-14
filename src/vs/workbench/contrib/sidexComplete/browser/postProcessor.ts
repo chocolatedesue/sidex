@@ -10,12 +10,12 @@ const DUPLICATE_SCAN_LINES = 50;
 const BRACKET_PAIRS: ReadonlyMap<string, string> = new Map([
 	['(', ')'],
 	['[', ']'],
-	['{', '}'],
+	['{', '}']
 ]);
 const CLOSE_TO_OPEN: ReadonlyMap<string, string> = new Map([
 	[')', '('],
 	[']', '['],
-	['}', '{'],
+	['}', '{']
 ]);
 
 export interface PostProcessContext {
@@ -25,7 +25,6 @@ export interface PostProcessContext {
 }
 
 export class CompletionPostProcessor {
-
 	process(completion: string, context: PostProcessContext): string | null {
 		let result = this._stripSpecialTokens(completion);
 
@@ -68,7 +67,7 @@ export class CompletionPostProcessor {
 		const suffixLines = suffix.split('\n');
 		const nearbyText = [
 			...prefixLines.slice(-DUPLICATE_SCAN_LINES),
-			...suffixLines.slice(0, DUPLICATE_SCAN_LINES),
+			...suffixLines.slice(0, DUPLICATE_SCAN_LINES)
 		].join('\n');
 
 		return nearbyText.includes(trimmed);
@@ -112,9 +111,7 @@ export class CompletionPostProcessor {
 	private _enforceMaxLength(text: string): string {
 		const lines = text.split('\n');
 		if (lines.length === 1) {
-			return text.length > MAX_SINGLELINE_CHARS
-				? text.slice(0, MAX_SINGLELINE_CHARS)
-				: text;
+			return text.length > MAX_SINGLELINE_CHARS ? text.slice(0, MAX_SINGLELINE_CHARS) : text;
 		}
 		if (lines.length > MAX_MULTILINE_LINES) {
 			return lines.slice(0, MAX_MULTILINE_LINES).join('\n');
@@ -136,7 +133,7 @@ export class CompletionPostProcessor {
 				continue;
 			}
 
-			if (ch === '"' || ch === '\'' || ch === '`') {
+			if (ch === '"' || ch === "'" || ch === '`') {
 				inString.active = true;
 				inString.char = ch;
 				continue;
@@ -172,27 +169,29 @@ export class CompletionPostProcessor {
 			return text;
 		}
 
-		return lines.map((line) => {
-			if (!line.trim()) {
-				return line;
-			}
-			const stripped = line.replace(/^[\t ]+/, '');
-			const leadingWhitespace = line.slice(0, line.length - stripped.length);
+		return lines
+			.map(line => {
+				if (!line.trim()) {
+					return line;
+				}
+				const stripped = line.replace(/^[\t ]+/, '');
+				const leadingWhitespace = line.slice(0, line.length - stripped.length);
 
-			if (useTabs && leadingWhitespace.includes(' ')) {
-				const spaceCount = (leadingWhitespace.match(/ /g) || []).length;
-				const tabEquiv = Math.round(spaceCount / 4);
-				const existingTabs = (leadingWhitespace.match(/\t/g) || []).length;
-				return '\t'.repeat(existingTabs + tabEquiv) + stripped;
-			}
-			if (!useTabs && leadingWhitespace.includes('\t')) {
-				const tabCount = (leadingWhitespace.match(/\t/g) || []).length;
-				const spaceEquiv = tabCount * 4;
-				const existingSpaces = (leadingWhitespace.match(/ /g) || []).length;
-				return ' '.repeat(existingSpaces + spaceEquiv) + stripped;
-			}
-			return line;
-		}).join('\n');
+				if (useTabs && leadingWhitespace.includes(' ')) {
+					const spaceCount = (leadingWhitespace.match(/ /g) || []).length;
+					const tabEquiv = Math.round(spaceCount / 4);
+					const existingTabs = (leadingWhitespace.match(/\t/g) || []).length;
+					return '\t'.repeat(existingTabs + tabEquiv) + stripped;
+				}
+				if (!useTabs && leadingWhitespace.includes('\t')) {
+					const tabCount = (leadingWhitespace.match(/\t/g) || []).length;
+					const spaceEquiv = tabCount * 4;
+					const existingSpaces = (leadingWhitespace.match(/ /g) || []).length;
+					return ' '.repeat(existingSpaces + spaceEquiv) + stripped;
+				}
+				return line;
+			})
+			.join('\n');
 	}
 
 	private _detectIndentStyle(lines: string[]): boolean {
@@ -265,22 +264,36 @@ export class CompletionPostProcessor {
 		const usesSemicolons = semiCount / stmtCount > 0.5;
 		const completionLines = text.split('\n');
 
-		return completionLines.map((line) => {
-			const trimmed = line.trimEnd();
-			if (!trimmed || trimmed.endsWith('{') || trimmed.endsWith('}') || trimmed.startsWith('//') || trimmed.startsWith('/*')) {
-				return line;
-			}
-
-			if (usesSemicolons && !trimmed.endsWith(';') && !trimmed.endsWith(',') && !trimmed.endsWith('(') && !trimmed.endsWith(':')) {
-				const isStatement = /^(const |let |var |return |import |export |throw |await )/.test(trimmed.trim())
-					|| /[)}\]]$/.test(trimmed);
-				if (isStatement) {
-					return line.trimEnd() + ';';
+		return completionLines
+			.map(line => {
+				const trimmed = line.trimEnd();
+				if (
+					!trimmed ||
+					trimmed.endsWith('{') ||
+					trimmed.endsWith('}') ||
+					trimmed.startsWith('//') ||
+					trimmed.startsWith('/*')
+				) {
+					return line;
 				}
-			} else if (!usesSemicolons && trimmed.endsWith(';')) {
-				return line.slice(0, -1);
-			}
-			return line;
-		}).join('\n');
+
+				if (
+					usesSemicolons &&
+					!trimmed.endsWith(';') &&
+					!trimmed.endsWith(',') &&
+					!trimmed.endsWith('(') &&
+					!trimmed.endsWith(':')
+				) {
+					const isStatement =
+						/^(const |let |var |return |import |export |throw |await )/.test(trimmed.trim()) || /[)}\]]$/.test(trimmed);
+					if (isStatement) {
+						return line.trimEnd() + ';';
+					}
+				} else if (!usesSemicolons && trimmed.endsWith(';')) {
+					return line.slice(0, -1);
+				}
+				return line;
+			})
+			.join('\n');
 	}
 }

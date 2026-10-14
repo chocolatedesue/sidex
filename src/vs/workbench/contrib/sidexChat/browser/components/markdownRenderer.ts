@@ -39,14 +39,16 @@ export function renderMarkdown(text: string): string {
 			const endLine = citationMatch[2];
 			const filepath = citationMatch[3];
 			const codeBody = citationMatch[4].trimEnd();
-			return `<div class="sc-code-citation" data-file="${escapeAttr(filepath)}" data-start-line="${startLine}" data-end-line="${endLine}">` +
+			return (
+				`<div class="sc-code-citation" data-file="${escapeAttr(filepath)}" data-start-line="${startLine}" data-end-line="${endLine}">` +
 				`<div class="sc-citation-header" title="Open ${escapeAttr(filepath)}">` +
 				`<span class="sc-citation-icon">📄</span> ` +
 				`<span class="sc-citation-path">${escapeHtml(filepath)}</span>` +
 				`<span class="sc-citation-lines">:${startLine}-${endLine}</span>` +
 				`</div>` +
 				`<pre class="sc-code-block sc-citation-code" style="margin:0; padding:10px; background:var(--vscode-textCodeBlock-background); font-family:var(--vscode-editor-font-family); font-size:12px; overflow-x:auto;"><code>${codeBody}</code></pre>` +
-				`</div>`;
+				`</div>`
+			);
 		}
 		const label = lang ? `<span class="sc-code-lang">${escapeHtml(lang)}</span>` : '';
 		return `<pre class="sc-code-block" style="background:var(--vscode-textCodeBlock-background);border-radius:6px;padding:10px;margin:8px 0;font-family:monospace;font-size:12px;overflow-x:auto;">${label}<code>${code.trimEnd()}</code></pre>`;
@@ -56,13 +58,28 @@ export function renderMarkdown(text: string): string {
 	html = renderTables(html);
 
 	// Headings (#### before ### before ## before #)
-	html = html.replace(/^#### (.+)$/gm, '<h4 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:13px;">$1</h4>');
-	html = html.replace(/^### (.+)$/gm, '<h3 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:14px;">$1</h3>');
-	html = html.replace(/^## (.+)$/gm, '<h2 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:16px;">$1</h2>');
-	html = html.replace(/^# (.+)$/gm, '<h1 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:18px;">$1</h1>');
+	html = html.replace(
+		/^#### (.+)$/gm,
+		'<h4 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:13px;">$1</h4>'
+	);
+	html = html.replace(
+		/^### (.+)$/gm,
+		'<h3 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:14px;">$1</h3>'
+	);
+	html = html.replace(
+		/^## (.+)$/gm,
+		'<h2 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:16px;">$1</h2>'
+	);
+	html = html.replace(
+		/^# (.+)$/gm,
+		'<h1 style="margin:12px 0 4px;font-weight:600;color:var(--vscode-foreground);font-size:18px;">$1</h1>'
+	);
 
 	// Inline code
-	html = html.replace(/`([^`]+)`/g, '<code class="sc-inline-code" style="background:var(--vscode-textCodeBlock-background);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:12px;">$1</code>');
+	html = html.replace(
+		/`([^`]+)`/g,
+		'<code class="sc-inline-code" style="background:var(--vscode-textCodeBlock-background);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:12px;">$1</code>'
+	);
 
 	// Bold + italic
 	html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -88,11 +105,17 @@ export function renderMarkdown(text: string): string {
 	// Unordered lists (- item)
 	html = html.replace(/^- (.+)$/gm, '<li class="sc-li" style="margin:2px 0;">$1</li>');
 	// Wrap consecutive <li> in <ul>
-	html = html.replace(/((?:<li class="sc-li">.*<\/li>\n?)+)/g, '<ul class="sc-ul" style="padding-left:20px;margin:4px 0;">$1</ul>');
+	html = html.replace(
+		/((?:<li class="sc-li">.*<\/li>\n?)+)/g,
+		'<ul class="sc-ul" style="padding-left:20px;margin:4px 0;">$1</ul>'
+	);
 
 	// Ordered lists (1. item)
 	html = html.replace(/^\d+\. (.+)$/gm, '<li class="sc-oli" style="margin:2px 0;">$1</li>');
-	html = html.replace(/((?:<li class="sc-oli">.*<\/li>\n?)+)/g, '<ol class="sc-ol" style="padding-left:20px;margin:4px 0;">$1</ol>');
+	html = html.replace(
+		/((?:<li class="sc-oli">.*<\/li>\n?)+)/g,
+		'<ol class="sc-ol" style="padding-left:20px;margin:4px 0;">$1</ol>'
+	);
 
 	// Line breaks (but not inside pre/table)
 	html = html.replace(/\n/g, '<br>');
@@ -137,9 +160,16 @@ function renderTables(html: string): string {
 function buildTable(lines: string[]): string {
 	const rows = lines
 		.filter(l => !l.match(/^\|\s*-+/)) // skip separator rows
-		.map(l => l.split('|').filter(c => c.trim() !== '').map(c => c.trim()));
+		.map(l =>
+			l
+				.split('|')
+				.filter(c => c.trim() !== '')
+				.map(c => c.trim())
+		);
 
-	if (rows.length === 0) { return lines.join('\n'); }
+	if (rows.length === 0) {
+		return lines.join('\n');
+	}
 
 	let html = '<table class="sc-table">';
 	// First row is header

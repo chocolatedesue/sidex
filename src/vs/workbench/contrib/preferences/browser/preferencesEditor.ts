@@ -125,9 +125,7 @@ export class PreferencesEditor extends EditorPane {
 		this.searchWidget.layout(dimension);
 		this.searchWidget.inputBox.inputElement.style.paddingRight = `12px`;
 
-		this.preferencesEditorPane.value?.layout(
-			new DOM.Dimension(this.bodyElement.clientWidth, dimension.height)
-		);
+		this.preferencesEditorPane.value?.layout(new DOM.Dimension(this.bodyElement.clientWidth, dimension.height));
 	}
 
 	override async setInput(

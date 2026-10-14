@@ -205,7 +205,7 @@ export class TextModelSearch {
 		let lineFeedCountBeforeMatch = 0;
 		if (lfCounter) {
 			lineFeedCountBeforeMatch = lfCounter.findLineFeedCountBeforeOffset(matchIndex);
-			startOffset = deltaOffset + matchIndex + lineFeedCountBeforeMatch /* add as many \r as there were \n */;
+			startOffset = deltaOffset + matchIndex + lineFeedCountBeforeMatch; /* add as many \r as there were \n */
 		} else {
 			startOffset = deltaOffset + matchIndex;
 		}
@@ -214,7 +214,7 @@ export class TextModelSearch {
 		if (lfCounter) {
 			const lineFeedCountBeforeEndOfMatch = lfCounter.findLineFeedCountBeforeOffset(matchIndex + match0.length);
 			const lineFeedCountInMatch = lineFeedCountBeforeEndOfMatch - lineFeedCountBeforeMatch;
-			endOffset = startOffset + match0.length + lineFeedCountInMatch /* add as many \r as there were \n */;
+			endOffset = startOffset + match0.length + lineFeedCountInMatch; /* add as many \r as there were \n */
 		} else {
 			endOffset = startOffset + match0.length;
 		}

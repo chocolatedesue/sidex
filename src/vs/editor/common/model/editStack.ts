@@ -272,7 +272,7 @@ export class SingleModelEditStackElement implements IResourceUndoRedoElement {
 		if (this._data instanceof SingleModelEditStackData) {
 			this._data = this._data.serialize();
 		}
-		return this._data.byteLength + 168 /*heap overhead*/;
+		return this._data.byteLength + 168; /*heap overhead*/
 	}
 }
 

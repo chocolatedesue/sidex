@@ -96,9 +96,7 @@ export abstract class SettingsTreeElement extends Disposable {
 }
 
 export type SettingsTreeGroupChild =
-	| SettingsTreeGroupElement
-	| SettingsTreeSettingElement
-	| SettingsTreeNewExtensionsElement;
+	SettingsTreeGroupElement | SettingsTreeSettingElement | SettingsTreeNewExtensionsElement;
 
 export class SettingsTreeGroupElement extends SettingsTreeElement {
 	count?: number;

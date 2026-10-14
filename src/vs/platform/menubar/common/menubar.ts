@@ -50,10 +50,7 @@ export interface IMenubarMenuItemSeparator {
 }
 
 export type MenubarMenuItem =
-	| IMenubarMenuItemAction
-	| IMenubarMenuItemSubmenu
-	| IMenubarMenuItemSeparator
-	| IMenubarMenuRecentItemAction;
+	IMenubarMenuItemAction | IMenubarMenuItemSubmenu | IMenubarMenuItemSeparator | IMenubarMenuRecentItemAction;
 
 export function isMenubarMenuItemSubmenu(menuItem: MenubarMenuItem): menuItem is IMenubarMenuItemSubmenu {
 	return (<IMenubarMenuItemSubmenu>menuItem).submenu !== undefined;

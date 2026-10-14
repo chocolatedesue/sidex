@@ -283,7 +283,7 @@ const module = { exports };
 							case 'pre':
 								if (0 === this.prerelease.length) this.prerelease = [0];
 								else {
-									for (var t = this.prerelease.length; --t >= 0; )
+									for (var t = this.prerelease.length; --t >= 0;)
 										'number' == typeof this.prerelease[t] && (this.prerelease[t]++, (t = -2));
 									-1 === t && this.prerelease.push(0);
 								}
@@ -868,8 +868,8 @@ const module = { exports };
 				if (!p) {
 					var e = a(l);
 					p = !0;
-					for (var r = c.length; r; ) {
-						for (u = c, c = []; ++f < r; ) u && u[f].run();
+					for (var r = c.length; r;) {
+						for (u = c, c = []; ++f < r;) u && u[f].run();
 						((f = -1), (r = c.length));
 					}
 					((u = null),

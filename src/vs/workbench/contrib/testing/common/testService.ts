@@ -153,7 +153,7 @@ export const expandAndGetTestById = async (
 	const idPath = [...TestId.fromString(id).idsFromRoot()];
 
 	let expandToLevel = 0;
-	for (let i = idPath.length - 1; !ct.isCancellationRequested && i >= expandToLevel; ) {
+	for (let i = idPath.length - 1; !ct.isCancellationRequested && i >= expandToLevel;) {
 		const id = idPath[i].toString();
 		const existing = collection.getNodeById(id);
 		if (!existing) {

@@ -33,17 +33,15 @@ export class RecentEditTracker extends Disposable implements IRecentEditTracker 
 	private readonly _edits: IRecentEdit[] = [];
 	private readonly _modelListeners = new Map<string, DisposableStore>();
 
-	constructor(
-		@IModelService private readonly _modelService: IModelService,
-	) {
+	constructor(@IModelService private readonly _modelService: IModelService) {
 		super();
 
 		for (const model of this._modelService.getModels()) {
 			this._watchModel(model);
 		}
 
-		this._register(this._modelService.onModelAdded((model) => this._watchModel(model)));
-		this._register(this._modelService.onModelRemoved((model) => this._unwatchModel(model)));
+		this._register(this._modelService.onModelAdded(model => this._watchModel(model)));
+		this._register(this._modelService.onModelRemoved(model => this._unwatchModel(model)));
 	}
 
 	getRecentEdits(limit: number): string[] {
@@ -64,7 +62,7 @@ export class RecentEditTracker extends Disposable implements IRecentEditTracker 
 		}
 
 		const store = new DisposableStore();
-		store.add(model.onDidChangeContent((e) => this._onModelContentChanged(model, e)));
+		store.add(model.onDidChangeContent(e => this._onModelContentChanged(model, e)));
 		this._modelListeners.set(key, store);
 	}
 
@@ -83,9 +81,10 @@ export class RecentEditTracker extends Disposable implements IRecentEditTracker 
 		}
 
 		for (const change of event.changes) {
-			const before = change.rangeLength > 0
-				? `[${change.rangeLength} chars @ L${change.range.startLineNumber}:${change.range.startColumn}]`
-				: '';
+			const before =
+				change.rangeLength > 0
+					? `[${change.rangeLength} chars @ L${change.range.startLineNumber}:${change.range.startColumn}]`
+					: '';
 			const after = change.text.slice(0, MAX_CHANGE_TEXT_LENGTH);
 
 			if (!before && !after) {
@@ -96,7 +95,7 @@ export class RecentEditTracker extends Disposable implements IRecentEditTracker 
 				file: model.uri.fsPath,
 				before,
 				after,
-				timestamp: Date.now(),
+				timestamp: Date.now()
 			});
 		}
 

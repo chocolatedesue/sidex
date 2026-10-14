@@ -31,8 +31,7 @@ import {
 } from './editorService.js';
 
 type FindGroupResult =
-	| Promise<[IEditorGroup, EditorActivation | undefined]>
-	| [IEditorGroup, EditorActivation | undefined];
+	Promise<[IEditorGroup, EditorActivation | undefined]> | [IEditorGroup, EditorActivation | undefined];
 
 /**
  * Finds the target `IEditorGroup` given the instructions provided

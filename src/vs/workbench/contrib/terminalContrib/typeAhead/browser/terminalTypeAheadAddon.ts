@@ -1243,7 +1243,7 @@ class TypeAheadStyle implements IDisposable {
 
 	private _onDidWriteSGR(args: SingleOrMany<number>[]) {
 		const originalUndo = this._undoArgs;
-		for (let i = 0; i < args.length; ) {
+		for (let i = 0; i < args.length;) {
 			const px = args[i];
 			const p = isNumber(px) ? px : px[0];
 

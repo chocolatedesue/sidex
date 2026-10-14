@@ -32,24 +32,21 @@ function normalizeOpenVsxItem(raw: any): MarketplaceExtensionResult {
 	const name = raw.name || raw.extensionName || '';
 	const id = raw.id || (namespace && name ? `${namespace}.${name}` : name);
 	const files = raw.files || {};
-	const downloadUrl =
-		raw.downloadUrl ||
-		files.download ||
-		raw.download ||
-		'';
+	const downloadUrl = raw.downloadUrl || files.download || raw.download || '';
 	return {
 		id,
 		name,
 		displayName: raw.displayName || raw.display_name || name,
 		description: raw.shortDescription || raw.short_description || raw.description || '',
 		version: raw.version || raw.versions?.[0]?.version || '',
-		publisher: typeof raw.publisher === 'string'
-			? raw.publisher
-			: (raw.publisher?.displayName || raw.publisher?.publisherName || namespace || ''),
+		publisher:
+			typeof raw.publisher === 'string'
+				? raw.publisher
+				: raw.publisher?.displayName || raw.publisher?.publisherName || namespace || '',
 		installCount: raw.installCount ?? raw.downloadCount ?? raw.download_count ?? 0,
 		rating: raw.rating ?? raw.averageRating ?? 0,
 		iconUrl: raw.iconUrl || raw.icon_url || files.icon,
-		downloadUrl,
+		downloadUrl
 	};
 }
 
@@ -58,7 +55,7 @@ async function fetchOpenVsxCompat(base: string, query: string, page: number): Pr
 	const offset = page * size;
 	const url = `${base}?query=${encodeURIComponent(query)}&offset=${offset}&size=${size}`;
 	const res = await fetch(url, {
-		headers: { accept: 'application/json', 'user-agent': 'SideX-marketplace/0.1' },
+		headers: { accept: 'application/json', 'user-agent': 'SideX-marketplace/0.1' }
 	});
 	if (!res.ok) {
 		throw new Error(`${base} HTTP ${res.status}`);
@@ -170,11 +167,12 @@ export class SideXExtensionService {
 	async resolveDownloadUrl(idOrQuery: string): Promise<string> {
 		const needle = idOrQuery.trim().toLowerCase();
 		const results = await this.searchMarketplace(needle.includes('.') ? needle.split('.').pop()! : needle, 0);
-		const exact = results.find(r => {
-			const id = (r.id || '').toLowerCase();
-			const composed = `${(r.publisher || '').toLowerCase()}.${(r.name || '').toLowerCase()}`;
-			return id === needle || composed === needle || (r.name || '').toLowerCase() === needle;
-		}) || results[0];
+		const exact =
+			results.find(r => {
+				const id = (r.id || '').toLowerCase();
+				const composed = `${(r.publisher || '').toLowerCase()}.${(r.name || '').toLowerCase()}`;
+				return id === needle || composed === needle || (r.name || '').toLowerCase() === needle;
+			}) || results[0];
 		if (!exact?.downloadUrl) {
 			throw new Error(`No marketplace download URL for ${idOrQuery}`);
 		}

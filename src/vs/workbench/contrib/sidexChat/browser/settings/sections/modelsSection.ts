@@ -5,8 +5,16 @@ import { createProductMark, productMarkKind } from '../productMarks.js';
 
 type Invoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
-interface ProviderModel { id: string; name: string }
-interface LocalServerInfo { provider: string; label: string; baseUrl: string; models: string[] }
+interface ProviderModel {
+	id: string;
+	name: string;
+}
+interface LocalServerInfo {
+	provider: string;
+	label: string;
+	baseUrl: string;
+	models: string[];
+}
 interface AccountInfo {
 	provider: string;
 	displayName: string;
@@ -18,11 +26,27 @@ interface AccountInfo {
 	subscriptionTier: string | null;
 	accountEmail: string | null;
 }
-interface ProviderStatusInfo { id: string; label: string; baseUrl: string; configured: boolean; enabled: boolean; source: string | null; keyless: boolean; envVar: string | null }
+interface ProviderStatusInfo {
+	id: string;
+	label: string;
+	baseUrl: string;
+	configured: boolean;
+	enabled: boolean;
+	source: string | null;
+	keyless: boolean;
+	envVar: string | null;
+}
 
 // The provider catalogue itself lives in Rust (providers_catalog) — this is
 // just the shape we render cards from, not a source of truth.
-interface ProviderCatalogEntry { id: string; label: string; defaultBaseUrl: string; envVars: string[]; consoleUrl: string; keyless: boolean }
+interface ProviderCatalogEntry {
+	id: string;
+	label: string;
+	defaultBaseUrl: string;
+	envVars: string[];
+	consoleUrl: string;
+	keyless: boolean;
+}
 
 // A configured key is never sent back to the UI. This placeholder marks a
 // field as already-set without exposing the value, and doubles as a sentinel
@@ -70,15 +94,21 @@ export class ModelsSection implements SettingsSection {
 	}
 
 	private async _loadState(): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 
 		try {
 			const raw = await this._invoke('settings_get', { section: 'sidex.models.enabled' });
 			const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
 			// There is no curated catalog to seed from anymore — an unset value
 			// just means no models are enabled yet, same as an explicit empty array.
-			if (Array.isArray(arr)) { this._enabledIds = new Set(arr); }
-		} catch { /* nothing enabled yet */ }
+			if (Array.isArray(arr)) {
+				this._enabledIds = new Set(arr);
+			}
+		} catch {
+			/* nothing enabled yet */
+		}
 
 		try {
 			const raw = await this._invoke('settings_get', { section: 'sidex.models.custom' });
@@ -87,33 +117,47 @@ export class ModelsSection implements SettingsSection {
 				this._customModels = [];
 				for (const entry of arr as Array<string | { id?: string; name?: string }>) {
 					const id = typeof entry === 'string' ? entry : entry?.id;
-					if (!id) { continue; }
+					if (!id) {
+						continue;
+					}
 					this._customModels.push(id);
 					const name = typeof entry === 'object' ? entry?.name : undefined;
-					if (name) { this._modelNames.set(id, name); }
+					if (name) {
+						this._modelNames.set(id, name);
+					}
 				}
 			}
-		} catch { /* empty */ }
+		} catch {
+			/* empty */
+		}
 
 		// Union in anything enabled that isn't in the registry (e.g. carried
 		// over from an older build) so an enabled model never disappears from the list.
 		for (const id of this._enabledIds) {
-			if (!this._customModels.includes(id)) { this._customModels.push(id); }
+			if (!this._customModels.includes(id)) {
+				this._customModels.push(id);
+			}
 		}
 
 		try {
-			this._providerCatalog = (await this._invoke('providers_catalog') as ProviderCatalogEntry[]) || [];
-		} catch { this._providerCatalog = []; }
+			this._providerCatalog = ((await this._invoke('providers_catalog')) as ProviderCatalogEntry[]) || [];
+		} catch {
+			this._providerCatalog = [];
+		}
 
 		await this._refreshProviderStatus();
 	}
 
 	private async _refreshProviderStatus(): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		try {
-			const statuses = (await this._invoke('providers_status') as ProviderStatusInfo[]) || [];
+			const statuses = ((await this._invoke('providers_status')) as ProviderStatusInfo[]) || [];
 			this._providerStatus = new Map(statuses.map(s => [s.id, s]));
-		} catch { /* keep the last known status rather than blanking every card */ }
+		} catch {
+			/* keep the last known status rather than blanking every card */
+		}
 	}
 
 	private _renderModelListSection(container: HTMLElement): void {
@@ -155,10 +199,16 @@ export class ModelsSection implements SettingsSection {
 	 * dozens — uncapped, the menu would render off the bottom of the screen
 	 * with no way to reach the rest. Same contract, just a bounded menu.
 	 */
-	private _boundedDropdown(options: (string | DropdownOption)[], currentValue: string, onChange: (value: string) => void): HTMLElement {
+	private _boundedDropdown(
+		options: (string | DropdownOption)[],
+		currentValue: string,
+		onChange: (value: string) => void
+	): HTMLElement {
 		const dropdown = createCustomDropdown(options, currentValue, onChange);
 		const menu = dropdown.querySelector('.sidex-custom-dropdown-menu') as HTMLElement | null;
-		if (menu) { menu.style.cssText += 'max-height:240px;overflow-y:auto;'; }
+		if (menu) {
+			menu.style.cssText += 'max-height:240px;overflow-y:auto;';
+		}
 		return dropdown;
 	}
 
@@ -215,7 +265,7 @@ export class ModelsSection implements SettingsSection {
 		// there's no curated entry underneath to fall back to.
 		const trash = document.createElement('span');
 		trash.className = 'codicon codicon-trash sidex-settings-model-remove';
-		trash.addEventListener('click', (e) => {
+		trash.addEventListener('click', e => {
 			e.stopPropagation();
 			this._removeCustomModel(id);
 		});
@@ -224,7 +274,7 @@ export class ModelsSection implements SettingsSection {
 		const isOn = this._enabledIds.has(id);
 		const toggle = document.createElement('div');
 		toggle.className = 'sidex-settings-toggle' + (isOn ? ' on' : '');
-		toggle.addEventListener('click', (e) => {
+		toggle.addEventListener('click', e => {
 			e.stopPropagation();
 			if (this._enabledIds.has(id)) {
 				this._enabledIds.delete(id);
@@ -232,7 +282,9 @@ export class ModelsSection implements SettingsSection {
 				this._enabledIds.add(id);
 			}
 			this._saveEnabledModels();
-			if (this._enabledListContainer) { this._renderEnabledModels(this._enabledListContainer); }
+			if (this._enabledListContainer) {
+				this._renderEnabledModels(this._enabledListContainer);
+			}
 		});
 		row.appendChild(toggle);
 
@@ -264,17 +316,20 @@ export class ModelsSection implements SettingsSection {
 		idInput.placeholder = 'Model ID (e.g. anthropic/claude-opus-4.6)';
 
 		const suggestions = document.createElement('div');
-		suggestions.style.cssText = 'font-size:11px;color:var(--vscode-descriptionForeground);display:flex;flex-direction:column;gap:4px;';
+		suggestions.style.cssText =
+			'font-size:11px;color:var(--vscode-descriptionForeground);display:flex;flex-direction:column;gap:4px;';
 
 		// Picking a configured provider fetches what it can actually serve, so
 		// users aren't guessing at IDs — but the text input below still takes
 		// anything, for providers we can't introspect or haven't set a key for.
 		const loadSuggestions = async (provider: string): Promise<void> => {
 			suggestions.innerHTML = '';
-			if (!provider || !this._invoke) { return; }
+			if (!provider || !this._invoke) {
+				return;
+			}
 			suggestions.textContent = 'Loading models…';
 			try {
-				const models = (await this._invoke('providers_list_models', { provider }) as ProviderModel[]) || [];
+				const models = ((await this._invoke('providers_list_models', { provider })) as ProviderModel[]) || [];
 				suggestions.innerHTML = '';
 				if (models.length === 0) {
 					suggestions.textContent = 'No models reported yet — enter an ID manually below.';
@@ -283,28 +338,39 @@ export class ModelsSection implements SettingsSection {
 				// Remember the labels now: picking one should carry its name
 				// through even though the input only holds the id.
 				for (const m of models) {
-					if (m?.id && m.name) { this._modelNames.set(m.id, m.name); }
+					if (m?.id && m.name) {
+						this._modelNames.set(m.id, m.name);
+					}
 				}
 				const label = document.createElement('div');
 				label.textContent = `${models.length} available — pick one, or type your own:`;
 				suggestions.appendChild(label);
-				suggestions.appendChild(this._boundedDropdown(
-					models.map(m => m.id), '', (value) => { idInput.value = value; }));
+				suggestions.appendChild(
+					this._boundedDropdown(
+						models.map(m => m.id),
+						'',
+						value => {
+							idInput.value = value;
+						}
+					)
+				);
 			} catch {
 				// Not configured, offline, or the provider just doesn't support
 				// listing — the manual text input below still works either way.
-				suggestions.textContent = 'Couldn\'t reach this provider to list its models — enter an ID manually below.';
+				suggestions.textContent = "Couldn't reach this provider to list its models — enter an ID manually below.";
 			}
 		};
 
 		const providerOptions = [
 			{ value: '', label: 'Custom (any provider)' },
-			...this._providerCatalog.map(p => ({ value: p.id, label: p.label })),
+			...this._providerCatalog.map(p => ({ value: p.id, label: p.label }))
 		];
-		form.appendChild(this._boundedDropdown(providerOptions, this._addModelProvider, (value) => {
-			this._addModelProvider = value;
-			void loadSuggestions(value);
-		}));
+		form.appendChild(
+			this._boundedDropdown(providerOptions, this._addModelProvider, value => {
+				this._addModelProvider = value;
+				void loadSuggestions(value);
+			})
+		);
 		form.appendChild(suggestions);
 
 		const row = document.createElement('div');
@@ -321,7 +387,9 @@ export class ModelsSection implements SettingsSection {
 		addBtn.textContent = 'Add';
 		addBtn.addEventListener('click', () => {
 			const val = idInput.value.trim();
-			if (val) { this._addCustomModel(val); }
+			if (val) {
+				this._addCustomModel(val);
+			}
 		});
 		row.appendChild(addBtn);
 
@@ -335,14 +403,25 @@ export class ModelsSection implements SettingsSection {
 		});
 		row.appendChild(cancelBtn);
 
-		idInput.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') { const v = idInput.value.trim(); if (v) { this._addCustomModel(v); } }
-			if (e.key === 'Escape') { this._addingCustom = false; this._addModelProvider = ''; this._updateCustomRow(); }
+		idInput.addEventListener('keydown', e => {
+			if (e.key === 'Enter') {
+				const v = idInput.value.trim();
+				if (v) {
+					this._addCustomModel(v);
+				}
+			}
+			if (e.key === 'Escape') {
+				this._addingCustom = false;
+				this._addModelProvider = '';
+				this._updateCustomRow();
+			}
 		});
 		form.appendChild(row);
 		wrap.appendChild(form);
 
-		if (this._addModelProvider) { void loadSuggestions(this._addModelProvider); }
+		if (this._addModelProvider) {
+			void loadSuggestions(this._addModelProvider);
+		}
 
 		return wrap;
 	}
@@ -358,12 +437,14 @@ export class ModelsSection implements SettingsSection {
 	}
 
 	private _onSearch(query: string): void {
-		if (!this._container) { return; }
+		if (!this._container) {
+			return;
+		}
 		const q = query.toLowerCase();
 		this._container.querySelectorAll('.sidex-settings-model-item').forEach(el => {
 			const name = (el as HTMLElement).dataset.modelName || '';
 			const id = (el as HTMLElement).dataset.modelId || '';
-			(el as HTMLElement).style.display = (!q || name.includes(q) || id.includes(q)) ? '' : 'none';
+			(el as HTMLElement).style.display = !q || name.includes(q) || id.includes(q) ? '' : 'none';
 		});
 	}
 
@@ -399,12 +480,16 @@ export class ModelsSection implements SettingsSection {
 			header.className = 'sidex-settings-model-group-header';
 			header.textContent = 'Configured';
 			card.appendChild(header);
-			for (const provider of configured) { card.appendChild(this._buildProviderCard(provider)); }
+			for (const provider of configured) {
+				card.appendChild(this._buildProviderCard(provider));
+			}
 		}
 
 		if (rest.length > 0) {
 			if (configured.length === 0) {
-				for (const provider of rest) { card.appendChild(this._buildProviderCard(provider)); }
+				for (const provider of rest) {
+					card.appendChild(this._buildProviderCard(provider));
+				}
 			} else {
 				const expanded = this._apiKeysExpanded;
 				const disclosureHeader = document.createElement('div');
@@ -423,7 +508,9 @@ export class ModelsSection implements SettingsSection {
 
 				const disclosureContent = document.createElement('div');
 				disclosureContent.className = 'sidex-settings-expandable-content' + (expanded ? ' visible' : '');
-				for (const provider of rest) { disclosureContent.appendChild(this._buildProviderCard(provider)); }
+				for (const provider of rest) {
+					disclosureContent.appendChild(this._buildProviderCard(provider));
+				}
 				card.appendChild(disclosureContent);
 			}
 		}
@@ -445,8 +532,12 @@ export class ModelsSection implements SettingsSection {
 		const keyPart = config.consoleUrl
 			? `Get a key from <a href="${config.consoleUrl}" class="sidex-settings-link" target="_blank">${config.label}</a> to use its models at cost.`
 			: `Enter an API key to use ${config.label} models at cost.`;
-		const envPart = config.envVars.length ? ` Picked up automatically if ${config.envVars.join(' or ')} is already set in your shell.` : '';
-		const baseUrlPart = config.defaultBaseUrl ? '' : ' This provider has no default endpoint, so a base URL is required below.';
+		const envPart = config.envVars.length
+			? ` Picked up automatically if ${config.envVars.join(' or ')} is already set in your shell.`
+			: '';
+		const baseUrlPart = config.defaultBaseUrl
+			? ''
+			: ' This provider has no default endpoint, so a base URL is required below.';
 		return keyPart + envPart + baseUrlPart;
 	}
 
@@ -493,7 +584,7 @@ export class ModelsSection implements SettingsSection {
 		descEl.className = 'sidex-settings-row-description';
 		descEl.innerHTML = this._providerDescriptionHtml(config);
 		descEl.querySelectorAll('a').forEach(link => {
-			link.addEventListener('click', (e) => {
+			link.addEventListener('click', e => {
 				e.preventDefault();
 				const href = link.getAttribute('href');
 				if (href && this._invoke) {
@@ -516,16 +607,23 @@ export class ModelsSection implements SettingsSection {
 		// resolve to an empty endpoint. The field has to be required, not
 		// merely suggested.
 		const needsBaseUrl = !config.defaultBaseUrl;
-		interface FieldSpec { id: 'apiKey' | 'baseUrl'; type: string; placeholder: string; prefill?: string; required?: boolean }
+		interface FieldSpec {
+			id: 'apiKey' | 'baseUrl';
+			type: string;
+			placeholder: string;
+			prefill?: string;
+			required?: boolean;
+		}
 		const fields: FieldSpec[] = [];
 		if (!config.keyless) {
 			fields.push({ id: 'apiKey', type: 'password', placeholder: `Enter your ${config.label} API Key` });
 		}
 		fields.push({
-			id: 'baseUrl', type: 'text',
+			id: 'baseUrl',
+			type: 'text',
 			placeholder: needsBaseUrl ? 'Base URL (required, e.g. https://your-host/v1)' : config.defaultBaseUrl,
 			prefill: status?.baseUrl && status.baseUrl !== config.defaultBaseUrl ? status.baseUrl : undefined,
-			required: needsBaseUrl,
+			required: needsBaseUrl
 		});
 
 		// Populated once the fields below exist, and read by both the field
@@ -544,7 +642,9 @@ export class ModelsSection implements SettingsSection {
 			if (field.required) {
 				input.setAttribute('aria-required', 'true');
 			}
-			if (field.prefill) { input.value = field.prefill; }
+			if (field.prefill) {
+				input.value = field.prefill;
+			}
 			if (hasCredential && field.type === 'password') {
 				input.value = MASKED_KEY;
 				input.disabled = true;
@@ -555,18 +655,26 @@ export class ModelsSection implements SettingsSection {
 			// it always looks "dirty" on the way out.
 			const initialValue = input.value;
 			const saveIfChanged = async (): Promise<void> => {
-				if (input.value === initialValue || input.value === MASKED_KEY) { return; }
+				if (input.value === initialValue || input.value === MASKED_KEY) {
+					return;
+				}
 				const error = await this._saveProviderKey(config, fieldInputs);
 				errorEl.textContent = error ?? '';
 				errorEl.style.display = error ? '' : 'none';
 			};
-			input.addEventListener('blur', () => { void saveIfChanged(); });
-			input.addEventListener('keydown', (e) => {
-				if (e.key === 'Enter') { void saveIfChanged(); }
+			input.addEventListener('blur', () => {
+				void saveIfChanged();
+			});
+			input.addEventListener('keydown', e => {
+				if (e.key === 'Enter') {
+					void saveIfChanged();
+				}
 			});
 			// A fresh edit makes the last save attempt's error stale — clear it
 			// rather than leaving it pinned under the field they're now fixing.
-			input.addEventListener('input', () => { errorEl.style.display = 'none'; });
+			input.addEventListener('input', () => {
+				errorEl.style.display = 'none';
+			});
 			wrapper.appendChild(input);
 			fieldInputs.set(field.id, input);
 			fieldsWrap.appendChild(wrapper);
@@ -594,7 +702,9 @@ export class ModelsSection implements SettingsSection {
 				return;
 			}
 			const firstInput = Array.from(fieldInputs.values())[0];
-			if (firstInput) { firstInput.focus(); }
+			if (firstInput) {
+				firstInput.focus();
+			}
 		});
 
 		return row;
@@ -631,9 +741,7 @@ export class ModelsSection implements SettingsSection {
 			resultEl.textContent = 'Importing…';
 			try {
 				const added = await this._adoptModelsFrom(config.id);
-				resultEl.textContent = added > 0
-					? `Added ${added} model${added === 1 ? '' : 's'}.`
-					: 'No new models found.';
+				resultEl.textContent = added > 0 ? `Added ${added} model${added === 1 ? '' : 's'}.` : 'No new models found.';
 			} catch (e) {
 				resultEl.textContent = e instanceof Error ? e.message : String(e);
 				resultEl.style.color = 'var(--vscode-editorError-foreground, #f85149)';
@@ -642,7 +750,9 @@ export class ModelsSection implements SettingsSection {
 				link.style.opacity = '';
 			}
 		};
-		link.addEventListener('click', () => { void run(); });
+		link.addEventListener('click', () => {
+			void run();
+		});
 
 		return wrap;
 	}
@@ -654,7 +764,9 @@ export class ModelsSection implements SettingsSection {
 	 */
 	private async _renderDiscoverySection(container: HTMLElement): Promise<void> {
 		container.innerHTML = '';
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 
 		const section = document.createElement('div');
 		const title = document.createElement('div');
@@ -673,22 +785,28 @@ export class ModelsSection implements SettingsSection {
 		const [local, accounts, statuses] = await Promise.all([
 			this._invoke('providers_detect_local').catch(() => []) as Promise<LocalServerInfo[]>,
 			this._invoke('accounts_list').catch(() => []) as Promise<AccountInfo[]>,
-			this._invoke('providers_status').catch(() => []) as Promise<ProviderStatusInfo[]>,
+			this._invoke('providers_status').catch(() => []) as Promise<ProviderStatusInfo[]>
 		]);
 
 		// --- local model servers ---
 		if (local.length === 0) {
-			card.appendChild(this._buildInfoRow(
-				'No local model server found',
-				'Start Ollama or LM Studio and reopen this panel to use local models with no key.'));
+			card.appendChild(
+				this._buildInfoRow(
+					'No local model server found',
+					'Start Ollama or LM Studio and reopen this panel to use local models with no key.'
+				)
+			);
 		} else {
 			for (const server of local) {
 				const count = server.models.length;
-				card.appendChild(this._buildInfoRow(
-					`${server.label} — ready`,
-					count > 0
-						? `${count} model${count === 1 ? '' : 's'} at ${server.baseUrl}`
-						: `Running at ${server.baseUrl}, but no models are pulled yet.`));
+				card.appendChild(
+					this._buildInfoRow(
+						`${server.label} — ready`,
+						count > 0
+							? `${count} model${count === 1 ? '' : 's'} at ${server.baseUrl}`
+							: `Running at ${server.baseUrl}, but no models are pulled yet.`
+					)
+				);
 			}
 		}
 
@@ -727,13 +845,11 @@ export class ModelsSection implements SettingsSection {
 			sub.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 			const who = account.accountEmail
 				? `${account.accountEmail}${account.subscriptionTier ? ` · ${account.subscriptionTier}` : ''}`
-				: account.subscriptionTier ?? '';
+				: (account.subscriptionTier ?? '');
 			if (account.expired) {
 				sub.textContent = `Signed out or expired. Sign in with ${account.displayName} again, then reconnect.`;
 			} else if (account.connected) {
-				sub.textContent = who
-					? `Connected — ${who}`
-					: `Connected — using the login at ${account.location}`;
+				sub.textContent = who ? `Connected — ${who}` : `Connected — using the login at ${account.location}`;
 			} else if (account.available) {
 				sub.textContent = who
 					? `Signed in as ${who}. Connect to use it for ${account.provider} models.`
@@ -748,7 +864,8 @@ export class ModelsSection implements SettingsSection {
 			if (account.available && account.credentialKind === 'oauth') {
 				const warn = document.createElement('div');
 				warn.className = 'sidex-settings-row-description';
-				warn.style.cssText = 'color:var(--vscode-editorWarning-foreground);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+				warn.style.cssText =
+					'color:var(--vscode-editorWarning-foreground);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 				warn.textContent = 'Subscription login, not a billed API key.';
 				infoCol.appendChild(warn);
 			}
@@ -766,9 +883,12 @@ export class ModelsSection implements SettingsSection {
 		// --- keys already in the environment ---
 		const fromEnv = statuses.filter(p => p.source === 'env');
 		for (const p of fromEnv) {
-			card.appendChild(this._buildInfoRow(
-				`${p.label} — using ${p.envVar ?? 'your environment'}`,
-				'Picked up from your shell. A key entered above overrides it.'));
+			card.appendChild(
+				this._buildInfoRow(
+					`${p.label} — using ${p.envVar ?? 'your environment'}`,
+					'Picked up from your shell. A key entered above overrides it.'
+				)
+			);
 		}
 
 		section.appendChild(card);
@@ -819,17 +939,22 @@ export class ModelsSection implements SettingsSection {
 			body,
 			// A subscription login is issued for that product. Say so before the
 			// user commits, not after.
-			caution: account.credentialKind === 'oauth'
-				? `This is a subscription login, not a billed API key. Using it from another app may not be permitted by ${account.displayName}'s terms — entering an API key above avoids that entirely.`
-				: undefined,
+			caution:
+				account.credentialKind === 'oauth'
+					? `This is a subscription login, not a billed API key. Using it from another app may not be permitted by ${account.displayName}'s terms — entering an API key above avoids that entirely.`
+					: undefined,
 			confirmLabel: 'Connect'
 		});
 	}
 
 	private async _setAccountConnected(account: AccountInfo, connect: boolean, statusEl: HTMLElement): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 
-		if (!await this._confirmAccountChange(account, connect)) { return; }
+		if (!(await this._confirmAccountChange(account, connect))) {
+			return;
+		}
 
 		statusEl.textContent = connect
 			? `Connecting your ${account.displayName} account…`
@@ -854,7 +979,9 @@ export class ModelsSection implements SettingsSection {
 						// future re-fetches. Leave the selection unset so it
 						// re-resolves to whatever the account currently serves.
 					}
-				} catch { /* connected fine; the card's own Import models action can retry */ }
+				} catch {
+					/* connected fine; the card's own Import models action can retry */
+				}
 			}
 			await this._applyCredentialChange();
 		} catch (e) {
@@ -872,14 +999,21 @@ export class ModelsSection implements SettingsSection {
 	 * show the message inline instead of the failure disappearing into the
 	 * console. Returns `null` on success or when there was nothing to save.
 	 */
-	private async _saveProviderKey(config: ProviderCatalogEntry, inputs: Map<string, HTMLInputElement>): Promise<string | null> {
-		if (!this._invoke) { return null; }
+	private async _saveProviderKey(
+		config: ProviderCatalogEntry,
+		inputs: Map<string, HTMLInputElement>
+	): Promise<string | null> {
+		if (!this._invoke) {
+			return null;
+		}
 		const apiKeyInput = inputs.get('apiKey');
 		// A disabled field is showing the masked placeholder, not a real
 		// value — never forward that as the key to save.
 		const apiKey = apiKeyInput && !apiKeyInput.disabled ? apiKeyInput.value.trim() || null : null;
 		const baseUrl = inputs.get('baseUrl')?.value.trim() || null;
-		if (!apiKey && !baseUrl) { return null; }
+		if (!apiKey && !baseUrl) {
+			return null;
+		}
 
 		// A provider that ships with no default base URL has nowhere to fall
 		// back to — an empty base URL would resolve to "" on the Rust side and
@@ -907,7 +1041,9 @@ export class ModelsSection implements SettingsSection {
 	private async _applyCredentialChange(): Promise<void> {
 		// Re-render can trigger blur handlers, so refuse to re-enter rather
 		// than restarting the server in a loop.
-		if (this._applyingCredentialChange) { return; }
+		if (this._applyingCredentialChange) {
+			return;
+		}
 		this._applyingCredentialChange = true;
 		try {
 			await this._doApplyCredentialChange();
@@ -924,16 +1060,26 @@ export class ModelsSection implements SettingsSection {
 
 		try {
 			await restartServer();
-		} catch { /* the chat panel surfaces the disconnected state on its own */ }
+		} catch {
+			/* the chat panel surfaces the disconnected state on its own */
+		}
 		await this._refreshProviderStatus();
-		if (this._apiKeysContainer) { this._renderApiKeysSection(this._apiKeysContainer); }
-		if (this._discoveryContainer) { await this._renderDiscoverySection(this._discoveryContainer); }
+		if (this._apiKeysContainer) {
+			this._renderApiKeysSection(this._apiKeysContainer);
+		}
+		if (this._discoveryContainer) {
+			await this._renderDiscoverySection(this._discoveryContainer);
+		}
 
-		if (scroller) { scroller.scrollTop = scrollTop; }
+		if (scroller) {
+			scroller.scrollTop = scrollTop;
+		}
 	}
 
 	private async _setProviderEnabled(provider: string, enabled: boolean): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		try {
 			await this._invoke('providers_set_enabled', { provider, enabled });
 			if (enabled) {
@@ -942,10 +1088,16 @@ export class ModelsSection implements SettingsSection {
 				// (not reachable yet, nothing exposed) is swallowed rather than
 				// reported as "failed to enable". The card's own Import models
 				// action covers retrying it.
-				try { await this._adoptModelsFrom(provider); } catch { /* see above */ }
+				try {
+					await this._adoptModelsFrom(provider);
+				} catch {
+					/* see above */
+				}
 			}
 			await this._applyCredentialChange();
-		} catch (e) { console.error(`Failed to ${enabled ? 'enable' : 'disable'} ${provider}:`, e); }
+		} catch (e) {
+			console.error(`Failed to ${enabled ? 'enable' : 'disable'} ${provider}:`, e);
+		}
 	}
 
 	/**
@@ -963,20 +1115,22 @@ export class ModelsSection implements SettingsSection {
 		anthropic: [
 			{ id: 'anthropic/claude-sonnet-4.6', name: 'Claude Sonnet 4.6' },
 			{ id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6' },
-			{ id: 'anthropic/claude-haiku-4.5', name: 'Claude Haiku 4.5' },
+			{ id: 'anthropic/claude-haiku-4.5', name: 'Claude Haiku 4.5' }
 		],
 		openai: [
 			{ id: 'openai/gpt-5.6-terra', name: 'GPT-5.6 Terra' },
 			{ id: 'openai/gpt-5.5', name: 'GPT-5.5' },
-			{ id: 'openai/gpt-5.4-mini', name: 'GPT-5.4 mini' },
-		],
+			{ id: 'openai/gpt-5.4-mini', name: 'GPT-5.4 mini' }
+		]
 	};
 
 	private async _adoptModelsFrom(provider: string): Promise<number> {
-		if (!this._invoke) { return 0; }
+		if (!this._invoke) {
+			return 0;
+		}
 		let models: ProviderModel[] = [];
 		try {
-			models = (await this._invoke('providers_list_models', { provider }) as ProviderModel[]) || [];
+			models = ((await this._invoke('providers_list_models', { provider })) as ProviderModel[]) || [];
 		} catch {
 			models = [];
 		}
@@ -986,29 +1140,43 @@ export class ModelsSection implements SettingsSection {
 		// Record names even for models already known, so a stale entry added by
 		// hand picks up its proper label.
 		for (const m of models) {
-			if (m?.id && m.name) { this._modelNames.set(m.id, m.name); }
+			if (m?.id && m.name) {
+				this._modelNames.set(m.id, m.name);
+			}
 		}
 		const added = models.map(m => m?.id).filter((id): id is string => !!id && !this._customModels.includes(id));
-		if (added.length === 0) { return 0; }
+		if (added.length === 0) {
+			return 0;
+		}
 
 		this._customModels.push(...added);
-		for (const id of added) { this._enabledIds.add(id); }
+		for (const id of added) {
+			this._enabledIds.add(id);
+		}
 		await this._saveCustomModels();
 		await this._saveEnabledModels();
-		if (this._enabledListContainer) { this._renderEnabledModels(this._enabledListContainer); }
+		if (this._enabledListContainer) {
+			this._renderEnabledModels(this._enabledListContainer);
+		}
 		return added.length;
 	}
 
 	private async _deleteProviderKey(provider: string): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		try {
 			await this._invoke('providers_delete', { provider });
 			await this._applyCredentialChange();
-		} catch (e) { console.error(`Failed to delete key for ${provider}:`, e); }
+		} catch (e) {
+			console.error(`Failed to delete key for ${provider}:`, e);
+		}
 	}
 
 	private async _saveCustomModels(): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		const value = this._customModels.map(id => {
 			const name = this._modelNames.get(id);
 			return name ? { id, name } : id;
@@ -1017,42 +1185,64 @@ export class ModelsSection implements SettingsSection {
 	}
 
 	private async _saveEnabledModels(): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		try {
 			// Store as a real JSON array (not a stringified string) so every
 			// reader — Rust models_get_enabled, the chat service, this panel —
 			// sees the same type.
-			await this._invoke('settings_update', { key: 'sidex.models.enabled', value: [...this._enabledIds], scope: 'user' });
+			await this._invoke('settings_update', {
+				key: 'sidex.models.enabled',
+				value: [...this._enabledIds],
+				scope: 'user'
+			});
 			// Tell the chat service to re-filter its model list immediately
 			window.dispatchEvent(new CustomEvent('sidex-models-changed'));
-		} catch (e) { console.error('Failed to save enabled models:', e); }
+		} catch (e) {
+			console.error('Failed to save enabled models:', e);
+		}
 	}
 
 	private async _addCustomModel(id: string): Promise<void> {
-		if (!this._invoke) { return; }
-		if (!this._customModels.includes(id)) { this._customModels.push(id); }
+		if (!this._invoke) {
+			return;
+		}
+		if (!this._customModels.includes(id)) {
+			this._customModels.push(id);
+		}
 		this._enabledIds.add(id);
 		this._addingCustom = false;
 		this._addModelProvider = '';
 		try {
 			await this._saveCustomModels();
 			await this._saveEnabledModels();
-		} catch (e) { console.error('Failed to add custom model:', e); }
+		} catch (e) {
+			console.error('Failed to add custom model:', e);
+		}
 
-		if (this._enabledListContainer) { this._renderEnabledModels(this._enabledListContainer); }
+		if (this._enabledListContainer) {
+			this._renderEnabledModels(this._enabledListContainer);
+		}
 		this._updateCustomRow();
 	}
 
 	private async _removeCustomModel(id: string): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		this._customModels = this._customModels.filter(m => m !== id);
 		this._enabledIds.delete(id);
 		try {
 			await this._saveCustomModels();
 			await this._saveEnabledModels();
-		} catch (e) { console.error('Failed to remove custom model:', e); }
+		} catch (e) {
+			console.error('Failed to remove custom model:', e);
+		}
 
-		if (this._enabledListContainer) { this._renderEnabledModels(this._enabledListContainer); }
+		if (this._enabledListContainer) {
+			this._renderEnabledModels(this._enabledListContainer);
+		}
 	}
 
 	dispose(): void {

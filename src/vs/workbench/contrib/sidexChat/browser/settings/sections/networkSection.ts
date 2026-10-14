@@ -26,10 +26,7 @@ interface ProviderStatusInfo {
  *     `src-tauri/tauri.conf.json`)
  * Keep these in sync with those files if either endpoint moves.
  */
-const FIXED_DOMAINS = [
-	'marketplace.siden.ai',
-	'cdn.siden.ai',
-];
+const FIXED_DOMAINS = ['marketplace.siden.ai', 'cdn.siden.ai'];
 
 function isLoopbackHost(host: string): boolean {
 	return host === 'localhost' || host === '127.0.0.1' || host === '::1';
@@ -51,12 +48,24 @@ export class NetworkSection implements SettingsSection {
 
 		if (this._invoke) {
 			try {
-				const statuses = await this._invoke('providers_status') as ProviderStatusInfo[] | null;
-				this._providerDomains = Array.from(new Set((statuses ?? [])
-					.filter(s => s.enabled && s.configured)
-					.map(s => { try { return new URL(s.baseUrl).hostname; } catch { return null; } })
-					.filter((host): host is string => !!host && !isLoopbackHost(host))));
-			} catch { /* provider list unavailable; the domain list just omits it */ }
+				const statuses = (await this._invoke('providers_status')) as ProviderStatusInfo[] | null;
+				this._providerDomains = Array.from(
+					new Set(
+						(statuses ?? [])
+							.filter(s => s.enabled && s.configured)
+							.map(s => {
+								try {
+									return new URL(s.baseUrl).hostname;
+								} catch {
+									return null;
+								}
+							})
+							.filter((host): host is string => !!host && !isLoopbackHost(host))
+					)
+				);
+			} catch {
+				/* provider list unavailable; the domain list just omits it */
+			}
 		}
 
 		const title = document.createElement('div');
@@ -83,22 +92,31 @@ export class NetworkSection implements SettingsSection {
 		left.appendChild(label);
 		const desc = document.createElement('div');
 		desc.className = 'sidex-settings-row-description';
-		desc.textContent = 'HTTP/2 provides low-latency streaming. Switch to HTTP/1.1 if your proxy or firewall does not support HTTP/2.';
+		desc.textContent =
+			'HTTP/2 provides low-latency streaming. Switch to HTTP/1.1 if your proxy or firewall does not support HTTP/2.';
 		left.appendChild(desc);
 		row.appendChild(left);
 
 		const action = document.createElement('div');
 		action.className = 'sidex-settings-row-action';
-		const dropdown = createCustomDropdown(['HTTP/2', 'HTTP/1.1'], 'HTTP/2', (newValue) => {
+		const dropdown = createCustomDropdown(['HTTP/2', 'HTTP/1.1'], 'HTTP/2', newValue => {
 			if (this._invoke) {
-				this._invoke('settings_update', { key: 'sidex.network.httpMode', value: JSON.stringify(newValue), scope: 'user' }).catch(() => {});
+				this._invoke('settings_update', {
+					key: 'sidex.network.httpMode',
+					value: JSON.stringify(newValue),
+					scope: 'user'
+				}).catch(() => {});
 			}
 		});
 
 		if (this._invoke) {
-			this._invoke('settings_get', { section: 'sidex.network.httpMode' }).then((val) => {
-				if (val && typeof val === 'string') { (dropdown as any).setValue(val); }
-			}).catch(() => {});
+			this._invoke('settings_get', { section: 'sidex.network.httpMode' })
+				.then(val => {
+					if (val && typeof val === 'string') {
+						(dropdown as any).setValue(val);
+					}
+				})
+				.catch(() => {});
 		}
 
 		action.appendChild(dropdown);
@@ -125,11 +143,13 @@ export class NetworkSection implements SettingsSection {
 		left.appendChild(label);
 		const desc = document.createElement('div');
 		desc.className = 'sidex-settings-row-description';
-		desc.textContent = 'These domains must be accessible for SideX to function: your configured AI provider(s), the extension marketplace, and update checks. Add them to your firewall or proxy allowlist.';
+		desc.textContent =
+			'These domains must be accessible for SideX to function: your configured AI provider(s), the extension marketplace, and update checks. Add them to your firewall or proxy allowlist.';
 		left.appendChild(desc);
 		const note = document.createElement('div');
 		note.className = 'sidex-settings-row-description';
-		note.textContent = 'The agent server itself runs on loopback (127.0.0.1) and never leaves this machine, so it does not need a firewall entry.';
+		note.textContent =
+			'The agent server itself runs on loopback (127.0.0.1) and never leaves this machine, so it does not need a firewall entry.';
 		left.appendChild(note);
 		row.appendChild(left);
 
@@ -143,20 +163,34 @@ export class NetworkSection implements SettingsSection {
 		copyBtn.addEventListener('click', () => {
 			const domainList = domains.join('\n');
 			if (this._invoke) {
-				this._invoke('clipboard_write_text', { text: domainList }).then(() => {
-					copyBtn.textContent = 'Copied!';
-					setTimeout(() => { copyBtn.textContent = 'Copy Domains'; }, 2000);
-				}).catch(() => {
-					navigator.clipboard.writeText(domainList).then(() => {
+				this._invoke('clipboard_write_text', { text: domainList })
+					.then(() => {
 						copyBtn.textContent = 'Copied!';
-						setTimeout(() => { copyBtn.textContent = 'Copy Domains'; }, 2000);
-					}).catch(() => {});
-				});
+						setTimeout(() => {
+							copyBtn.textContent = 'Copy Domains';
+						}, 2000);
+					})
+					.catch(() => {
+						navigator.clipboard
+							.writeText(domainList)
+							.then(() => {
+								copyBtn.textContent = 'Copied!';
+								setTimeout(() => {
+									copyBtn.textContent = 'Copy Domains';
+								}, 2000);
+							})
+							.catch(() => {});
+					});
 			} else {
-				navigator.clipboard.writeText(domainList).then(() => {
-					copyBtn.textContent = 'Copied!';
-					setTimeout(() => { copyBtn.textContent = 'Copy Domains'; }, 2000);
-				}).catch(() => {});
+				navigator.clipboard
+					.writeText(domainList)
+					.then(() => {
+						copyBtn.textContent = 'Copied!';
+						setTimeout(() => {
+							copyBtn.textContent = 'Copy Domains';
+						}, 2000);
+					})
+					.catch(() => {});
 			}
 		});
 		action.appendChild(copyBtn);
@@ -178,7 +212,8 @@ export class NetworkSection implements SettingsSection {
 		domainsList.style.cssText = 'display:none;padding:0 16px 12px;';
 
 		const domainsPre = document.createElement('div');
-		domainsPre.style.cssText = 'font-family:var(--vscode-editor-font-family, monospace);font-size:11px;color:var(--vscode-settings-textInputForeground);background:var(--vscode-settings-textInputBackground);border:1px solid var(--vscode-settings-textInputBorder, transparent);border-radius:2px;padding:8px 12px;line-height:1.6;';
+		domainsPre.style.cssText =
+			'font-family:var(--vscode-editor-font-family, monospace);font-size:11px;color:var(--vscode-settings-textInputForeground);background:var(--vscode-settings-textInputBackground);border:1px solid var(--vscode-settings-textInputBorder, transparent);border-radius:2px;padding:8px 12px;line-height:1.6;';
 		domainsPre.textContent = domains.join('\n');
 		domainsList.appendChild(domainsPre);
 
@@ -225,7 +260,9 @@ export class NetworkSection implements SettingsSection {
 		btn.textContent = 'Running...';
 
 		const prev = card.querySelector('.sidex-settings-diag-results');
-		if (prev) { prev.remove(); }
+		if (prev) {
+			prev.remove();
+		}
 
 		const results: { domain: string; ok: boolean; latencyMs?: number }[] = [];
 
@@ -276,7 +313,8 @@ export class NetworkSection implements SettingsSection {
 			line.appendChild(icon);
 
 			const domain = document.createElement('span');
-			domain.style.cssText = 'font-family:var(--vscode-editor-font-family, monospace);color:var(--vscode-editor-foreground);';
+			domain.style.cssText =
+				'font-family:var(--vscode-editor-font-family, monospace);color:var(--vscode-editor-foreground);';
 			domain.textContent = r.domain;
 			line.appendChild(domain);
 

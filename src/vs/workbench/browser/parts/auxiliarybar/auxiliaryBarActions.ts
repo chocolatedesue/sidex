@@ -72,10 +72,7 @@ export class ToggleAuxiliaryBarAction extends Action2 {
 				condition: AuxiliaryBarVisibleContext,
 				title: localize('closeSecondarySideBar', 'Hide Secondary Side Bar'),
 				icon: closeIcon,
-				mnemonicTitle: localize(
-					{ key: 'miCloseSecondarySideBar', comment: ['&& denotes a mnemonic'] },
-					'&&Sidex'
-				)
+				mnemonicTitle: localize({ key: 'miCloseSecondarySideBar', comment: ['&& denotes a mnemonic'] }, '&&Sidex')
 			},
 			icon: closeIcon,
 			category: Categories.View,

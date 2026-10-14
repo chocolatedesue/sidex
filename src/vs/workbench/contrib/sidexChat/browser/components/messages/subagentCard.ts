@@ -35,7 +35,9 @@ export class SubagentCard extends Component {
 		this._build();
 	}
 
-	get info(): SubagentInfo { return this._info; }
+	get info(): SubagentInfo {
+		return this._info;
+	}
 
 	private _build(): void {
 		// Header row (always visible)
@@ -71,7 +73,8 @@ export class SubagentCard extends Component {
 			this._info.status = info.status;
 			this._statusDot.classList.remove('sc-subagent-running', 'sc-subagent-completed', 'sc-subagent-failed');
 			this._statusDot.classList.add(`sc-subagent-${info.status}`);
-			this._statusText.textContent = info.status === 'running' ? 'Running...' : info.status === 'completed' ? 'Completed' : 'Failed';
+			this._statusText.textContent =
+				info.status === 'running' ? 'Running...' : info.status === 'completed' ? 'Completed' : 'Failed';
 		}
 		if (info.toolCalls) {
 			this._info.toolCalls = info.toolCalls;
@@ -109,16 +112,24 @@ export class SubagentCard extends Component {
 			const row = DOM.append(this._toolsEl, $('div.sc-subagent-tool-item'));
 			const icon = DOM.append(row, $('span.sc-subagent-tool-icon'));
 			icon.textContent = tc.status === 'done' ? '✓' : tc.status === 'running' ? '◑' : '✕';
-			icon.classList.add(tc.status === 'done' ? 'sc-tool-done' : tc.status === 'running' ? 'sc-tool-running' : 'sc-tool-error');
+			icon.classList.add(
+				tc.status === 'done' ? 'sc-tool-done' : tc.status === 'running' ? 'sc-tool-running' : 'sc-tool-error'
+			);
 			const name = DOM.append(row, $('span.sc-subagent-tool-name'));
 			name.textContent = tc.name;
 		}
 	}
 
 	private _formatModel(model: string): string {
-		if (model.includes('opus')) {return 'Claude Opus';}
-		if (model.includes('sonnet')) {return 'Claude Sonnet';}
-		if (model.includes('haiku')) {return 'Claude Haiku';}
+		if (model.includes('opus')) {
+			return 'Claude Opus';
+		}
+		if (model.includes('sonnet')) {
+			return 'Claude Sonnet';
+		}
+		if (model.includes('haiku')) {
+			return 'Claude Haiku';
+		}
 		return model.split('.').pop()?.replace(/-/g, ' ') || model;
 	}
 }

@@ -201,13 +201,7 @@ export class ExtHostWebviewViews implements extHostProtocol.ExtHostWebviewViewsS
 
 		const { provider, extension } = entry;
 
-		const webview = this._extHostWebview.createNewWebview(
-			webviewHandle,
-			{
-				/* todo */
-			},
-			extension
-		);
+		const webview = this._extHostWebview.createNewWebview(webviewHandle, {/* todo */}, extension);
 		const revivedView = new ExtHostWebviewView(webviewHandle, this._proxy, viewType, title, webview, true);
 
 		this._webviewViews.set(webviewHandle, revivedView);

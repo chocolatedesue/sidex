@@ -2014,8 +2014,7 @@ export abstract class AbstractTaskService extends Disposable implements ITaskSer
 		const taskConfig = CustomTask.is(task) || ConfiguringTask.is(task) ? task._source.config : undefined;
 		if (taskConfig && taskConfig.element) {
 			toCustomize = { ...(taskConfig.element as Record<string, unknown>) } as
-				| TaskConfig.ICustomTask
-				| TaskConfig.IConfiguringTask;
+				TaskConfig.ICustomTask | TaskConfig.IConfiguringTask;
 		} else if (ContributedTask.is(task)) {
 			toCustomize = {};
 			const identifier: TaskConfig.ITaskIdentifier = Object.assign(Object.create(null), task.defines);
@@ -4783,16 +4782,14 @@ export abstract class AbstractTaskService extends Disposable implements ITaskSer
 				configElement.command = task.command.name;
 			} else if (suppressTaskName) {
 				configElement.command = (task._source.config.element as Record<string, unknown>).command as
-					| string
-					| CommandString;
+					string | CommandString;
 			}
 			if (task.command.args && (!Array.isArray(task.command.args) || task.command.args.length > 0)) {
 				if (!globalConfig.windows?.args && !globalConfig.osx?.args && !globalConfig.linux?.args) {
 					configElement.args = task.command.args;
 				} else {
 					configElement.args = (task._source.config.element as Record<string, unknown>).args as
-						| string[]
-						| CommandString[];
+						string[] | CommandString[];
 				}
 			}
 		}

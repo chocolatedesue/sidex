@@ -270,18 +270,16 @@ export class MainThreadDebugService implements MainThreadDebugServiceShape, IDeb
 	): Promise<void> {
 		for (const dto of DTOs) {
 			if (dto.type === 'sourceMulti') {
-				const rawbps = dto.lines.map(
-					(l): IBreakpointData => ({
-						id: l.id,
-						enabled: l.enabled,
-						lineNumber: l.line + 1,
-						column: l.character > 0 ? l.character + 1 : undefined, // a column value of 0 results in an omitted column attribute; see #46784
-						condition: l.condition,
-						hitCondition: l.hitCondition,
-						logMessage: l.logMessage,
-						mode: l.mode
-					})
-				);
+				const rawbps = dto.lines.map((l): IBreakpointData => ({
+					id: l.id,
+					enabled: l.enabled,
+					lineNumber: l.line + 1,
+					column: l.character > 0 ? l.character + 1 : undefined, // a column value of 0 results in an omitted column attribute; see #46784
+					condition: l.condition,
+					hitCondition: l.hitCondition,
+					logMessage: l.logMessage,
+					mode: l.mode
+				}));
 				this.debugService.addBreakpoints(uri.revive(dto.uri), rawbps);
 			} else if (dto.type === 'function') {
 				this.debugService.addFunctionBreakpoint(

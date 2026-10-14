@@ -612,10 +612,7 @@ export interface IThemeScopedSemanticTokenColorCustomizations {
 
 export interface ISemanticTokenColorCustomizations {
 	[styleRuleOrThemeScope: string]:
-		| IThemeScopedSemanticTokenColorCustomizations
-		| ISemanticTokenRules
-		| boolean
-		| undefined;
+		IThemeScopedSemanticTokenColorCustomizations | ISemanticTokenRules | boolean | undefined;
 	enabled?: boolean;
 	rules?: ISemanticTokenRules;
 }
@@ -626,9 +623,7 @@ export interface IThemeScopedExperimentalSemanticTokenColorCustomizations {
 
 export interface IExperimentalSemanticTokenColorCustomizations {
 	[styleRuleOrThemeScope: string]:
-		| IThemeScopedExperimentalSemanticTokenColorCustomizations
-		| ISemanticTokenRules
-		| undefined;
+		IThemeScopedExperimentalSemanticTokenColorCustomizations | ISemanticTokenRules | undefined;
 }
 
 export type IThemeScopedCustomizations =

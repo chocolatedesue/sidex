@@ -52,10 +52,7 @@ const enum CellBufferInfo {
 }
 
 type QueuedBufferEvent =
-	| ViewConfigurationChangedEvent
-	| ViewLineMappingChangedEvent
-	| ViewLinesDeletedEvent
-	| ViewZonesChangedEvent;
+	ViewConfigurationChangedEvent | ViewLineMappingChangedEvent | ViewLinesDeletedEvent | ViewZonesChangedEvent;
 
 /**
  * A render strategy that tracks a large buffer, uploading only dirty lines as they change and

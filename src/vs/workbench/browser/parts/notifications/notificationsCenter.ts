@@ -534,7 +534,7 @@ export class NotificationsCenter extends Themable implements INotificationsCente
 				availableWidth -= 2 * 8; // adjust for paddings left and right
 
 				// Make sure notifications are not exceeding available height
-				availableHeight = this.workbenchDimensions.height - 35 /* header */;
+				availableHeight = this.workbenchDimensions.height - 35; /* header */
 				if (this.layoutService.isVisible(Parts.STATUSBAR_PART, mainWindow)) {
 					availableHeight -= 22; // adjust for status bar
 				}

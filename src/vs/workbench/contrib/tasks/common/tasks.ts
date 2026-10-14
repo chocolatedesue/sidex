@@ -509,11 +509,7 @@ export interface WorkspaceFileTaskSource extends IBaseTaskSource {
 }
 
 export type TaskSource =
-	| IWorkspaceTaskSource
-	| IExtensionTaskSource
-	| IInMemoryTaskSource
-	| IUserTaskSource
-	| WorkspaceFileTaskSource;
+	IWorkspaceTaskSource | IExtensionTaskSource | IInMemoryTaskSource | IUserTaskSource | WorkspaceFileTaskSource;
 export type FileBasedTaskSource = IWorkspaceTaskSource | IUserTaskSource | WorkspaceFileTaskSource;
 export interface ITaskIdentifier {
 	type: string;

@@ -274,11 +274,7 @@ class LoadingDetails {
 /** Type of nodes returned from {@link TestCoverage}. Note: value is *always* defined. */
 type TestCoverageFileNode = IPrefixTreeNode<ComputedFileCoverage | FileCoverage>;
 type CoverageTreeElement =
-	| TestCoverageFileNode
-	| DeclarationCoverageNode
-	| LoadingDetails
-	| RevealUncoveredDeclarations
-	| CurrentlyFilteredTo;
+	TestCoverageFileNode | DeclarationCoverageNode | LoadingDetails | RevealUncoveredDeclarations | CurrentlyFilteredTo;
 
 const isFileCoverage = (c: CoverageTreeElement): c is TestCoverageFileNode => typeof c === 'object' && 'value' in c;
 const isDeclarationCoverage = (c: CoverageTreeElement): c is DeclarationCoverageNode =>

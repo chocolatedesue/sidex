@@ -236,8 +236,7 @@ export interface ILegacyCommandProperties {
 }
 
 export type CommandString =
-	| Types.SingleOrMany<string>
-	| { value: Types.SingleOrMany<string>; quoting: 'escape' | 'strong' | 'weak' };
+	Types.SingleOrMany<string> | { value: Types.SingleOrMany<string>; quoting: 'escape' | 'strong' | 'weak' };
 
 export namespace CommandString {
 	export function value(value: CommandString): string {

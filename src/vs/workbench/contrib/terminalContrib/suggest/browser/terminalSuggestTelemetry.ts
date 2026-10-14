@@ -12,8 +12,7 @@ import { ITerminalCompletion, TerminalCompletionItemKind } from './terminalCompl
 
 export class TerminalSuggestTelemetry extends Disposable {
 	private _acceptedCompletions:
-		| Array<{ label: string; kind?: string; sessionId: string; provider: string }>
-		| undefined;
+		Array<{ label: string; kind?: string; sessionId: string; provider: string }> | undefined;
 
 	private _kindMap = new Map<number, string>([
 		[TerminalCompletionItemKind.File, 'File'],

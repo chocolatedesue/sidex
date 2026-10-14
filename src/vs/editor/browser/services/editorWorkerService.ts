@@ -337,11 +337,7 @@ class WordBasedCompletionItemProvider implements languages.CompletionItemProvide
 	async provideCompletionItems(model: ITextModel, position: Position): Promise<languages.CompletionList | undefined> {
 		type WordBasedSuggestionsConfig = {
 			wordBasedSuggestions?:
-				| 'off'
-				| 'currentDocument'
-				| 'matchingDocuments'
-				| 'allDocuments'
-				| 'offWithInlineSuggestions';
+				'off' | 'currentDocument' | 'matchingDocuments' | 'allDocuments' | 'offWithInlineSuggestions';
 		};
 		const config = this._configurationService.getValue<WordBasedSuggestionsConfig>(model.uri, position, 'editor');
 		if (config.wordBasedSuggestions === 'off') {

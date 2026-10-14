@@ -72,12 +72,10 @@ export class InlayHintsHover extends MarkdownHoverParticipant implements IEditor
 			return null;
 		}
 		const options = mouseEvent.target.detail.injectedText?.options;
-		if (
-			!(
-				options instanceof ModelDecorationInjectedTextOptions &&
-				options.attachedData instanceof RenderedInlayHintLabelPart
-			)
-		) {
+		if (!(
+			options instanceof ModelDecorationInjectedTextOptions &&
+			options.attachedData instanceof RenderedInlayHintLabelPart
+		)) {
 			return null;
 		}
 		return new InlayHintsHoverAnchor(options.attachedData, this, mouseEvent.event.posx, mouseEvent.event.posy);

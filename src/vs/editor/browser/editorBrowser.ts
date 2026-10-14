@@ -476,9 +476,7 @@ export interface IMouseTargetMarginData {
 }
 export interface IMouseTargetMargin extends IBaseMouseTarget {
 	readonly type:
-		| MouseTargetType.GUTTER_GLYPH_MARGIN
-		| MouseTargetType.GUTTER_LINE_NUMBERS
-		| MouseTargetType.GUTTER_LINE_DECORATIONS;
+		MouseTargetType.GUTTER_GLYPH_MARGIN | MouseTargetType.GUTTER_LINE_NUMBERS | MouseTargetType.GUTTER_LINE_DECORATIONS;
 	readonly position: Position;
 	readonly range: Range;
 	readonly detail: IMouseTargetMarginData;

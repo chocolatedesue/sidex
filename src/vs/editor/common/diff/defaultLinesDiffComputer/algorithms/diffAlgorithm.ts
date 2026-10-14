@@ -66,9 +66,9 @@ export class SequenceDiff {
 		let last: SequenceDiff | undefined = undefined;
 		for (const cur of sequenceDiffs) {
 			if (last) {
-				if (
-					!(last.seq1Range.endExclusive <= cur.seq1Range.start && last.seq2Range.endExclusive <= cur.seq2Range.start)
-				) {
+				if (!(
+					last.seq1Range.endExclusive <= cur.seq1Range.start && last.seq2Range.endExclusive <= cur.seq2Range.start
+				)) {
 					throw new BugIndicatingError('Sequence diffs must be sorted');
 				}
 			}

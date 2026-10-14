@@ -42,12 +42,12 @@ export class InlineDiffView extends Component {
 		newContent: string,
 		callbacks: DiffCallbacks,
 		private readonly _languageService?: ILanguageService,
-		private readonly _modelService?: IModelService,
+		private readonly _modelService?: IModelService
 	) {
 		super('div', 'ui-tool-call-card');
 		this.element.classList.add('ui-edit-tool-call');
 		this.element.classList.add('sc-diff-view');
-		
+
 		this.element.dataset.hasContent = 'true';
 		this.element.classList.add('show-file-icons');
 		this._filePath = filePath;
@@ -63,7 +63,9 @@ export class InlineDiffView extends Component {
 		this._tokenizeFullContent(oldContent, newContent);
 	}
 
-	get hunks(): readonly DiffHunk[] { return this._hunks; }
+	get hunks(): readonly DiffHunk[] {
+		return this._hunks;
+	}
 
 	private _render(): void {
 		this._renderHeader();
@@ -79,9 +81,10 @@ export class InlineDiffView extends Component {
 		const segments = this._filePath.split('/');
 		const fileName = segments.pop() || this._filePath;
 		const resource = URI.file(this._filePath);
-		const iconClasses = this._modelService && this._languageService
-			? getIconClasses(this._modelService, this._languageService, resource, FileKind.FILE)
-			: ['file-icon'];
+		const iconClasses =
+			this._modelService && this._languageService
+				? getIconClasses(this._modelService, this._languageService, resource, FileKind.FILE)
+				: ['file-icon'];
 		const iconEl = DOM.append(fileInfo, DOM.$('span'));
 		iconEl.classList.add(...iconClasses);
 		iconEl.setAttribute('aria-hidden', 'true');
@@ -90,7 +93,7 @@ export class InlineDiffView extends Component {
 
 		// Filename
 		const pathEl = DOM.append(fileInfo, $('span.ui-edit-tool-call__filename'));
-		
+
 		pathEl.textContent = fileName;
 
 		// Change counts
@@ -123,11 +126,14 @@ export class InlineDiffView extends Component {
 	private _renderDiffBody(): void {
 		const body = this.append('div', 'ui-tool-call-card__body');
 
-		const scrollArea = DOM.append(body, DOM.$('div.ui-scroll-area.ui-edit-tool-call__scroll-area.ui-edit-tool-call__expanded-scroll-area'));
+		const scrollArea = DOM.append(
+			body,
+			DOM.$('div.ui-scroll-area.ui-edit-tool-call__scroll-area.ui-edit-tool-call__expanded-scroll-area')
+		);
 		scrollArea.setAttribute('data-scroll-padding', '4');
 		scrollArea.setAttribute('data-visibility', 'hover');
 		scrollArea.setAttribute('data-direction', 'both');
-		
+
 		const viewport = DOM.append(scrollArea, DOM.$('div.ui-scroll-area__viewport'));
 		const scrollContent = DOM.append(viewport, DOM.$('div.ui-scroll-area__content'));
 
@@ -156,14 +162,15 @@ export class InlineDiffView extends Component {
 				} else if (line.newLineNo !== undefined) {
 					this._newLineElements.set(line.newLineNo, cont);
 				}
-
-				
 			}
 
 			// Expand/Collapse logic
 			const hasHidden = hunk.lines.length > 6;
 			if (hasHidden) {
-				const expandBtn = DOM.append(body, DOM.$('button.ui-tool-call-card__expand-button.ui-tool-call-card__expand-button--collapsed'));
+				const expandBtn = DOM.append(
+					body,
+					DOM.$('button.ui-tool-call-card__expand-button.ui-tool-call-card__expand-button--collapsed')
+				);
 				expandBtn.setAttribute('type', 'button');
 				expandBtn.setAttribute('aria-label', 'Expand diff');
 				expandBtn.setAttribute('aria-expanded', 'false');
@@ -180,7 +187,7 @@ export class InlineDiffView extends Component {
 					expandBtn.setAttribute('aria-label', expanded ? 'Collapse diff' : 'Expand diff');
 					iconI.classList.toggle('codicon-chevron-down', !expanded);
 					iconI.classList.toggle('codicon-chevron-up', expanded);
-					
+
 					scrollArea.classList.toggle('ui-edit-tool-call__expanded-scroll-area', expanded);
 					scrollArea.classList.toggle('ui-edit-tool-call__collapsed-scroll-area', !expanded);
 				});
@@ -196,9 +203,7 @@ export class InlineDiffView extends Component {
 			return;
 		}
 
-		const langId = this._languageService.guessLanguageIdByFilepathOrFirstLine(
-			URI.file(this._filePath)
-		) ?? 'plaintext';
+		const langId = this._languageService.guessLanguageIdByFilepathOrFirstLine(URI.file(this._filePath)) ?? 'plaintext';
 
 		// Tokenize full new content as a single block to preserve parser state
 		tokenizeToString(this._languageService, newContent, langId).then(html => {
@@ -257,10 +262,11 @@ export class InlineDiffView extends Component {
 
 	private _updateHunkVisual(hunk: DiffHunk): void {
 		const el = this._hunkElements.get(hunk.id);
-		if (!el) { return; }
+		if (!el) {
+			return;
+		}
 
 		el.classList.remove('pending', 'accepted', 'rejected');
 		el.classList.add(hunk.status);
 	}
 }
-

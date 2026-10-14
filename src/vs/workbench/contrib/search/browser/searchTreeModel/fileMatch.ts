@@ -257,12 +257,10 @@ export class FileMatchImpl extends Disposable implements ISearchTreeFileMatch {
 
 		this._model.changeDecorations(accessor => {
 			const newDecorations = this.parent().showHighlights
-				? this.matches().map(
-						(match): IModelDeltaDecoration => ({
-							range: match.range(),
-							options: FileMatchImpl.getDecorationOption(this.isMatchSelected(match))
-						})
-					)
+				? this.matches().map((match): IModelDeltaDecoration => ({
+						range: match.range(),
+						options: FileMatchImpl.getDecorationOption(this.isMatchSelected(match))
+					}))
 				: [];
 			this._modelDecorations = accessor.deltaDecorations(this._modelDecorations, newDecorations);
 		});

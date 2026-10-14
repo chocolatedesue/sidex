@@ -37,10 +37,7 @@ export interface IBaseSerializableStorageRequest {
 	 * denote application or profile scope depending on profile.
 	 */
 	readonly workspace:
-		| ISerializedWorkspaceIdentifier
-		| ISerializedSingleFolderWorkspaceIdentifier
-		| IEmptyWorkspaceIdentifier
-		| undefined;
+		ISerializedWorkspaceIdentifier | ISerializedSingleFolderWorkspaceIdentifier | IEmptyWorkspaceIdentifier | undefined;
 
 	/**
 	 * Additional payload for the request to perform.

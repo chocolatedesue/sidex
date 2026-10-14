@@ -9,7 +9,7 @@ import { Range } from '../../../../../editor/common/core/range.js';
 import {
 	InlineCompletionContext,
 	InlineCompletions,
-	InlineCompletionsProvider,
+	InlineCompletionsProvider
 } from '../../../../../editor/common/languages.js';
 import { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import { serverWsUrl } from '../localServer.js';
@@ -23,9 +23,7 @@ export class SidexCompletionProvider implements InlineCompletionsProvider {
 	private _debounceTimer: ReturnType<typeof setTimeout> | undefined;
 	private _lastController: AbortController | null = null;
 
-	constructor(
-		@IConfigurationService private readonly _configService: IConfigurationService,
-	) { }
+	constructor(@IConfigurationService private readonly _configService: IConfigurationService) {}
 
 	private get _serverUrl(): string {
 		const wsUrl = serverWsUrl(this._configService.getValue<string>('sidex.chat.serverUrl'));
@@ -36,7 +34,7 @@ export class SidexCompletionProvider implements InlineCompletionsProvider {
 		model: ITextModel,
 		position: Position,
 		_context: InlineCompletionContext,
-		token: CancellationToken,
+		token: CancellationToken
 	): Promise<InlineCompletions> {
 		const empty: InlineCompletions = { items: [] };
 
@@ -61,10 +59,12 @@ export class SidexCompletionProvider implements InlineCompletionsProvider {
 			}
 
 			return {
-				items: [{
-					insertText: completion,
-					range: new Range(position.lineNumber, position.column, position.lineNumber, position.column),
-				}],
+				items: [
+					{
+						insertText: completion,
+						range: new Range(position.lineNumber, position.column, position.lineNumber, position.column)
+					}
+				]
 			};
 		} catch {
 			return empty;
@@ -84,9 +84,9 @@ export class SidexCompletionProvider implements InlineCompletionsProvider {
 		suffix: string,
 		filePath: string,
 		language: string,
-		token: CancellationToken,
+		token: CancellationToken
 	): Promise<string | null> {
-		return new Promise((resolve) => {
+		return new Promise(resolve => {
 			if (this._debounceTimer) {
 				clearTimeout(this._debounceTimer);
 			}
@@ -119,9 +119,9 @@ export class SidexCompletionProvider implements InlineCompletionsProvider {
 							prefix,
 							suffix,
 							file_path: filePath,
-							language,
+							language
 						}),
-						signal: controller.signal,
+						signal: controller.signal
 					});
 
 					if (!resp.ok) {

@@ -25,7 +25,7 @@ export class InlineEditController extends Disposable {
 
 	constructor(
 		private readonly _editor: ICodeEditor,
-		private readonly _configService: IConfigurationService,
+		private readonly _configService: IConfigurationService
 	) {
 		super();
 	}
@@ -48,7 +48,9 @@ export class InlineEditController extends Disposable {
 		let editRange: Range;
 		if (!sel || sel.isEmpty()) {
 			const pos = this._editor.getPosition();
-			if (!pos) { return; }
+			if (!pos) {
+				return;
+			}
 			editRange = new Range(pos.lineNumber, 1, pos.lineNumber, model.getLineMaxColumn(pos.lineNumber));
 		} else {
 			editRange = sel;
@@ -59,26 +61,32 @@ export class InlineEditController extends Disposable {
 		this._isActive = true;
 
 		// Highlight the selected range
-		this._diffDecorations = this._editor.deltaDecorations(this._diffDecorations, [{
-			range: editRange,
-			options: {
-				description: 'sidex-inline-edit-selection',
-				className: 'sidex-inline-edit-selection',
-				isWholeLine: false,
-			},
-		}]);
+		this._diffDecorations = this._editor.deltaDecorations(this._diffDecorations, [
+			{
+				range: editRange,
+				options: {
+					description: 'sidex-inline-edit-selection',
+					className: 'sidex-inline-edit-selection',
+					isWholeLine: false
+				}
+			}
+		]);
 
 		this._inputWidget = this._widgetDisposables.add(
 			new InlineEditInputWidget(this._editor, editRange.endLineNumber, 1)
 		);
 
-		this._widgetDisposables.add(this._inputWidget.onDidSubmit(instruction => {
-			void this._submit(instruction);
-		}));
+		this._widgetDisposables.add(
+			this._inputWidget.onDidSubmit(instruction => {
+				void this._submit(instruction);
+			})
+		);
 
-		this._widgetDisposables.add(this._inputWidget.onDidCancel(() => {
-			this.dismiss();
-		}));
+		this._widgetDisposables.add(
+			this._inputWidget.onDidCancel(() => {
+				this.dismiss();
+			})
+		);
 
 		this._inputWidget.show();
 	}
@@ -89,7 +97,9 @@ export class InlineEditController extends Disposable {
 		}
 
 		const model = this._editor.getModel();
-		if (!model) { return; }
+		if (!model) {
+			return;
+		}
 
 		this._inputWidget.setLoading(true);
 
@@ -102,7 +112,7 @@ export class InlineEditController extends Disposable {
 				instruction,
 				code: this._originalCode,
 				language,
-				file_path: filePath,
+				file_path: filePath
 			});
 
 			this._inputWidget.hide();
@@ -115,7 +125,7 @@ export class InlineEditController extends Disposable {
 
 	private async _streamEdit(
 		serverUrl: string,
-		body: { instruction: string; code: string; language: string; file_path: string },
+		body: { instruction: string; code: string; language: string; file_path: string }
 	): Promise<string> {
 		const httpUrl = serverUrl.replace(/^ws/, 'http');
 		const model = this._configService.getValue<string>('sidex.selectedModel') || '';
@@ -123,7 +133,7 @@ export class InlineEditController extends Disposable {
 		const resp = await fetch(`${httpUrl}/v1/inline-edit`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ...body, model }),
+			body: JSON.stringify({ ...body, model })
 		});
 
 		if (!resp.ok) {
@@ -141,7 +151,9 @@ export class InlineEditController extends Disposable {
 
 		while (true) {
 			const { done, value } = await reader.read();
-			if (done) { break; }
+			if (done) {
+				break;
+			}
 
 			buffer += decoder.decode(value, { stream: true });
 
@@ -149,9 +161,13 @@ export class InlineEditController extends Disposable {
 			buffer = lines.pop() || '';
 
 			for (const line of lines) {
-				if (!line.startsWith('data: ')) { continue; }
+				if (!line.startsWith('data: ')) {
+					continue;
+				}
 				const jsonStr = line.slice(6).trim();
-				if (!jsonStr) { continue; }
+				if (!jsonStr) {
+					continue;
+				}
 
 				try {
 					const chunk = JSON.parse(jsonStr);
@@ -161,7 +177,9 @@ export class InlineEditController extends Disposable {
 						throw new Error(chunk.error || 'Unknown server error');
 					}
 				} catch (e) {
-					if (e instanceof SyntaxError) { continue; }
+					if (e instanceof SyntaxError) {
+						continue;
+					}
 					throw e;
 				}
 			}
@@ -171,7 +189,9 @@ export class InlineEditController extends Disposable {
 	}
 
 	private _showInlineDiff(model: ITextModel): void {
-		if (!this._editRange) { return; }
+		if (!this._editRange) {
+			return;
+		}
 
 		// Clear the selection highlight
 		this._diffDecorations = this._editor.deltaDecorations(this._diffDecorations, []);
@@ -202,8 +222,8 @@ export class InlineEditController extends Disposable {
 							description: 'sidex-inline-diff-removed',
 							className: 'sidex-inline-diff-removed',
 							isWholeLine: true,
-							glyphMarginClassName: 'sidex-inline-diff-glyph-removed',
-						},
+							glyphMarginClassName: 'sidex-inline-diff-glyph-removed'
+						}
 					});
 				}
 				oldLineOffset++;
@@ -219,9 +239,9 @@ export class InlineEditController extends Disposable {
 						isWholeLine: false,
 						after: {
 							content: ' + ' + line.content,
-							inlineClassName: 'sidex-inline-diff-added-text',
-						},
-					},
+							inlineClassName: 'sidex-inline-diff-added-text'
+						}
+					}
 				});
 			} else {
 				oldLineOffset++;
@@ -234,7 +254,9 @@ export class InlineEditController extends Disposable {
 	}
 
 	private _showAcceptRejectButtons(): void {
-		if (!this._editRange) { return; }
+		if (!this._editRange) {
+			return;
+		}
 
 		this._removeActionWidget();
 
@@ -292,10 +314,12 @@ export class InlineEditController extends Disposable {
 		}
 
 		// Apply the edit
-		this._editor.executeEdits('sidex.inlineEdit', [{
-			range: this._editRange,
-			text: this._editedCode,
-		}]);
+		this._editor.executeEdits('sidex.inlineEdit', [
+			{
+				range: this._editRange,
+				text: this._editedCode
+			}
+		]);
 
 		this.dismiss();
 	}

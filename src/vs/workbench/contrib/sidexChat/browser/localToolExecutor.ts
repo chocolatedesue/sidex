@@ -25,7 +25,7 @@ export interface ILocalToolContext {
 }
 
 // Tauri invoke is available globally in the webview via @tauri-apps/api
- 
+
 declare function __TAURI_INVOKE__(cmd: string, args?: Record<string, unknown>): Promise<any>;
 
 interface RustToolResponse {
@@ -64,7 +64,7 @@ export class LocalToolExecutor {
 				type: 'tool_response',
 				tool_call_id: req.tool_call_id,
 				output: '',
-				error: 'local tool execution unavailable (Tauri IPC not reachable)',
+				error: 'local tool execution unavailable (Tauri IPC not reachable)'
 			};
 		}
 
@@ -72,15 +72,15 @@ export class LocalToolExecutor {
 		ctx.onProgress?.({ name: req.name, status: 'running' });
 
 		try {
-			const result = await invoke('agent_execute_tool', {
+			const result = (await invoke('agent_execute_tool', {
 				request: {
 					tool_call_id: req.tool_call_id,
 					name: req.name,
 					arguments: req.arguments || '{}',
 					cwd: ctx.cwd,
-					token: ctx.token || "",
-				},
-			}) as RustToolResponse;
+					token: ctx.token || ''
+				}
+			})) as RustToolResponse;
 
 			const status = result.error ? 'error' : 'done';
 			ctx.onProgress?.({ name: req.name, status, detail: result.error || undefined });
@@ -89,7 +89,7 @@ export class LocalToolExecutor {
 				type: 'tool_response',
 				tool_call_id: result.tool_call_id,
 				output: result.output,
-				error: result.error,
+				error: result.error
 			};
 		} catch (e) {
 			const msg = (e as Error).message || String(e);
@@ -98,7 +98,7 @@ export class LocalToolExecutor {
 				type: 'tool_response',
 				tool_call_id: req.tool_call_id,
 				output: '',
-				error: msg,
+				error: msg
 			};
 		}
 	}

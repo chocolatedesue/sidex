@@ -109,9 +109,7 @@ export class RemoteAuthorityResolverService extends Disposable implements IRemot
 			return;
 		}
 		if (!request.promise.isSettled) {
-			request.promise.error(
-				new RemoteAuthorityResolverError(`Cleared remote authority '${authority}'`)
-			);
+			request.promise.error(new RemoteAuthorityResolverError(`Cleared remote authority '${authority}'`));
 		}
 		this._resolveAuthorityRequests.delete(authority);
 	}

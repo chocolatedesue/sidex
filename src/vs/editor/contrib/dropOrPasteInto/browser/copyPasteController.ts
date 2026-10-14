@@ -586,13 +586,11 @@ export class CopyPasteController extends Disposable implements IEditorContributi
 
 					const selected = await this._quickInputService.pick<ItemWithEdit>(
 						[
-							...editSession.edits.map(
-								(edit): ItemWithEdit => ({
-									label: edit.title,
-									description: edit.kind?.value,
-									edit
-								})
-							),
+							...editSession.edits.map((edit): ItemWithEdit => ({
+								label: edit.title,
+								description: edit.kind?.value,
+								edit
+							})),
 							...(CopyPasteController._configureDefaultAction
 								? [
 										upcast<IQuickPickSeparator>({ type: 'separator' }),

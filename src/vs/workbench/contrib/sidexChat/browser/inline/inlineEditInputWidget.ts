@@ -4,7 +4,12 @@
  *  Uses Monaco's IContentWidget API for editor-relative positioning.
  *--------------------------------------------------------------------------------------------*/
 
-import { ICodeEditor, IContentWidget, IContentWidgetPosition, ContentWidgetPositionPreference } from '../../../../../editor/browser/editorBrowser.js';
+import {
+	ICodeEditor,
+	IContentWidget,
+	IContentWidgetPosition,
+	ContentWidgetPositionPreference
+} from '../../../../../editor/browser/editorBrowser.js';
 import { Emitter, Event } from '../../../../../base/common/event.js';
 import { Disposable } from '../../../../../base/common/lifecycle.js';
 import * as DOM from '../../../../../base/browser/dom.js';
@@ -27,7 +32,7 @@ export class InlineEditInputWidget extends Disposable implements IContentWidget 
 	constructor(
 		private readonly _editor: ICodeEditor,
 		lineNumber: number,
-		column: number,
+		column: number
 	) {
 		super();
 		this._id = `sidex.inlineEditInput.${InlineEditInputWidget._idCounter++}`;
@@ -61,31 +66,54 @@ export class InlineEditInputWidget extends Disposable implements IContentWidget 
 
 		this._domNode.appendChild(row);
 
-		this._register(DOM.addDisposableListener(this._input, 'keydown', (e: KeyboardEvent) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
-				e.preventDefault();
-				e.stopPropagation();
-				const value = this._input.value.trim();
-				if (value) {
-					this._onDidSubmit.fire(value);
+		this._register(
+			DOM.addDisposableListener(this._input, 'keydown', (e: KeyboardEvent) => {
+				if (e.key === 'Enter' && !e.shiftKey) {
+					e.preventDefault();
+					e.stopPropagation();
+					const value = this._input.value.trim();
+					if (value) {
+						this._onDidSubmit.fire(value);
+					}
+				} else if (e.key === 'Escape') {
+					e.preventDefault();
+					e.stopPropagation();
+					this._onDidCancel.fire();
 				}
-			} else if (e.key === 'Escape') {
-				e.preventDefault();
-				e.stopPropagation();
-				this._onDidCancel.fire();
-			}
-		}));
+			})
+		);
 
 		// Prevent the editor from handling key events while input is focused
-		this._register(DOM.addDisposableListener(this._input, 'keydown', (e: KeyboardEvent) => {
-			e.stopPropagation();
-		}, true));
-		this._register(DOM.addDisposableListener(this._input, 'keyup', (e: KeyboardEvent) => {
-			e.stopPropagation();
-		}, true));
-		this._register(DOM.addDisposableListener(this._input, 'keypress', (e: KeyboardEvent) => {
-			e.stopPropagation();
-		}, true));
+		this._register(
+			DOM.addDisposableListener(
+				this._input,
+				'keydown',
+				(e: KeyboardEvent) => {
+					e.stopPropagation();
+				},
+				true
+			)
+		);
+		this._register(
+			DOM.addDisposableListener(
+				this._input,
+				'keyup',
+				(e: KeyboardEvent) => {
+					e.stopPropagation();
+				},
+				true
+			)
+		);
+		this._register(
+			DOM.addDisposableListener(
+				this._input,
+				'keypress',
+				(e: KeyboardEvent) => {
+					e.stopPropagation();
+				},
+				true
+			)
+		);
 	}
 
 	getId(): string {
@@ -102,7 +130,7 @@ export class InlineEditInputWidget extends Disposable implements IContentWidget 
 		}
 		return {
 			position: { lineNumber: this._lineNumber, column: this._column },
-			preference: [ContentWidgetPositionPreference.BELOW],
+			preference: [ContentWidgetPositionPreference.BELOW]
 		};
 	}
 

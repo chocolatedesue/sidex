@@ -28,7 +28,6 @@ tauri = { version = "2.12.3", features = [
 tauri-plugin-log = "2.10"
 tauri-plugin-dialog = "2.8"
 tauri-plugin-shell = "2.5"
-jsonwebtoken = { version = "10.4", features = ["aws_lc_rs"] }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -149,6 +148,11 @@ module_name_repetitions = "allow"
 dbg_macro = "warn"
 todo = "warn"
 unimplemented = "warn"
+
+# cargo-udeps false positive: `sidex_textmate` is used in
+# src/commands/textmate.rs, but only through paths udeps does not follow.
+[package.metadata.cargo-udeps.ignore]
+normal = ["sidex-textmate"]
 
 [profile.release]
 opt-level = 3

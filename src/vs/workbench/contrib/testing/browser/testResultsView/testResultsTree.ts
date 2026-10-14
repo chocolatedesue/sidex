@@ -333,12 +333,7 @@ class TestMessageElement implements ITreeElement {
 }
 
 type TreeElement =
-	| TestResultElement
-	| TestCaseElement
-	| TestMessageElement
-	| TaskElement
-	| CoverageElement
-	| OlderResultsElement;
+	TestResultElement | TestCaseElement | TestMessageElement | TaskElement | CoverageElement | OlderResultsElement;
 
 export class OutputPeekTree extends Disposable {
 	private disposed = false;

@@ -28,9 +28,13 @@ export class AgentsSection implements SettingsSection {
 
 		if (this._invoke) {
 			try {
-				const data = await this._invoke('settings_get', { section: 'sidex.agents' }) as SettingsData | null;
-				if (data) { this._settings = data; }
-			} catch { /* use defaults */ }
+				const data = (await this._invoke('settings_get', { section: 'sidex.agents' })) as SettingsData | null;
+				if (data) {
+					this._settings = data;
+				}
+			} catch {
+				/* use defaults */
+			}
 			await this._loadModelOptions();
 		}
 
@@ -49,27 +53,66 @@ export class AgentsSection implements SettingsSection {
 	private _renderMainSettings(container: HTMLElement): void {
 		const card = this._createCard(container);
 
-		this._createDropdownRow(card, 'Text Size', 'Controls conversation text size', 'sidex.agents.textSize',
-			['Default', 'Small', 'Large'], this._getSetting('textSize', 'Default') as string);
+		this._createDropdownRow(
+			card,
+			'Text Size',
+			'Controls conversation text size',
+			'sidex.agents.textSize',
+			['Default', 'Small', 'Large'],
+			this._getSetting('textSize', 'Default') as string
+		);
 
-		this._createToggleRow(card, 'Submit with Cmd+Enter', 'When enabled, Cmd+Enter submits and Enter inserts newline',
-			'sidex.agents.submitWithCmdEnter', this._getSetting('submitWithCmdEnter', false) as boolean);
+		this._createToggleRow(
+			card,
+			'Submit with Cmd+Enter',
+			'When enabled, Cmd+Enter submits and Enter inserts newline',
+			'sidex.agents.submitWithCmdEnter',
+			this._getSetting('submitWithCmdEnter', false) as boolean
+		);
 
-		this._createNumberWithDropdownRow(card, 'Max Tab Count', 'Maximum number of concurrent tabs',
-			'sidex.agents.maxTabCount', this._getSetting('maxTabCount', 5) as number,
-			['Custom', 'Unlimited'], this._getSetting('maxTabCountMode', 'Custom') as string);
+		this._createNumberWithDropdownRow(
+			card,
+			'Max Tab Count',
+			'Maximum number of concurrent tabs',
+			'sidex.agents.maxTabCount',
+			this._getSetting('maxTabCount', 5) as number,
+			['Custom', 'Unlimited'],
+			this._getSetting('maxTabCountMode', 'Custom') as string
+		);
 
-		this._createDropdownRow(card, 'Queue Messages', 'Behavior when sending messages while one is active', 'sidex.agents.queueMessages',
-			['Send after current message', 'Queue all', 'Ask each time'], this._getSetting('queueMessages', 'Send after current message') as string);
+		this._createDropdownRow(
+			card,
+			'Queue Messages',
+			'Behavior when sending messages while one is active',
+			'sidex.agents.queueMessages',
+			['Send after current message', 'Queue all', 'Ask each time'],
+			this._getSetting('queueMessages', 'Send after current message') as string
+		);
 
-		this._createDropdownRow(card, 'Usage Summary', 'When to show usage summary after responses', 'sidex.agents.usageSummary',
-			['Auto', 'Always', 'Never'], this._getSetting('usageSummary', 'Auto') as string);
+		this._createDropdownRow(
+			card,
+			'Usage Summary',
+			'When to show usage summary after responses',
+			'sidex.agents.usageSummary',
+			['Auto', 'Always', 'Never'],
+			this._getSetting('usageSummary', 'Auto') as string
+		);
 
-		this._createToggleRow(card, 'Agent Autocomplete', 'Contextual suggestions while prompting',
-			'sidex.agents.agentAutocomplete', this._getSetting('agentAutocomplete', true) as boolean);
+		this._createToggleRow(
+			card,
+			'Agent Autocomplete',
+			'Contextual suggestions while prompting',
+			'sidex.agents.agentAutocomplete',
+			this._getSetting('agentAutocomplete', true) as boolean
+		);
 
-		this._createToggleRow(card, 'Auto-Approve Mode Transitions', 'Allow agent to switch modes without asking',
-			'sidex.agents.autoApproveModeTransitions', this._getSetting('autoApproveModeTransitions', false) as boolean);
+		this._createToggleRow(
+			card,
+			'Auto-Approve Mode Transitions',
+			'Allow agent to switch modes without asking',
+			'sidex.agents.autoApproveModeTransitions',
+			this._getSetting('autoApproveModeTransitions', false) as boolean
+		);
 	}
 
 	private _renderSubagents(container: HTMLElement): void {
@@ -110,7 +153,7 @@ export class AgentsSection implements SettingsSection {
 			action.appendChild(link);
 		} else {
 			const currentModel = this._getSetting('exploreSubagentModel', this._modelOptions[0]) as string;
-			const dropdown = createCustomDropdown(this._modelOptions, currentModel, (newValue) => {
+			const dropdown = createCustomDropdown(this._modelOptions, currentModel, newValue => {
 				this._saveSetting('sidex.agents.exploreSubagentModel', newValue);
 			});
 			action.appendChild(dropdown);
@@ -139,17 +182,38 @@ export class AgentsSection implements SettingsSection {
 
 		const card = this._createCard(container);
 
-		this._createToggleRow(card, 'Start Agent Review on Commit', 'Automatically start review when committing',
-			'sidex.agents.startReviewOnCommit', this._getSetting('startReviewOnCommit', false) as boolean);
+		this._createToggleRow(
+			card,
+			'Start Agent Review on Commit',
+			'Automatically start review when committing',
+			'sidex.agents.startReviewOnCommit',
+			this._getSetting('startReviewOnCommit', false) as boolean
+		);
 
-		this._createToggleRow(card, 'Include Submodules in Agent Review', 'Include git submodule changes in review',
-			'sidex.agents.includeSubmodules', this._getSetting('includeSubmodules', true) as boolean);
+		this._createToggleRow(
+			card,
+			'Include Submodules in Agent Review',
+			'Include git submodule changes in review',
+			'sidex.agents.includeSubmodules',
+			this._getSetting('includeSubmodules', true) as boolean
+		);
 
-		this._createToggleRow(card, 'Include Untracked Files in Agent Review', 'Include new untracked files in review',
-			'sidex.agents.includeUntracked', this._getSetting('includeUntracked', true) as boolean);
+		this._createToggleRow(
+			card,
+			'Include Untracked Files in Agent Review',
+			'Include new untracked files in review',
+			'sidex.agents.includeUntracked',
+			this._getSetting('includeUntracked', true) as boolean
+		);
 
-		this._createDropdownRow(card, 'Default Approach', 'How thorough agent review should be', 'sidex.agents.defaultApproach',
-			['Quick', 'Thorough'], this._getSetting('defaultApproach', 'Quick') as string);
+		this._createDropdownRow(
+			card,
+			'Default Approach',
+			'How thorough agent review should be',
+			'sidex.agents.defaultApproach',
+			['Quick', 'Thorough'],
+			this._getSetting('defaultApproach', 'Quick') as string
+		);
 	}
 
 	private _renderAttribution(container: HTMLElement): void {
@@ -161,11 +225,21 @@ export class AgentsSection implements SettingsSection {
 
 		const card = this._createCard(container);
 
-		this._createToggleRow(card, 'Commit Attribution', 'Mark commits as \'Made with SideX\'',
-			'sidex.agents.commitAttribution', this._getSetting('commitAttribution', true) as boolean);
+		this._createToggleRow(
+			card,
+			'Commit Attribution',
+			"Mark commits as 'Made with SideX'",
+			'sidex.agents.commitAttribution',
+			this._getSetting('commitAttribution', true) as boolean
+		);
 
-		this._createToggleRow(card, 'PR Attribution', 'Mark pull requests as made with SideX',
-			'sidex.agents.prAttribution', this._getSetting('prAttribution', true) as boolean);
+		this._createToggleRow(
+			card,
+			'PR Attribution',
+			'Mark pull requests as made with SideX',
+			'sidex.agents.prAttribution',
+			this._getSetting('prAttribution', true) as boolean
+		);
 	}
 
 	private _renderGit(container: HTMLElement): void {
@@ -177,21 +251,33 @@ export class AgentsSection implements SettingsSection {
 
 		const card = this._createCard(container);
 
-		this._createInputRow(card, 'Branch Prefix', 'Prefix applied to branches created by the agent',
-			'sidex.agents.branchPrefix', this._getSetting('branchPrefix', '') as string, 'cursor/');
+		this._createInputRow(
+			card,
+			'Branch Prefix',
+			'Prefix applied to branches created by the agent',
+			'sidex.agents.branchPrefix',
+			this._getSetting('branchPrefix', '') as string,
+			'cursor/'
+		);
 	}
 
 	/** Mirrors ModelsSection's 'sidex.models.custom' — the only source of model ids now that there's no preset catalog. */
 	private async _loadModelOptions(): Promise<void> {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		try {
 			const raw = await this._invoke('settings_get', { section: 'sidex.models.custom' });
 			const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
-			if (!Array.isArray(arr)) { return; }
+			if (!Array.isArray(arr)) {
+				return;
+			}
 			this._modelOptions = arr
-				.map((entry: string | { id?: string }) => typeof entry === 'string' ? entry : entry?.id)
+				.map((entry: string | { id?: string }) => (typeof entry === 'string' ? entry : entry?.id))
 				.filter((id): id is string => !!id);
-		} catch { /* no models configured yet */ }
+		} catch {
+			/* no models configured yet */
+		}
 	}
 
 	// --- Helpers ---
@@ -201,7 +287,9 @@ export class AgentsSection implements SettingsSection {
 	}
 
 	private _saveSetting(key: string, value: unknown): void {
-		if (!this._invoke) { return; }
+		if (!this._invoke) {
+			return;
+		}
 		this._invoke('settings_update', { key, value: JSON.stringify(value), scope: 'user' }).catch(() => {});
 	}
 
@@ -212,7 +300,13 @@ export class AgentsSection implements SettingsSection {
 		return card;
 	}
 
-	private _createToggleRow(parent: HTMLElement, label: string, description: string, settingKey: string, initialState: boolean): void {
+	private _createToggleRow(
+		parent: HTMLElement,
+		label: string,
+		description: string,
+		settingKey: string,
+		initialState: boolean
+	): void {
 		const row = document.createElement('div');
 		row.className = 'sidex-settings-row';
 
@@ -244,7 +338,14 @@ export class AgentsSection implements SettingsSection {
 		parent.appendChild(row);
 	}
 
-	private _createDropdownRow(parent: HTMLElement, label: string, description: string, settingKey: string, options: string[], currentValue: string): void {
+	private _createDropdownRow(
+		parent: HTMLElement,
+		label: string,
+		description: string,
+		settingKey: string,
+		options: string[],
+		currentValue: string
+	): void {
 		const row = document.createElement('div');
 		row.className = 'sidex-settings-row';
 
@@ -264,7 +365,7 @@ export class AgentsSection implements SettingsSection {
 
 		const action = document.createElement('div');
 		action.className = 'sidex-settings-row-action';
-		const dropdown = createCustomDropdown(options, currentValue, (newValue) => {
+		const dropdown = createCustomDropdown(options, currentValue, newValue => {
 			this._saveSetting(settingKey, newValue);
 		});
 		action.appendChild(dropdown);
@@ -273,7 +374,14 @@ export class AgentsSection implements SettingsSection {
 		parent.appendChild(row);
 	}
 
-	private _createInputRow(parent: HTMLElement, label: string, description: string, settingKey: string, currentValue: string, placeholder: string): void {
+	private _createInputRow(
+		parent: HTMLElement,
+		label: string,
+		description: string,
+		settingKey: string,
+		currentValue: string,
+		placeholder: string
+	): void {
 		const row = document.createElement('div');
 		row.className = 'sidex-settings-row';
 
@@ -308,7 +416,15 @@ export class AgentsSection implements SettingsSection {
 		parent.appendChild(row);
 	}
 
-	private _createNumberWithDropdownRow(parent: HTMLElement, label: string, description: string, settingKey: string, currentNumber: number, modeOptions: string[], currentMode: string): void {
+	private _createNumberWithDropdownRow(
+		parent: HTMLElement,
+		label: string,
+		description: string,
+		settingKey: string,
+		currentNumber: number,
+		modeOptions: string[],
+		currentMode: string
+	): void {
 		const row = document.createElement('div');
 		row.className = 'sidex-settings-row';
 
@@ -341,10 +457,12 @@ export class AgentsSection implements SettingsSection {
 		numInput.max = '50';
 		numInput.value = String(currentNumber);
 		numInput.style.textAlign = 'center';
-		numInput.addEventListener('change', () => this._saveSetting(settingKey, parseInt(numInput.value, 10) || currentNumber));
+		numInput.addEventListener('change', () =>
+			this._saveSetting(settingKey, parseInt(numInput.value, 10) || currentNumber)
+		);
 		numWrapper.appendChild(numInput);
 
-		const select = createCustomDropdown(modeOptions, currentMode, (newValue) => {
+		const select = createCustomDropdown(modeOptions, currentMode, newValue => {
 			const isUnlimited = newValue === 'Unlimited';
 			numInput.disabled = isUnlimited;
 			numWrapper.style.opacity = isUnlimited ? '0.5' : '1';

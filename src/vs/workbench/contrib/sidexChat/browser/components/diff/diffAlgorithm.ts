@@ -42,11 +42,7 @@ function myersDiff(a: string[], b: string[]): Array<{ op: 0 | -1 | 1; value: str
 		prefixLen++;
 	}
 	let suffixLen = 0;
-	while (
-		suffixLen < n - prefixLen &&
-		suffixLen < m - prefixLen &&
-		a[n - 1 - suffixLen] === b[m - 1 - suffixLen]
-	) {
+	while (suffixLen < n - prefixLen && suffixLen < m - prefixLen && a[n - 1 - suffixLen] === b[m - 1 - suffixLen]) {
 		suffixLen++;
 	}
 
@@ -73,9 +69,15 @@ function myersDiffCore(a: string[], b: string[]): Array<{ op: 0 | -1 | 1; value:
 	const n = a.length;
 	const m = b.length;
 
-	if (n === 0 && m === 0) { return []; }
-	if (n === 0) { return b.map(v => ({ op: 1 as const, value: v })); }
-	if (m === 0) { return a.map(v => ({ op: -1 as const, value: v })); }
+	if (n === 0 && m === 0) {
+		return [];
+	}
+	if (n === 0) {
+		return b.map(v => ({ op: 1 as const, value: v }));
+	}
+	if (m === 0) {
+		return a.map(v => ({ op: -1 as const, value: v }));
+	}
 
 	const max = n + m;
 	const vSize = 2 * max + 1;
@@ -111,10 +113,7 @@ function myersDiffCore(a: string[], b: string[]): Array<{ op: 0 | -1 | 1; value:
 	}
 
 	// Fallback (shouldn't reach here)
-	return [
-		...a.map(v => ({ op: -1 as const, value: v })),
-		...b.map(v => ({ op: 1 as const, value: v })),
-	];
+	return [...a.map(v => ({ op: -1 as const, value: v })), ...b.map(v => ({ op: 1 as const, value: v }))];
 }
 
 function buildResult(
@@ -253,8 +252,12 @@ export function groupIntoHunks(lines: DiffLine[], contextLines: number = 3): Dif
 		const oldLns: string[] = [];
 		const newLns: string[] = [];
 		for (let j = g.start; j <= g.end; j++) {
-			if (lines[j].type === 'removed') { oldLns.push(lines[j].content); }
-			if (lines[j].type === 'added') { newLns.push(lines[j].content); }
+			if (lines[j].type === 'removed') {
+				oldLns.push(lines[j].content);
+			}
+			if (lines[j].type === 'added') {
+				newLns.push(lines[j].content);
+			}
 		}
 
 		const startOld = hunkLines[0]?.oldLineNo ?? 1;
@@ -269,7 +272,7 @@ export function groupIntoHunks(lines: DiffLine[], contextLines: number = 3): Dif
 			contextBefore,
 			contextAfter,
 			lines: hunkLines,
-			status: 'pending',
+			status: 'pending'
 		});
 	}
 

@@ -281,12 +281,10 @@ export class RangeMapping {
 		for (let i = 1; i < rangeMappings.length; i++) {
 			const previous = rangeMappings[i - 1];
 			const current = rangeMappings[i];
-			if (
-				!(
-					previous.originalRange.getEndPosition().isBeforeOrEqual(current.originalRange.getStartPosition()) &&
-					previous.modifiedRange.getEndPosition().isBeforeOrEqual(current.modifiedRange.getStartPosition())
-				)
-			) {
+			if (!(
+				previous.originalRange.getEndPosition().isBeforeOrEqual(current.originalRange.getStartPosition()) &&
+				previous.modifiedRange.getEndPosition().isBeforeOrEqual(current.modifiedRange.getStartPosition())
+			)) {
 				throw new BugIndicatingError('Range mappings must be sorted');
 			}
 		}
