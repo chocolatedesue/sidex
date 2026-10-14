@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.11 — 2026-10-14
+
+### Added
+- **Node extensions can run.** Real VS Code extensions now activate and reach the
+  workbench: the extension host derives the implicit `onLanguage:*` /
+  `onCommand:*` / `onView:*` / `onDebug*` / … activation events from
+  `contributes` (VS Code semantics) instead of only honouring an explicit
+  `activationEvents` list, and the workbench registers a user-installed
+  extension's `contributes.languages` so its files open with the right language
+  id instead of Plain Text.
+- **Tinymist (Typst) works end to end.** With `myriad-dreamin.tinymist` installed
+  (plus the `tinymist` server binary on `PATH` or `tinymist.serverPath`), a
+  `.typ` file gets the `typst` language, the language server starts, edits sync
+  live and diagnostics show up. Covered by `npm run e2e:typst`.
+- `vscode.DocumentDropOrPasteEditKind` in the extension-host `vscode` shim; its
+  absence aborted activation of tinymist and markdown-language-features.
+
+### Fixed
+- **Release builds now log.** `tauri-plugin-log` was only installed in debug
+  builds, so every `log::` record — including the extension host's forwarded
+  stderr — was dropped. Setting `SIDEX_LOG` raises the level to debug.
+
+### Notes
+- Node-based extensions need a system `node` (>= 18) on `PATH`; SideX does not
+  bundle one yet, and without it the extension host fails to start.
+
 ## 0.1.10 — 2026-10-14
 
 ### Fixed

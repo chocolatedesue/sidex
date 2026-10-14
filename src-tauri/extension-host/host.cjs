@@ -497,6 +497,7 @@ class ExtensionHost extends EventEmitter {
 
   _handleDocumentOpened(id, params) {
     const { uri, languageId, version, text } = params;
+    vlog(`documentOpened ${uri} language=${languageId}`);
     this._textDocuments.set(uri, { uri, languageId, version, text: text || '' });
     this._onDocumentEvent.fire(this._makeDocumentProxy(uri));
     this._checkActivationEvents(`onLanguage:${languageId}`);
@@ -2102,6 +2103,12 @@ function log(msg) {
   process.stderr.write(`[ext-host] ${msg}\n`);
 }
 
+// Extra diagnostics, off unless SIDEX_LOG is set (the app raises its log level
+// to debug in that case, so these land in the app log).
+function vlog(msg) {
+  if (process.env.SIDEX_LOG) process.stderr.write(`[ext-host] ${msg}\n`);
+}
+
 // VS Code lets extensions omit many activation events: they are derived from
 // `contributes`. Without this, any extension that ships contributions but no
 // explicit `activationEvents` (most modern ones, e.g. tinymist) never activates.
@@ -2469,6 +2476,25 @@ function createVscodeShim() {
   });
   const IndentAction = { None: 0, Indent: 1, IndentOutdent: 2, Outdent: 3 };
   const FoldingRangeKind = { Comment: 1, Imports: 2, Region: 3 };
+  class VscDocumentDropOrPasteEditKind {
+    constructor(value) {
+      this.value = value || '';
+    }
+    append(...parts) {
+      const joined = [this.value, ...parts.filter(p => !!p)].filter(p => !!p).join('.');
+      return new VscDocumentDropOrPasteEditKind(joined);
+    }
+    toString() {
+      return this.value;
+    }
+    static fromValue(value) {
+      return typeof value === 'string' ? new VscDocumentDropOrPasteEditKind(value) : value;
+    }
+  }
+  VscDocumentDropOrPasteEditKind.Empty = new VscDocumentDropOrPasteEditKind('');
+  VscDocumentDropOrPasteEditKind.Text = new VscDocumentDropOrPasteEditKind('text');
+  VscDocumentDropOrPasteEditKind.URI = new VscDocumentDropOrPasteEditKind('uri');
+  const DocumentDropOrPasteEditKind = VscDocumentDropOrPasteEditKind;
   const SignatureHelpTriggerKind = { Invoke: 1, TriggerCharacter: 2, ContentChange: 3 };
   const InlayHintKind = { Type: 1, Parameter: 2 };
   const TextDocumentSaveReason = { Manual: 1, AfterDelay: 2, FocusOut: 3 };
@@ -2906,6 +2932,8 @@ function createVscodeShim() {
       );
       host.emit('event', { type: 'diagnosticsChanged', uri: key, diagnostics: host._diagnostics.get(key) });
       host._onDiagnosticsChangeEvent.fire({ uris: [VscUri.parse(key)] });
+      const diags = host._diagnostics.get(key) || [];
+      vlog(`diagnostics ${key} count=${diags.length}` + (diags[0]?.message ? ` first="${String(diags[0].message).slice(0, 120)}"` : ''));
     }
     delete(uri) {
       const key = typeof uri === 'string' ? uri : uri.toString();
@@ -4805,6 +4833,7 @@ function createVscodeShim() {
     SemanticTokensBuilder,
     SemanticTokens,
     CodeActionKind,
+    DocumentDropOrPasteEditKind,
     IndentAction,
     FileType,
     TextEditorCursorStyle,
@@ -5569,6 +5598,7 @@ if (process.env.SIDEX_EXTENSION_HOST === 'true' && process.send) {
           exports: null,
           activated: false,
         });
+        vlog(`loaded ${manifest.id} activationEvents=[${(manifest.activationEvents || []).join(',')}]`);
         const activationEvents = manifest.activationEvents || [];
         if (
           activationEvents.includes('*') ||

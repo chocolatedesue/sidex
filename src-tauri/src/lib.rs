@@ -709,10 +709,20 @@ pub fn run() {
                 app.set_menu(menu)?;
             }
 
-            if cfg!(debug_assertions) {
+            // Install the log plugin in release builds too. Without it every
+            // `log::` record is dropped — including the extension host's
+            // forwarded stderr — which makes field debugging impossible. Set
+            // `SIDEX_LOG=1` to raise the level to Debug (host stderr is logged
+            // at debug).
+            {
+                let level = if std::env::var_os("SIDEX_LOG").is_some() {
+                    log::LevelFilter::Debug
+                } else {
+                    log::LevelFilter::Info
+                };
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
+                        .level(level)
                         .build(),
                 )?;
             }
