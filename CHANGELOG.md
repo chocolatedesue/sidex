@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.12 — 2026-10-14
+
+### Fixed
+- **macOS: the main window silently lost its entire configuration.** Tauri
+  merges `tauri.macos.conf.json` into `tauri.conf.json` with JSON Merge Patch
+  (RFC 7396), where an array is replaced wholesale. The macOS override declared
+  `app.windows[0]` only to switch on native decorations, so on macOS the window
+  lost its title, size, `visible: false`, the background colour, drag-and-drop
+  and `useHttpsScheme`. Dropping `useHttpsScheme` moves the webview origin from
+  `https://tauri.localhost` to `tauri://localhost`, which changes how
+  custom-scheme subresources are treated — the likely cause of icons not
+  rendering on macOS, since extension icon fonts are loaded through
+  `sidex-asset://`. The override now carries the complete window config.
+- Guarded by a new `npm run test:platform-config`, which re-applies Tauri's own
+  merge to `tauri.conf.json` plus each platform override and asserts the
+  resulting window and bundle configuration (including `icons/icon.icns` and
+  the bundled resources), so an override can no longer clobber them.
+
 ## 0.1.11 — 2026-10-14
 
 ### Added

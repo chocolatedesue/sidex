@@ -1,6 +1,6 @@
 {
   "name": "sidex",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "type": "module",
   "scripts": {
     "setup": "bash scripts/ensure-file-icon-theme.sh && node scripts/generate-extension-meta.js",
@@ -28,7 +28,8 @@
     "e2e:native": "bash scripts/e2e/gui-smoke.sh",
     "e2e:typst": "bash scripts/e2e/gui-typst.sh",
     "test:ext-host": "node --test scripts/test-ext-host.mjs",
-    "test": "npm run test:ext-host"
+    "test:platform-config": "node scripts/smoke-platform-config.mjs",
+    "test": "npm run test:ext-host && npm run test:platform-config"
   },
   "dependencies": {
     "@embedpdf/snippet": "^2.15.1",
