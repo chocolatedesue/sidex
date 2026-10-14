@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.10 — 2026-10-14
+
+### Fixed
+- **Go to Line/Column (Ctrl+G) did nothing.** `workbench.action.gotoLine` was
+  never registered: the only thing importing
+  `contrib/codeEditor/browser/quickaccess/gotoLineQuickAccess.ts` was the
+  `codeEditor.contribution` barrel, and that file had been removed. Restored the
+  quick-access provider, the `GotoLineAction` / `GotoOffsetAction` actions and
+  the `Ctrl+G` keybinding, and wired the module back into `workbench.common.main`.
+- **Zoom (Ctrl+= / Ctrl+- / Ctrl+0) did nothing.** The workbench runs in a system
+  webview now, so the Electron native zoom was gone and nothing replaced it. Added
+  `browser/actions/zoomActions.ts`: `workbench.action.zoomIn` / `zoomOut` /
+  `zoomReset`, the `window.zoomLevel` setting, and a CSS `zoom` on the workbench
+  container that follows the setting on startup and on change.
+- **No language support — every file opened as Plain Text.** `npm run build` never
+  ran `scripts/setup-extensions.sh`, so the built-in extension catalog was empty
+  in the shipped artifacts (only `release.yml` populated it). `build` now runs it,
+  so `.js` / `.ts` / `.py` / `.md` and the rest open with a real language mode,
+  file icons and grammar.
+- **Toggle Line Comment (Ctrl+/) was a no-op.** `languageConfigurationExtensionPoint.ts`
+  had been replaced by a 10-line stub, so no comment token / indentation rule was
+  ever registered for any language. Restored the real `LanguageConfigurationFileHandler`.
+
+### Tests
+- **`scripts/e2e/gui-smoke.sh`** now covers the everyday editor gestures in
+  addition to boot + quick open + save: undo, redo, move / delete / duplicate
+  line, toggle comment, cut and paste assert on the file on disk; find,
+  find+replace, go-to-line, settings, sidebar, panel and zoom assert on a real
+  before/after pixel delta. 25 checks, all green on Linux.
+
 ## 0.1.9 — 2026-10-14
 
 ### Added

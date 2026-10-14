@@ -36,6 +36,7 @@ import './browser/actions/layoutActions.js';
 import './browser/actions/listCommands.js';
 import './browser/actions/navigationActions.js';
 import './browser/actions/windowActions.js';
+import './browser/actions/zoomActions.js';
 import './browser/actions/workspaceActions.js';
 import './browser/actions/workspaceCommands.js';
 import './browser/actions/quickAccessActions.js';
@@ -198,6 +199,8 @@ import './contrib/logs/common/logs.contribution.js';
 
 // Quickaccess
 import './contrib/quickaccess/browser/quickAccess.contribution.js';
+// Go to Line/Column (Ctrl+G) and Go to Offset — lost when codeEditor.contribution.ts was removed
+import './contrib/codeEditor/browser/quickaccess/gotoLineQuickAccess.js';
 
 // Explorer
 import './contrib/files/browser/explorerViewlet.js';

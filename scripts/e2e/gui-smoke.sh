@@ -76,7 +76,11 @@ if [ ! -x "$BIN" ]; then
 fi
 
 WORKSPACE="$(mktemp -d /tmp/sidex-e2e-ws.XXXXXX)"
-NOTE="$WORKSPACE/note.md"
+# Plain text on purpose: once the built-in extension catalog is installed a
+# `.md` file has both a text editor and the Markdown preview registered as
+# default, which pops a "multiple default editors" prompt and makes quick open
+# ambiguous. `.txt` keeps this step about Ctrl+S, not about editor selection.
+NOTE="$WORKSPACE/note.txt"
 printf '# e2e note\n\noriginal line\n' > "$NOTE"
 
 XVFB_PID=""
@@ -210,15 +214,15 @@ sleep 1
 
 xdotool key --clearmodifiers ctrl+p
 sleep 1.5
-xdotool type --delay 60 "note.md"
-sleep 1.2
+xdotool type --delay 60 "note.txt"
+sleep 1.6
 shot "03-quick-open.png"
 # The quick-open widget must be on screen: the welcome editor is static, so any
 # real change against the startup shot is the widget (or its result list).
 QO_DIFF="$(compare -metric AE "$OUT/01-startup.png" "$OUT/03-quick-open.png" null: 2>&1 | tr -d '\n' || true)"
 QO_CHANGED="$(awk -v d="${QO_DIFF:-0}" 'BEGIN { print (d + 0 > 2000) ? "yes" : "no" }')"
 if [ "$QO_CHANGED" = "yes" ]; then
-  step "ui.quickOpen" ok "screen changed by ${QO_DIFF} px after ctrl+p + 'note.md'"
+  step "ui.quickOpen" ok "screen changed by ${QO_DIFF} px after ctrl+p + 'note.txt'"
 else
   step "ui.quickOpen" fail "screen barely changed (${QO_DIFF:-0} px); quick open did not show"
 fi
@@ -229,7 +233,7 @@ shot "04-opened.png"
 TITLE="$(xdotool getwindowname "$WIN" 2>/dev/null)"
 # SideX keeps a static window title ("SideX"), so the title is recorded as
 # evidence rather than asserted on. The real proof that the file opened is the
-# save check below: the marker must land in note.md while its original line
+# save check below: the marker must land in note.txt while its original line
 # survives — that can only happen if quick open loaded this file into the editor.
 step "editor.opened" ok "window title: $TITLE (informational; save check below is authoritative)"
 
@@ -316,6 +320,7 @@ mk op-undo.js    'alpha\nbravo\ncharlie\n'
 mk op-move.js    'alpha\nbravo\ncharlie\n'
 mk op-del.js     'alpha\nbravo\ncharlie\n'
 mk op-dup.js     'alpha\nbravo\n'
+mk op-comment.js 'alpha\nbravo\n'
 mk op-cut.js     'cutme\nkeepme\n'
 mk op-ui.js      'alpha\nbravo\ncharlie\ndelta\n'
 
@@ -377,12 +382,18 @@ else
   step "ops.duplicateLine" fail "line not duplicated; file=$(tr '\n' '|' < "$OPS/op-dup.js")"
 fi
 
-# 6.6 toggle line comment — Ctrl+/. GAP: none of the bundled language
-# extensions are active, so every buffer opens as "Plain Text" (status bar) and
-# a plain-text model has no line-comment token for editor.action.commentLine to
-# insert. The command itself is registered (it shows in the palette with its
-# Ctrl+/ binding); only the language support is missing.
-gap "ops.toggleComment" "Ctrl+/ no-op: no active language (all files open as Plain Text), so there is no comment token"
+# 6.6 toggle line comment — Ctrl+/. Needs a real language mode (the built-in
+# extension catalog provides `javascript`), so the model has a line-comment
+# token to insert.
+focus_editor; open_doc op-comment.js; focus_editor
+xdotool key --clearmodifiers ctrl+Home; sleep 0.4
+xdotool key --clearmodifiers ctrl+slash; sleep 0.7
+xdotool key --clearmodifiers ctrl+s; sleep 2.5
+if printf '%s' "$(first_line "$OPS/op-comment.js")" | grep -q '^//'; then
+  step "ops.toggleComment" ok "Ctrl+/ commented the line ($(first_line "$OPS/op-comment.js"))"
+else
+  step "ops.toggleComment" fail "Ctrl+/ did not comment; file=$(tr '\n' '|' < "$OPS/op-comment.js")"
+fi
 
 # 6.7 cut then paste — Ctrl+X / Ctrl+V.
 focus_editor; open_doc op-cut.js; focus_editor
@@ -423,10 +434,11 @@ ui_changed() { # ui_changed <step> <label> <keys...>
 focus_editor; open_doc op-ui.js; focus_editor
 ui_changed ops.findWidget    "Ctrl+F opens the find widget"      ctrl+f
 ui_changed ops.replaceWidget "Ctrl+H opens find+replace"         ctrl+h
+ui_changed ops.gotoLine      "Ctrl+G opens Go to Line/Column"    ctrl+g
 ui_changed ops.settings      "Ctrl+, opens the Settings editor"  ctrl+comma
-# GAP: workbench.action.gotoLine is not registered in the port (the palette
-# reports "No matching commands" for "Go to Line"), so Ctrl+G does nothing.
-gap "ops.gotoLine" "Ctrl+G dead: workbench.action.gotoLine is not registered (palette has no such command)"
+# Ctrl+, opens Settings as a full editor tab; close it so it cannot swallow the
+# keystrokes of the steps that follow.
+xdotool key --clearmodifiers ctrl+w; sleep 1
 
 # 6.12 sidebar toggle — Ctrl+B, then toggle back.
 shot "ops.sidebar-before.png"
@@ -452,10 +464,18 @@ else
 fi
 xdotool key --clearmodifiers ctrl+j; sleep 1.2
 
-# 6.14 zoom — GAP: the window zoom actions (workbench.action.zoomIn / zoomOut /
-# zoomReset) were not carried over into the port; the palette reports "No
-# matching commands" for "Zoom In", so Ctrl+= has nothing to trigger.
-gap "ops.zoom" "Ctrl+= dead: window zoom actions (workbench.action.zoomIn/Out/Reset) are not in the port"
+# 6.14 zoom in — Ctrl+= scales the workbench, Ctrl+0 restores it.
+focus_editor
+shot "ops.zoom-before.png"
+xdotool key --clearmodifiers ctrl+equal; sleep 2
+shot "ops.zoom-after.png"
+ZM="$(compare -metric AE "$OUT/ops.zoom-before.png" "$OUT/ops.zoom-after.png" null: 2>&1 | tr -d '\n' || true)"
+if awk -v d="${ZM:-0}" 'BEGIN{exit !(d+0>2000)}'; then
+  step "ops.zoom" ok "Ctrl+= scaled the workbench — screen changed by ${ZM} px"
+else
+  step "ops.zoom" fail "Ctrl+= did not zoom (${ZM:-0} px)"
+fi
+xdotool key --clearmodifiers ctrl+0; sleep 1.5
 
 # --- 7. wrap up -------------------------------------------------------------
 if [ "${E2E_KEEP:-0}" != "1" ]; then
@@ -484,9 +504,11 @@ cat > "$OUT/evidence.json" <<JSON
     "06-saved.png",
     "ops.findWidget-after.png",
     "ops.replaceWidget-after.png",
+    "ops.gotoLine-after.png",
     "ops.settings-after.png",
     "ops.sidebar-after.png",
-    "ops.panel-after.png"
+    "ops.panel-after.png",
+    "ops.zoom-after.png"
   ]
 }
 JSON
