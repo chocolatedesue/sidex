@@ -204,7 +204,10 @@ mod tests {
             .set_plain("sidex.baseurl.ollama", "http://127.0.0.1:11434/v1")
             .unwrap();
         assert_eq!(
-            storage.get_plain("sidex.baseurl.ollama").unwrap().as_deref(),
+            storage
+                .get_plain("sidex.baseurl.ollama")
+                .unwrap()
+                .as_deref(),
             Some("http://127.0.0.1:11434/v1")
         );
 

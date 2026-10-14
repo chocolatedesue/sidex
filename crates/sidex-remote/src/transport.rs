@@ -135,19 +135,22 @@ pub trait RemoteTransport: Send + Sync {
 
     /// Create one directory (parent must exist).
     async fn mkdir(&self, path: &str) -> Result<()> {
-        self.checked(&format!("mkdir -p -- {}", crate::shell::sh_quote(path))).await
+        self.checked(&format!("mkdir -p -- {}", crate::shell::sh_quote(path)))
+            .await
     }
 
     /// Delete a file or directory.
     async fn remove(&self, path: &str, recursive: bool) -> Result<()> {
         let flag = if recursive { "-rf" } else { "-f" };
-        self.checked(&format!("rm {flag} -- {}", crate::shell::sh_quote(path))).await
+        self.checked(&format!("rm {flag} -- {}", crate::shell::sh_quote(path)))
+            .await
     }
 
     /// Rename / move.
     async fn rename(&self, from: &str, to: &str, _overwrite: bool) -> Result<()> {
         let q = crate::shell::sh_quote;
-        self.checked(&format!("mv -f -- {} {}", q(from), q(to))).await
+        self.checked(&format!("mv -f -- {} {}", q(from), q(to)))
+            .await
     }
 
     /// `false` once the underlying connection is known to be gone.

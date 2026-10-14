@@ -318,7 +318,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/home/user/project".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();
@@ -342,7 +344,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/ws".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();
@@ -398,7 +402,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/ws".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();
@@ -435,7 +441,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/ws".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();
@@ -449,7 +457,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/ws".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();
@@ -483,7 +493,9 @@ mod tests {
             model: "claude-sonnet".into(),
             mode: "agent".into(),
             workspace: "/ws".into(),
-            message_count: 0, pinned: false, archived: false,
+            message_count: 0,
+            pinned: false,
+            archived: false,
         };
         save_session(&db, &session).unwrap();
 
@@ -510,7 +522,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/workspace-a".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();
@@ -524,7 +538,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/workspace-b".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();
@@ -547,7 +563,9 @@ mod tests {
                 model: "claude-sonnet".into(),
                 mode: "agent".into(),
                 workspace: "/ws".into(),
-                message_count: 0, pinned: false, archived: false,
+                message_count: 0,
+                pinned: false,
+                archived: false,
             },
         )
         .unwrap();

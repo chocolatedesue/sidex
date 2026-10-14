@@ -247,9 +247,15 @@ fn map_io_error(e: &std::io::Error, ep: &Endpoint) -> anyhow::Error {
     match e.kind() {
         K::ConnectionRefused => coded(
             errors::REFUSED,
-            format!("connection refused by {}:{} (is sshd running?)", ep.host, ep.port),
+            format!(
+                "connection refused by {}:{} (is sshd running?)",
+                ep.host, ep.port
+            ),
         ),
-        K::TimedOut => coded(errors::TIMEOUT, format!("connecting to {}:{} timed out", ep.host, ep.port)),
+        K::TimedOut => coded(
+            errors::TIMEOUT,
+            format!("connecting to {}:{} timed out", ep.host, ep.port),
+        ),
         _ => coded(
             errors::UNREACHABLE,
             format!("cannot reach {}:{}: {e}", ep.host, ep.port),
@@ -309,9 +315,13 @@ async fn connect_session(
             ))
         }
     };
-    let o = outcome.lock().unwrap().clone().unwrap_or(HostKeyOutcome::Unchecked {
-        fingerprint: String::new(),
-    });
+    let o = outcome
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or(HostKeyOutcome::Unchecked {
+            fingerprint: String::new(),
+        });
     Ok((session, o))
 }
 
@@ -414,11 +424,17 @@ fn load_key(path: &Path, passphrase: Option<&str>) -> Result<key::KeyPair> {
         Ok(k) => Ok(k),
         Err(russh_keys::Error::KeyIsEncrypted) => Err(coded(
             errors::KEY_ENCRYPTED,
-            format!("key {} is encrypted; a passphrase is required", path.display()),
+            format!(
+                "key {} is encrypted; a passphrase is required",
+                path.display()
+            ),
         )),
         Err(e) if passphrase.is_some() => Err(coded(
             errors::KEY_PASSPHRASE,
-            format!("cannot decrypt key {} (wrong passphrase?): {e}", path.display()),
+            format!(
+                "cannot decrypt key {} (wrong passphrase?): {e}",
+                path.display()
+            ),
         )),
         Err(e) => Err(anyhow::anyhow!("loading key {}: {e}", path.display())),
     }
@@ -595,12 +611,22 @@ impl SshTransport {
                 None => None,
                 Some(prev) => {
                     let ch = prev
-                        .channel_open_direct_tcpip(ep.host.clone(), u32::from(ep.port), "127.0.0.1", 0)
+                        .channel_open_direct_tcpip(
+                            ep.host.clone(),
+                            u32::from(ep.port),
+                            "127.0.0.1",
+                            0,
+                        )
                         .await
                         .map_err(|e| {
                             coded(
                                 errors::PROXY_FAILED,
-                                format!("jump host {} could not open a tunnel to {}:{}: {e}", all[i - 1].0, ep.host, ep.port),
+                                format!(
+                                    "jump host {} could not open a tunnel to {}:{}: {e}",
+                                    all[i - 1].0,
+                                    ep.host,
+                                    ep.port
+                                ),
                             )
                         })?;
                     Some(Box::new(ch.into_stream()))
@@ -617,7 +643,13 @@ impl SshTransport {
             sessions.push(Arc::new(s));
         }
         let session = sessions.pop().expect("target session");
-        let mut t = Self::from_parts(target, Arc::try_unwrap(session).ok().expect("unique"), sessions, None, last_hk.unwrap());
+        let mut t = Self::from_parts(
+            target,
+            Arc::try_unwrap(session).ok().expect("unique"),
+            sessions,
+            None,
+            last_hk.unwrap(),
+        );
         t.host = target.host.clone();
         Ok(t)
     }
@@ -643,7 +675,10 @@ impl SshTransport {
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
         let mut child = cmd.spawn().map_err(|e| {
-            coded(errors::PROXY_FAILED, format!("cannot start ProxyCommand `{command}`: {e}"))
+            coded(
+                errors::PROXY_FAILED,
+                format!("cannot start ProxyCommand `{command}`: {e}"),
+            )
         })?;
         let stdin = child.stdin.take().context("proxy stdin")?;
         let stdout = child.stdout.take().context("proxy stdout")?;
@@ -654,12 +689,17 @@ impl SshTransport {
             Err(e) => {
                 let _ = child.start_kill();
                 let mut buf = Vec::new();
-                let _ = tokio::time::timeout(Duration::from_millis(500), stderr.read_to_end(&mut buf)).await;
+                let _ =
+                    tokio::time::timeout(Duration::from_millis(500), stderr.read_to_end(&mut buf))
+                        .await;
                 let msg = String::from_utf8_lossy(&buf).trim().to_string();
                 if msg.is_empty() {
                     Err(e)
                 } else {
-                    Err(coded(errors::PROXY_FAILED, format!("ProxyCommand `{command}` failed: {msg} ({e})")))
+                    Err(coded(
+                        errors::PROXY_FAILED,
+                        format!("ProxyCommand `{command}` failed: {msg} ({e})"),
+                    ))
                 }
             }
         }
@@ -688,10 +728,25 @@ impl SshTransport {
                 .or(r.user.clone())
                 .unwrap_or_else(default_user),
         };
-        let mut t = if let Some(pc) = r.proxy_command.as_deref().filter(|p| !p.eq_ignore_ascii_case("none")) {
-            let pc = crate::ssh_config::expand_tokens(pc, &target.host, &d.host, target.port, Some(&target.user), &home_dir());
+        let mut t = if let Some(pc) = r
+            .proxy_command
+            .as_deref()
+            .filter(|p| !p.eq_ignore_ascii_case("none"))
+        {
+            let pc = crate::ssh_config::expand_tokens(
+                pc,
+                &target.host,
+                &d.host,
+                target.port,
+                Some(&target.user),
+                &home_dir(),
+            );
             Self::connect_proxy_command(&pc, &target, &auth, &opts).await?
-        } else if r.proxy_jump.as_deref().is_some_and(|p| !p.eq_ignore_ascii_case("none")) {
+        } else if r
+            .proxy_jump
+            .as_deref()
+            .is_some_and(|p| !p.eq_ignore_ascii_case("none"))
+        {
             let jumps = resolve_proxy_jumps(r.proxy_jump.as_deref().unwrap_or_default(), config)
                 .map_err(|e| coded(errors::PROXY_FAILED, e))?;
             let mut hops = Vec::new();
@@ -765,13 +820,21 @@ impl SshTransport {
     fn lost(&self) -> anyhow::Error {
         coded(
             errors::CONNECTION_LOST,
-            format!("connection to {}@{}:{} was lost", self.user, self.host, self.port),
+            format!(
+                "connection to {}@{}:{} was lost",
+                self.user, self.host, self.port
+            ),
         )
     }
 
     /// Local forward `127.0.0.1:local_port` → `remote_host:remote_port`.
     /// `local_port == 0` picks a free port; the bound port is returned.
-    pub async fn forward_port(&self, local_port: u16, remote_host: &str, remote_port: u16) -> Result<u16> {
+    pub async fn forward_port(
+        &self,
+        local_port: u16,
+        remote_host: &str,
+        remote_port: u16,
+    ) -> Result<u16> {
         let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], local_port)))
             .await
             .with_context(|| format!("binding local port {local_port}"))?;
@@ -784,7 +847,12 @@ impl SshTransport {
                 let rh = rh.clone();
                 tokio::spawn(async move {
                     match session
-                        .channel_open_direct_tcpip(rh, u32::from(remote_port), peer.ip().to_string(), u32::from(peer.port()))
+                        .channel_open_direct_tcpip(
+                            rh,
+                            u32::from(remote_port),
+                            peer.ip().to_string(),
+                            u32::from(peer.port()),
+                        )
                         .await
                     {
                         Ok(ch) => {
@@ -803,8 +871,16 @@ impl SshTransport {
     /// Remote → local forwarding needs a `tcpip-forward` global request
     /// handler; not implemented.
     #[allow(clippy::unused_async)]
-    pub async fn reverse_forward_port(&self, _remote_port: u16, _local_host: &str, _local_port: u16) -> Result<()> {
-        Err(coded(errors::UNSUPPORTED, "remote (reverse) port forwarding is not supported yet"))
+    pub async fn reverse_forward_port(
+        &self,
+        _remote_port: u16,
+        _local_host: &str,
+        _local_port: u16,
+    ) -> Result<()> {
+        Err(coded(
+            errors::UNSUPPORTED,
+            "remote (reverse) port forwarding is not supported yet",
+        ))
     }
 
     async fn env_prefix(&self) -> String {
@@ -846,7 +922,9 @@ impl SshTransport {
         while let Some(msg) = ch.wait().await {
             match msg {
                 ChannelMsg::Data { data } => out.stdout.extend_from_slice(&data),
-                ChannelMsg::ExtendedData { data, ext } if ext == 1 => out.stderr.extend_from_slice(&data),
+                ChannelMsg::ExtendedData { data, ext } if ext == 1 => {
+                    out.stderr.extend_from_slice(&data)
+                }
                 ChannelMsg::ExitStatus { exit_status } => {
                     out.exit_code = i32::try_from(exit_status).unwrap_or(-1);
                     done = true;
@@ -867,7 +945,13 @@ impl SshTransport {
     }
 
     /// Run a SideX FS script and turn its marker / exit code into a coded error.
-    async fn fs_script(&self, script: &str, stdin: Option<&[u8]>, what: &str, path: &str) -> Result<Vec<u8>> {
+    async fn fs_script(
+        &self,
+        script: &str,
+        stdin: Option<&[u8]>,
+        what: &str,
+        path: &str,
+    ) -> Result<Vec<u8>> {
         let r = self.exec_raw(script, stdin).await?;
         if r.exit_code == 0 {
             return Ok(r.stdout);
@@ -884,14 +968,28 @@ impl SshTransport {
         } else if err.contains(MARK_EISDIR) || err.contains("Is a directory") {
             errors::EISDIR
         } else {
-            return Err(anyhow::anyhow!("{what} {path} failed (exit {}): {}", r.exit_code, err.trim()));
+            return Err(anyhow::anyhow!(
+                "{what} {path} failed (exit {}): {}",
+                r.exit_code,
+                err.trim()
+            ));
         };
         let detail: String = err
             .lines()
             .filter(|l| !l.contains("__SIDEX_"))
             .collect::<Vec<_>>()
             .join(" ");
-        Err(coded(code, format!("{what} {path}{}", if detail.trim().is_empty() { String::new() } else { format!(": {}", detail.trim()) })))
+        Err(coded(
+            code,
+            format!(
+                "{what} {path}{}",
+                if detail.trim().is_empty() {
+                    String::new()
+                } else {
+                    format!(": {}", detail.trim())
+                }
+            ),
+        ))
     }
 }
 
@@ -953,7 +1051,9 @@ impl RemoteTransport for SshTransport {
              if [ ! -e {q} ] && [ ! -w \"$D\" ]; then echo {MARK_EACCES} >&2; exit 13; fi; \
              cat > {q}"
         );
-        self.fs_script(&script, Some(data), "write", path).await.map(|_| ())
+        self.fs_script(&script, Some(data), "write", path)
+            .await
+            .map(|_| ())
     }
 
     async fn read_dir(&self, path: &str) -> Result<Vec<DirEntry>> {
@@ -1033,8 +1133,16 @@ impl RemoteTransport for SshTransport {
             return Err(self.lost());
         }
         let mut ch = self.session.channel_open_session().await?;
-        ch.request_pty(true, "xterm-256color", u32::from(cols), u32::from(rows), 0, 0, &[])
-            .await?;
+        ch.request_pty(
+            true,
+            "xterm-256color",
+            u32::from(cols),
+            u32::from(rows),
+            0,
+            0,
+            &[],
+        )
+        .await?;
         ch.request_shell(true).await?;
 
         let (client_side, task_side) = tokio::io::duplex(64 * 1024);
@@ -1066,7 +1174,11 @@ impl RemoteTransport for SshTransport {
             let _ = task_write.shutdown().await;
         });
 
-        Ok(RemotePty::new(Box::new(client_write), Box::new(client_read), resize_tx))
+        Ok(RemotePty::new(
+            Box::new(client_write),
+            Box::new(client_read),
+            resize_tx,
+        ))
     }
 
     async fn upload(&self, local: &Path, remote: &str) -> Result<()> {
@@ -1095,7 +1207,9 @@ impl RemoteTransport for SshTransport {
              D=$(dirname -- {q}); if [ ! -d \"$D\" ]; then echo {MARK_ENOENT} >&2; exit 2; fi; \
              if [ ! -w \"$D\" ]; then echo {MARK_EACCES} >&2; exit 13; fi; mkdir -- {q}"
         );
-        self.fs_script(&script, None, "mkdir", path).await.map(|_| ())
+        self.fs_script(&script, None, "mkdir", path)
+            .await
+            .map(|_| ())
     }
 
     async fn remove(&self, path: &str, recursive: bool) -> Result<()> {
@@ -1109,7 +1223,9 @@ impl RemoteTransport for SshTransport {
             "{}D=$(dirname -- {q}); if [ ! -w \"$D\" ]; then echo {MARK_EACCES} >&2; exit 13; fi; {rm}",
             check_exists_script(&q)
         );
-        self.fs_script(&script, None, "delete", path).await.map(|_| ())
+        self.fs_script(&script, None, "delete", path)
+            .await
+            .map(|_| ())
     }
 
     async fn rename(&self, from: &str, to: &str, overwrite: bool) -> Result<()> {
@@ -1123,7 +1239,9 @@ impl RemoteTransport for SshTransport {
             "{}{guard}D=$(dirname -- {b}); if [ ! -d \"$D\" ]; then echo {MARK_ENOENT} >&2; exit 2; fi; mv -f -- {a} {b}",
             check_exists_script(&a)
         );
-        self.fs_script(&script, None, "rename", from).await.map(|_| ())
+        self.fs_script(&script, None, "rename", from)
+            .await
+            .map(|_| ())
     }
 
     fn is_alive(&self) -> bool {
@@ -1139,7 +1257,9 @@ impl RemoteTransport for SshTransport {
             .disconnect(russh::Disconnect::ByApplication, "bye", "en")
             .await;
         for j in self.jumps.iter().rev() {
-            let _ = j.disconnect(russh::Disconnect::ByApplication, "bye", "en").await;
+            let _ = j
+                .disconnect(russh::Disconnect::ByApplication, "bye", "en")
+                .await;
         }
         if let Some(mut c) = self.proxy_child.lock().unwrap().take() {
             let _ = c.start_kill();
@@ -1220,7 +1340,12 @@ impl SshConnection {
                     let code = errors::code_of(&e.to_string()).map(str::to_string);
                     if matches!(
                         code.as_deref(),
-                        Some(errors::AUTH_FAILED | errors::HOSTKEY_CHANGED | errors::HOSTKEY_UNKNOWN | errors::KEY_ENCRYPTED)
+                        Some(
+                            errors::AUTH_FAILED
+                                | errors::HOSTKEY_CHANGED
+                                | errors::HOSTKEY_UNKNOWN
+                                | errors::KEY_ENCRYPTED
+                        )
                     ) {
                         return Err(e);
                     }
@@ -1233,7 +1358,11 @@ impl SshConnection {
     }
 
     pub async fn exec_command(&self, cmd: &str) -> Result<ExecOutput> {
-        self.transport.as_ref().context("not connected")?.exec(cmd).await
+        self.transport
+            .as_ref()
+            .context("not connected")?
+            .exec(cmd)
+            .await
     }
 
     pub async fn disconnect(&mut self) -> Result<()> {
@@ -1285,10 +1414,22 @@ mod tests {
 
     #[test]
     fn host_key_policy_from_option() {
-        assert_eq!(HostKeyPolicy::from_ssh_option(Some("yes")), HostKeyPolicy::Strict);
-        assert_eq!(HostKeyPolicy::from_ssh_option(Some("No")), HostKeyPolicy::AcceptAll);
-        assert_eq!(HostKeyPolicy::from_ssh_option(Some("accept-new")), HostKeyPolicy::AcceptNew);
-        assert_eq!(HostKeyPolicy::from_ssh_option(None), HostKeyPolicy::AcceptNew);
+        assert_eq!(
+            HostKeyPolicy::from_ssh_option(Some("yes")),
+            HostKeyPolicy::Strict
+        );
+        assert_eq!(
+            HostKeyPolicy::from_ssh_option(Some("No")),
+            HostKeyPolicy::AcceptAll
+        );
+        assert_eq!(
+            HostKeyPolicy::from_ssh_option(Some("accept-new")),
+            HostKeyPolicy::AcceptNew
+        );
+        assert_eq!(
+            HostKeyPolicy::from_ssh_option(None),
+            HostKeyPolicy::AcceptNew
+        );
     }
 
     #[test]
@@ -1320,11 +1461,12 @@ mod tests {
         let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = l.local_addr().unwrap().port();
         drop(l);
-        let err = SshTransport::connect_as("u", "127.0.0.1", port, SshAuth::Password("x".into()), None)
-            .await
-            .err()
-            .unwrap()
-            .to_string();
+        let err =
+            SshTransport::connect_as("u", "127.0.0.1", port, SshAuth::Password("x".into()), None)
+                .await
+                .err()
+                .unwrap()
+                .to_string();
         assert_eq!(errors::code_of(&err), Some(errors::REFUSED), "{err}");
     }
 
@@ -1341,7 +1483,11 @@ mod tests {
             connect_timeout: Duration::from_millis(700),
             ..Default::default()
         };
-        let ep = Endpoint { host: "127.0.0.1".into(), port, user: "u".into() };
+        let ep = Endpoint {
+            host: "127.0.0.1".into(),
+            port,
+            user: "u".into(),
+        };
         let t0 = std::time::Instant::now();
         let err = SshTransport::connect_endpoint(&ep, &SshAuth::Password("x".into()), &opts)
             .await

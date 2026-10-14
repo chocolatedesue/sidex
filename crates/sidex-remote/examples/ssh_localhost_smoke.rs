@@ -4,9 +4,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use sidex_remote::ssh::{
-    Endpoint, HostKeyPolicy, SshAuth, SshConnectOptions, SshTransport,
-};
+use sidex_remote::ssh::{Endpoint, HostKeyPolicy, SshAuth, SshConnectOptions, SshTransport};
 use sidex_remote::transport::RemoteTransport;
 
 #[tokio::main]
@@ -16,9 +14,8 @@ async fn main() -> anyhow::Result<()> {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(2222);
-    let user = std::env::var("SIDEX_SMOKE_SSH_USER").unwrap_or_else(|_| {
-        std::env::var("USER").unwrap_or_else(|_| "box".into())
-    });
+    let user = std::env::var("SIDEX_SMOKE_SSH_USER")
+        .unwrap_or_else(|_| std::env::var("USER").unwrap_or_else(|_| "box".into()));
     let key = std::env::var("SIDEX_SMOKE_SSH_KEY").unwrap_or_else(|_| {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))

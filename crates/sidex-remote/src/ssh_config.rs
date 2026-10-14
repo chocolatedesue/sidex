@@ -384,9 +384,8 @@ impl SshConfig {
                         r.strict_host_key_checking = Some(val.to_ascii_lowercase())
                     }
                     "userknownhostsfile" => {
-                        r.user_known_hosts_file = split_args(v)
-                            .first()
-                            .map(|p| expand_tilde(p, &self.home))
+                        r.user_known_hosts_file =
+                            split_args(v).first().map(|p| expand_tilde(p, &self.home))
                     }
                     "setenv" => {
                         for kv in split_args(v) {
@@ -402,7 +401,14 @@ impl SshConfig {
         }
         r.port = port.unwrap_or(22);
         let raw_host = hostname.unwrap_or_else(|| alias.to_string());
-        r.hostname = expand_tokens(&raw_host, alias, alias, r.port, r.user.as_deref(), &self.home);
+        r.hostname = expand_tokens(
+            &raw_host,
+            alias,
+            alias,
+            r.port,
+            r.user.as_deref(),
+            &self.home,
+        );
         let hn = r.hostname.clone();
         r.identity_files = r
             .identity_files
@@ -531,7 +537,10 @@ impl Destination {
                 .split_once(']')
                 .ok_or_else(|| anyhow::anyhow!("invalid IPv6 destination: {s}"))?;
             let port = match after.strip_prefix(':') {
-                Some(p) => Some(p.parse::<u16>().with_context(|| format!("invalid port in {s}"))?),
+                Some(p) => Some(
+                    p.parse::<u16>()
+                        .with_context(|| format!("invalid port in {s}"))?,
+                ),
                 None => None,
             };
             (h.to_string(), port)
@@ -539,7 +548,10 @@ impl Destination {
             let (h, p) = rest.split_once(':').unwrap();
             (
                 h.to_string(),
-                Some(p.parse::<u16>().with_context(|| format!("invalid port in {s}"))?),
+                Some(
+                    p.parse::<u16>()
+                        .with_context(|| format!("invalid port in {s}"))?,
+                ),
             )
         } else {
             (rest.to_string(), None)
@@ -586,10 +598,7 @@ fn walk_jumps(
             walk_jumps(&pj, cfg, stack, out)?;
             stack.pop();
         }
-        out.push(JumpHop {
-            dest,
-            config: conf,
-        });
+        out.push(JumpHop { dest, config: conf });
         if out.len() > MAX_PROXY_JUMPS {
             bail!("ProxyJump chain is longer than {MAX_PROXY_JUMPS} hops");
         }
@@ -644,7 +653,11 @@ mod tests {
         assert_eq!(r.user.as_deref(), Some("corpuser"));
         assert_eq!(r.port, 2200);
         let r = c.resolve("bastion.corp");
-        assert_eq!(r.user.as_deref(), Some("fallback"), "negated pattern excluded");
+        assert_eq!(
+            r.user.as_deref(),
+            Some("fallback"),
+            "negated pattern excluded"
+        );
         assert_eq!(c.resolve("bastion").user.as_deref(), Some("jump"));
         assert!(glob_match("web-??", "web-01"));
         assert!(!glob_match("web-??", "web-001"));
@@ -661,7 +674,10 @@ mod tests {
     fn key_equals_value_and_case_insensitive_keywords() {
         let c = parse("Host eq\n  HostName=10.1.1.1\n  PORT = 2022\n  user=\"me\"\n");
         let r = c.resolve("eq");
-        assert_eq!((r.hostname.as_str(), r.port, r.user.as_deref()), ("10.1.1.1", 2022, Some("me")));
+        assert_eq!(
+            (r.hostname.as_str(), r.port, r.user.as_deref()),
+            ("10.1.1.1", 2022, Some("me"))
+        );
     }
 
     #[test]
@@ -729,8 +745,15 @@ mod tests {
     #[test]
     fn include_top_level() {
         let (_d, ssh) = tmp_home();
-        fs::write(ssh.join("config.d/extra"), "Host included\n HostName 10.0.0.1\n").unwrap();
-        let c = parse_at(&ssh, "Include config.d/*\n\nHost local\n HostName 127.0.0.1\n");
+        fs::write(
+            ssh.join("config.d/extra"),
+            "Host included\n HostName 10.0.0.1\n",
+        )
+        .unwrap();
+        let c = parse_at(
+            &ssh,
+            "Include config.d/*\n\nHost local\n HostName 127.0.0.1\n",
+        );
         assert_eq!(c.hosts(), vec!["included", "local"]);
         assert_eq!(c.resolve("included").hostname, "10.0.0.1");
     }
@@ -738,8 +761,15 @@ mod tests {
     #[test]
     fn include_trailing_host_block() {
         let (_d, ssh) = tmp_home();
-        fs::write(ssh.join("config.d/extra"), "Host included\n HostName 10.0.0.1\n").unwrap();
-        let c = parse_at(&ssh, "Host local\n HostName 127.0.0.1\n\nInclude config.d/*\n");
+        fs::write(
+            ssh.join("config.d/extra"),
+            "Host included\n HostName 10.0.0.1\n",
+        )
+        .unwrap();
+        let c = parse_at(
+            &ssh,
+            "Host local\n HostName 127.0.0.1\n\nInclude config.d/*\n",
+        );
         assert_eq!(c.hosts(), vec!["local", "included"]);
         assert_eq!(c.resolve("local").hostname, "127.0.0.1");
         assert_eq!(c.resolve("included").hostname, "10.0.0.1");
@@ -748,8 +778,15 @@ mod tests {
     #[test]
     fn include_trailing_match_block() {
         let (_d, ssh) = tmp_home();
-        fs::write(ssh.join("config.d/extra"), "Host included\n HostName 10.0.0.1\n").unwrap();
-        let c = parse_at(&ssh, "Host local\n HostName 127.0.0.1\n\nMatch all\nInclude config.d/*\n");
+        fs::write(
+            ssh.join("config.d/extra"),
+            "Host included\n HostName 10.0.0.1\n",
+        )
+        .unwrap();
+        let c = parse_at(
+            &ssh,
+            "Host local\n HostName 127.0.0.1\n\nMatch all\nInclude config.d/*\n",
+        );
         assert_eq!(c.hosts(), vec!["local", "included"]);
         assert_eq!(c.resolve("included").hostname, "10.0.0.1");
     }
@@ -762,7 +799,11 @@ mod tests {
             "Host first\n HostName 10.0.0.1\n\nInclude config.d/nested/*.conf\n",
         )
         .unwrap();
-        fs::write(ssh.join("config.d/nested/second.conf"), "Host second\n HostName 10.0.0.2\n").unwrap();
+        fs::write(
+            ssh.join("config.d/nested/second.conf"),
+            "Host second\n HostName 10.0.0.2\n",
+        )
+        .unwrap();
         fs::write(ssh.join("config.d/zz.conf"), "Host zz\n").unwrap();
         fs::write(ssh.join("config.d/ignored.txt"), "Host nope\n").unwrap();
         let c = parse_at(&ssh, "Match all\nInclude config.d/*.conf\n");
@@ -785,7 +826,11 @@ mod tests {
     #[test]
     fn include_self_loop_is_rejected() {
         let (_d, ssh) = tmp_home();
-        fs::write(ssh.join("config.d/loop.conf"), "Include config.d/loop.conf\n").unwrap();
+        fs::write(
+            ssh.join("config.d/loop.conf"),
+            "Include config.d/loop.conf\n",
+        )
+        .unwrap();
         let text = "Include config.d/loop.conf\n";
         let err = SshConfig::parse_str(text, &ssh, ssh.parent().unwrap()).unwrap_err();
         assert!(err.to_string().contains("nested too deeply"));
@@ -795,7 +840,10 @@ mod tests {
     fn options_after_include_stay_in_block() {
         let (_d, ssh) = tmp_home();
         fs::write(ssh.join("config.d/inc"), "Host other\n HostName 5.5.5.5\n").unwrap();
-        let c = parse_at(&ssh, "Host a\n HostName 1.1.1.1\n Include config.d/inc\n User auser\n");
+        let c = parse_at(
+            &ssh,
+            "Host a\n HostName 1.1.1.1\n Include config.d/inc\n User auser\n",
+        );
         assert_eq!(c.resolve("a").user.as_deref(), Some("auser"));
         assert_eq!(c.resolve("other").user, None);
     }
@@ -806,12 +854,19 @@ mod tests {
     fn destination_parsing() {
         assert_eq!(
             Destination::parse("me@gateway:2022").unwrap(),
-            Destination { host: "gateway".into(), user: Some("me".into()), port: Some(2022) }
+            Destination {
+                host: "gateway".into(),
+                user: Some("me".into()),
+                port: Some(2022)
+            }
         );
         assert_eq!(Destination::parse("host").unwrap().port, None);
         assert_eq!(Destination::parse("[::1]:2200").unwrap().host, "::1");
         assert_eq!(Destination::parse("ssh://u@h:7").unwrap().port, Some(7));
-        assert_eq!(Destination::parse("a@b@host").unwrap().user.as_deref(), Some("a@b"));
+        assert_eq!(
+            Destination::parse("a@b@host").unwrap().user.as_deref(),
+            Some("a@b")
+        );
         assert!(Destination::parse("h:notaport").is_err());
         assert!(Destination::parse("").is_err());
     }
@@ -831,9 +886,16 @@ mod tests {
 
     #[test]
     fn jumps_walk_declared_proxyjump_first() {
-        assert_eq!(names("second", "Host second\n ProxyJump first\n").unwrap(), ["first", "second"]);
         assert_eq!(
-            names("third", "Host third\n ProxyJump second\nHost second\n ProxyJump first\n").unwrap(),
+            names("second", "Host second\n ProxyJump first\n").unwrap(),
+            ["first", "second"]
+        );
+        assert_eq!(
+            names(
+                "third",
+                "Host third\n ProxyJump second\nHost second\n ProxyJump first\n"
+            )
+            .unwrap(),
             ["first", "second", "third"]
         );
         assert_eq!(
@@ -862,7 +924,10 @@ mod tests {
 
     #[test]
     fn jumps_detect_loops_and_length() {
-        assert!(names("a", "Host a\n ProxyJump a\n").unwrap_err().to_string().contains("loops back to 'a'"));
+        assert!(names("a", "Host a\n ProxyJump a\n")
+            .unwrap_err()
+            .to_string()
+            .contains("loops back to 'a'"));
         assert!(names("a", "Host a\n ProxyJump b\nHost b\n ProxyJump a\n")
             .unwrap_err()
             .to_string()
@@ -871,6 +936,9 @@ mod tests {
         for i in 0..=MAX_PROXY_JUMPS + 1 {
             cfg.push_str(&format!("Host h{i}\n ProxyJump h{}\n", i + 1));
         }
-        assert!(names("h0", &cfg).unwrap_err().to_string().contains("longer than"));
+        assert!(names("h0", &cfg)
+            .unwrap_err()
+            .to_string()
+            .contains("longer than"));
     }
 }

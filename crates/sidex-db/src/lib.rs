@@ -30,8 +30,8 @@ pub mod window_state;
 
 pub use chat_sessions::{
     create_session, delete_session, list_sessions, load_messages, save_message, save_session,
-    search_sessions, update_session_title, update_session_pin, update_session_archive,
-    ChatMessage, ChatSession,
+    search_sessions, update_session_archive, update_session_pin, update_session_title, ChatMessage,
+    ChatSession,
 };
 pub use db::{Database, CURRENT_SCHEMA_VERSION};
 pub use history::{

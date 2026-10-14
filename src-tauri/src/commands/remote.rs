@@ -12,8 +12,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
 use std::sync::Arc;
-use tokio::sync::mpsc;
 use std::time::Duration;
+use tokio::sync::mpsc;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
@@ -62,7 +62,10 @@ impl RemoteManagerStore {
             .await
             .get_arc(ConnectionId(id))
             .ok_or_else(|| {
-                format!("[{}] no remote connection with id {id} (closed?)", errors::CONNECTION_LOST)
+                format!(
+                    "[{}] no remote connection with id {id} (closed?)",
+                    errors::CONNECTION_LOST
+                )
             })
     }
 }
@@ -233,9 +236,9 @@ fn ssh_entry(info: ConnectionInfo, t: &SshTransport) -> RemoteConnectionEntry {
     let (kind, fp) = match &t.host_key {
         H::Trusted { fingerprint } => ("trusted", fingerprint),
         H::Learned { fingerprint } => ("learned", fingerprint),
-        H::Unchecked { fingerprint } | H::Changed { fingerprint, .. } | H::Rejected { fingerprint } => {
-            ("unchecked", fingerprint)
-        }
+        H::Unchecked { fingerprint }
+        | H::Changed { fingerprint, .. }
+        | H::Rejected { fingerprint } => ("unchecked", fingerprint),
     };
     e.host_key = Some(kind.into());
     e.host_key_fingerprint = Some(fp.clone());
@@ -251,10 +254,15 @@ async fn do_connect_ssh(
     let p = params.clone();
     let task = tokio::spawn(async move {
         let cfg = load_ssh_config();
-        SshTransport::connect_destination(&p.host, p.user.as_deref(), p.port, p.auth, p.opts, &cfg).await
+        SshTransport::connect_destination(&p.host, p.user.as_deref(), p.port, p.auth, p.opts, &cfg)
+            .await
     });
     if let Some(id) = &request_id {
-        store.pending.lock().unwrap().insert(id.clone(), task.abort_handle());
+        store
+            .pending
+            .lock()
+            .unwrap()
+            .insert(id.clone(), task.abort_handle());
     }
     let res = task.await;
     if let Some(id) = &request_id {
@@ -264,7 +272,11 @@ async fn do_connect_ssh(
         Ok(Ok(t)) => Arc::new(t),
         Ok(Err(e)) => return Err(format!("SSH connect failed: {e:#}")),
         Err(j) if j.is_cancelled() => {
-            return Err(format!("[{}] connection to {} was cancelled", errors::CANCELLED, params.host))
+            return Err(format!(
+                "[{}] connection to {} was cancelled",
+                errors::CANCELLED,
+                params.host
+            ))
         }
         Err(j) => return Err(format!("SSH connect task failed: {j}")),
     };
@@ -392,9 +404,13 @@ pub async fn remote_forward_port(
         .get(&connection_id)
         .map(|(t, _)| Arc::clone(t))
         .ok_or_else(|| format!("no SSH connection with id {connection_id}"))?;
-    t.forward_port(local_port, remote_host.as_deref().unwrap_or("127.0.0.1"), remote_port)
-        .await
-        .map_err(|e| format!("port forward failed: {e}"))
+    t.forward_port(
+        local_port,
+        remote_host.as_deref().unwrap_or("127.0.0.1"),
+        remote_port,
+    )
+    .await
+    .map_err(|e| format!("port forward failed: {e}"))
 }
 
 #[tauri::command]
@@ -569,7 +585,10 @@ pub async fn remote_disconnect(
     store.ssh.lock().await.remove(&connection_id);
     let t = store.inner.lock().await.take(ConnectionId(connection_id));
     match t {
-        Some(t) => t.disconnect().await.map_err(|e| format!("disconnect failed: {e}")),
+        Some(t) => t
+            .disconnect()
+            .await
+            .map_err(|e| format!("disconnect failed: {e}")),
         None => Ok(()),
     }
 }

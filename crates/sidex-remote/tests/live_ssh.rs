@@ -83,7 +83,15 @@ impl Ctx {
         SshConfig::parse_file(&self.lab.join("ssh_config")).unwrap()
     }
     async fn dest(&self, dest: &str) -> anyhow::Result<SshTransport> {
-        SshTransport::connect_destination(dest, None, None, SshAuth::Agent, self.opts(), &self.config()).await
+        SshTransport::connect_destination(
+            dest,
+            None,
+            None,
+            SshAuth::Agent,
+            self.opts(),
+            &self.config(),
+        )
+        .await
     }
 }
 
@@ -92,7 +100,11 @@ fn user() -> String {
 }
 
 fn ep_user(u: &str, port: u16) -> Endpoint {
-    Endpoint { host: "127.0.0.1".into(), port, user: u.into() }
+    Endpoint {
+        host: "127.0.0.1".into(),
+        port,
+        user: u.into(),
+    }
 }
 
 fn code(e: &anyhow::Error) -> String {
@@ -133,9 +145,16 @@ async fn config_user_at_host_port_overrides() {
     let dest = format!("{}@127.0.0.1:2222", user());
     let mut o = c.opts();
     o.identity_files = vec![c.lab.join("id_lab")];
-    let t = SshTransport::connect_destination(&dest, None, None, SshAuth::Agent, o, &SshConfig::default())
-        .await
-        .unwrap();
+    let t = SshTransport::connect_destination(
+        &dest,
+        None,
+        None,
+        SshAuth::Agent,
+        o,
+        &SshConfig::default(),
+    )
+    .await
+    .unwrap();
     assert_eq!(t.endpoint().user, user());
     // ssh:// form + explicit port override wins over config
     let t = SshTransport::connect_destination(
@@ -155,7 +174,10 @@ async fn config_user_at_host_port_overrides() {
 async fn config_proxy_jump_goes_through_jump_host() {
     let c = ctx(lab!());
     let log = c.lab.join("sshd_2225.log");
-    let before = std::fs::read_to_string(&log).unwrap_or_default().matches("direct-tcpip").count();
+    let before = std::fs::read_to_string(&log)
+        .unwrap_or_default()
+        .matches("direct-tcpip")
+        .count();
     let t = c.dest("lab-target").await.unwrap();
     assert_eq!(t.jump_count(), 1);
     assert_eq!(t.endpoint().port, 2226);
@@ -163,8 +185,14 @@ async fn config_proxy_jump_goes_through_jump_host() {
     // FS works through the tunnel too
     assert!(!t.home().await.unwrap().is_empty());
     tokio::time::sleep(Duration::from_millis(200)).await;
-    let after = std::fs::read_to_string(&log).unwrap_or_default().matches("direct-tcpip").count();
-    assert!(after > before, "jump host log shows no direct-tcpip ({before} → {after})");
+    let after = std::fs::read_to_string(&log)
+        .unwrap_or_default()
+        .matches("direct-tcpip")
+        .count();
+    assert!(
+        after > before,
+        "jump host log shows no direct-tcpip ({before} → {after})"
+    );
     t.disconnect().await.unwrap();
 }
 
@@ -194,11 +222,16 @@ async fn config_failing_proxy_command_reports_error_fast() {
     )
     .unwrap();
     let t0 = Instant::now();
-    let e = SshTransport::connect_destination("bad", Some("x"), None, SshAuth::Agent, c.opts(), &cfg)
-        .await
-        .err()
-        .unwrap();
-    assert!(t0.elapsed() < Duration::from_secs(5), "took {:?}", t0.elapsed());
+    let e =
+        SshTransport::connect_destination("bad", Some("x"), None, SshAuth::Agent, c.opts(), &cfg)
+            .await
+            .err()
+            .unwrap();
+    assert!(
+        t0.elapsed() < Duration::from_secs(5),
+        "took {:?}",
+        t0.elapsed()
+    );
     assert_eq!(code(&e), errors::PROXY_FAILED, "{e}");
     assert!(e.to_string().contains("proxy-broke"), "{e}");
 }
@@ -212,10 +245,11 @@ async fn config_unreachable_jump_host_names_the_hop() {
         Path::new("/tmp"),
     )
     .unwrap();
-    let e = SshTransport::connect_destination("t", Some(&user()), None, SshAuth::Agent, c.opts(), &cfg)
-        .await
-        .err()
-        .unwrap();
+    let e =
+        SshTransport::connect_destination("t", Some(&user()), None, SshAuth::Agent, c.opts(), &cfg)
+            .await
+            .err()
+            .unwrap();
     assert_eq!(code(&e), errors::REFUSED, "{e}");
     assert!(e.to_string().contains("jump host"), "{e}");
 }
@@ -251,14 +285,16 @@ async fn auth_encrypted_key_passphrase_flow() {
         .err()
         .unwrap();
     assert_eq!(code(&e), errors::KEY_ENCRYPTED, "{e}");
-    let e = SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab_enc", Some("nope")), &c.opts())
-        .await
-        .err()
-        .unwrap();
+    let e =
+        SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab_enc", Some("nope")), &c.opts())
+            .await
+            .err()
+            .unwrap();
     assert_eq!(code(&e), errors::KEY_PASSPHRASE, "{e}");
-    let t = SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab_enc", Some(KEYPASS)), &c.opts())
-        .await
-        .unwrap();
+    let t =
+        SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab_enc", Some(KEYPASS)), &c.opts())
+            .await
+            .unwrap();
     assert_eq!(sh(&t, "echo enc").await.trim(), "enc");
 }
 
@@ -267,7 +303,10 @@ async fn auth_auto_reports_encrypted_identity() {
     let c = ctx(lab!());
     let mut o = c.opts();
     o.identity_files = vec![c.lab.join("id_lab_enc")];
-    let e = SshTransport::connect_endpoint(&c.ep(2222), &SshAuth::Agent, &o).await.err().unwrap();
+    let e = SshTransport::connect_endpoint(&c.ep(2222), &SshAuth::Agent, &o)
+        .await
+        .err()
+        .unwrap();
     assert_eq!(code(&e), errors::KEY_ENCRYPTED, "{e}");
     assert!(e.to_string().contains("id_lab_enc"), "{e}");
 }
@@ -276,7 +315,10 @@ async fn auth_auto_reports_encrypted_identity() {
 async fn auth_agent() {
     let c = ctx(lab!());
     let sock = c.lab.join("agent.sock");
-    assert!(sock.exists(), "lab agent sock missing — run scripts/remote-ssh-lab.sh up");
+    assert!(
+        sock.exists(),
+        "lab agent sock missing — run scripts/remote-ssh-lab.sh up"
+    );
     // Temporarily point the process at the lab agent without an unsafe set_var:
     // spawn a short-lived scope by relying on SSH_AUTH_SOCK already exported by
     // the test runner / lab script. If unset, skip.
@@ -286,29 +328,42 @@ async fn auth_agent() {
     }
     let mut o = c.opts();
     o.identities_only = false;
-    let t = SshTransport::connect_endpoint(&c.ep(2222), &SshAuth::Agent, &o).await.unwrap();
+    let t = SshTransport::connect_endpoint(&c.ep(2222), &SshAuth::Agent, &o)
+        .await
+        .unwrap();
     assert_eq!(sh(&t, "echo agent").await.trim(), "agent");
 }
 
 #[tokio::test]
 async fn auth_auto_without_any_key_fails() {
     let c = ctx(lab!());
-    let e = SshTransport::connect_endpoint(&c.ep(2222), &SshAuth::Agent, &c.opts()).await.err().unwrap();
+    let e = SshTransport::connect_endpoint(&c.ep(2222), &SshAuth::Agent, &c.opts())
+        .await
+        .err()
+        .unwrap();
     assert_eq!(code(&e), errors::AUTH_FAILED, "{e}");
 }
 
 #[tokio::test]
 async fn auth_password_ok_and_wrong() {
     let c = ctx(lab!());
-    let t = SshTransport::connect_endpoint(&ep_user("sxpass", 2223), &SshAuth::Password(PASS.into()), &c.opts())
-        .await
-        .unwrap();
+    let t = SshTransport::connect_endpoint(
+        &ep_user("sxpass", 2223),
+        &SshAuth::Password(PASS.into()),
+        &c.opts(),
+    )
+    .await
+    .unwrap();
     assert_eq!(sh(&t, "whoami").await.trim(), "sxpass");
     let t0 = Instant::now();
-    let e = SshTransport::connect_endpoint(&ep_user("sxpass", 2223), &SshAuth::Password("wrong".into()), &c.opts())
-        .await
-        .err()
-        .unwrap();
+    let e = SshTransport::connect_endpoint(
+        &ep_user("sxpass", 2223),
+        &SshAuth::Password("wrong".into()),
+        &c.opts(),
+    )
+    .await
+    .err()
+    .unwrap();
     assert_eq!(code(&e), errors::AUTH_FAILED, "{e}");
     assert!(t0.elapsed() < Duration::from_secs(9));
 }
@@ -316,9 +371,13 @@ async fn auth_password_ok_and_wrong() {
 #[tokio::test]
 async fn auth_password_falls_back_to_keyboard_interactive() {
     let c = ctx(lab!());
-    let t = SshTransport::connect_endpoint(&ep_user("sxpass", 2224), &SshAuth::Password(PASS.into()), &c.opts())
-        .await
-        .unwrap();
+    let t = SshTransport::connect_endpoint(
+        &ep_user("sxpass", 2224),
+        &SshAuth::Password(PASS.into()),
+        &c.opts(),
+    )
+    .await
+    .unwrap();
     assert_eq!(sh(&t, "whoami").await.trim(), "sxpass");
 }
 
@@ -335,10 +394,14 @@ async fn auth_password_against_key_only_server() {
 #[tokio::test]
 async fn auth_otp_style_keyboard_interactive_is_unsupported() {
     let c = ctx(lab!());
-    let e = SshTransport::connect_endpoint(&ep_user("sxpass", 2224), &SshAuth::KeyboardInteractive, &c.opts())
-        .await
-        .err()
-        .unwrap();
+    let e = SshTransport::connect_endpoint(
+        &ep_user("sxpass", 2224),
+        &SshAuth::KeyboardInteractive,
+        &c.opts(),
+    )
+    .await
+    .err()
+    .unwrap();
     assert_eq!(code(&e), errors::UNSUPPORTED, "{e}");
 }
 
@@ -348,11 +411,19 @@ async fn auth_otp_style_keyboard_interactive_is_unsupported() {
 async fn hostkey_first_seen_is_learned_then_trusted() {
     let c = ctx(lab!());
     let t = c.conn(2222).await;
-    assert!(matches!(t.host_key, HostKeyOutcome::Learned { .. }), "{:?}", t.host_key);
+    assert!(
+        matches!(t.host_key, HostKeyOutcome::Learned { .. }),
+        "{:?}",
+        t.host_key
+    );
     let kh = std::fs::read_to_string(&c.kh).unwrap();
     assert!(kh.contains("[127.0.0.1]:2222"), "{kh}");
     let t = c.conn(2222).await;
-    assert!(matches!(t.host_key, HostKeyOutcome::Trusted { .. }), "{:?}", t.host_key);
+    assert!(
+        matches!(t.host_key, HostKeyOutcome::Trusted { .. }),
+        "{:?}",
+        t.host_key
+    );
 }
 
 #[tokio::test]
@@ -376,11 +447,16 @@ async fn hostkey_strict_rejects_unknown_accepts_known() {
     let c = ctx(lab!());
     let mut o = c.opts();
     o.host_key_policy = HostKeyPolicy::Strict;
-    let e = SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab", None), &o).await.err().unwrap();
+    let e = SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab", None), &o)
+        .await
+        .err()
+        .unwrap();
     assert_eq!(code(&e), errors::HOSTKEY_UNKNOWN, "{e}");
     assert!(!c.kh.exists() || std::fs::read_to_string(&c.kh).unwrap().is_empty());
     c.conn(2222).await; // learn
-    SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab", None), &o).await.unwrap();
+    SshTransport::connect_endpoint(&c.ep(2222), &c.key("id_lab", None), &o)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -397,7 +473,10 @@ async fn hostkey_known_hosts_is_per_port() {
 async fn lifecycle_refused_is_fast_and_coded() {
     let c = ctx(lab!());
     let t0 = Instant::now();
-    let e = SshTransport::connect_endpoint(&c.ep(2299), &c.key("id_lab", None), &c.opts()).await.err().unwrap();
+    let e = SshTransport::connect_endpoint(&c.ep(2299), &c.key("id_lab", None), &c.opts())
+        .await
+        .err()
+        .unwrap();
     assert_eq!(code(&e), errors::REFUSED, "{e}");
     assert!(t0.elapsed() < Duration::from_secs(2));
 }
@@ -407,9 +486,16 @@ async fn lifecycle_blackhole_times_out() {
     let c = ctx(lab!());
     let mut o = c.opts();
     o.connect_timeout = Duration::from_millis(1500);
-    let ep = Endpoint { host: "10.255.255.1".into(), port: 22, user: "x".into() };
+    let ep = Endpoint {
+        host: "10.255.255.1".into(),
+        port: 22,
+        user: "x".into(),
+    };
     let t0 = Instant::now();
-    let e = SshTransport::connect_endpoint(&ep, &SshAuth::Password("x".into()), &o).await.err().unwrap();
+    let e = SshTransport::connect_endpoint(&ep, &SshAuth::Password("x".into()), &o)
+        .await
+        .err()
+        .unwrap();
     let c2 = code(&e);
     assert!(c2 == errors::TIMEOUT || c2 == errors::UNREACHABLE, "{e}");
     assert!(t0.elapsed() < Duration::from_secs(4), "{:?}", t0.elapsed());
@@ -418,8 +504,15 @@ async fn lifecycle_blackhole_times_out() {
 #[tokio::test]
 async fn lifecycle_unknown_host_name() {
     let c = ctx(lab!());
-    let ep = Endpoint { host: "no-such-host.invalid".into(), port: 22, user: "x".into() };
-    let e = SshTransport::connect_endpoint(&ep, &SshAuth::Password("x".into()), &c.opts()).await.err().unwrap();
+    let ep = Endpoint {
+        host: "no-such-host.invalid".into(),
+        port: 22,
+        user: "x".into(),
+    };
+    let e = SshTransport::connect_endpoint(&ep, &SshAuth::Password("x".into()), &c.opts())
+        .await
+        .err()
+        .unwrap();
     let c2 = code(&e);
     assert!(c2 == errors::UNREACHABLE || c2 == errors::TIMEOUT, "{e}");
 }
@@ -429,11 +522,19 @@ async fn lifecycle_cancel_connect_by_dropping() {
     let c = ctx(lab!());
     let mut o = c.opts();
     o.connect_timeout = Duration::from_secs(60);
-    let ep = Endpoint { host: "10.255.255.1".into(), port: 22, user: "x".into() };
-    let task = tokio::spawn(async move { SshTransport::connect_endpoint(&ep, &SshAuth::Password("x".into()), &o).await });
+    let ep = Endpoint {
+        host: "10.255.255.1".into(),
+        port: 22,
+        user: "x".into(),
+    };
+    let task = tokio::spawn(async move {
+        SshTransport::connect_endpoint(&ep, &SshAuth::Password("x".into()), &o).await
+    });
     tokio::time::sleep(Duration::from_millis(200)).await;
     task.abort();
-    let r = tokio::time::timeout(Duration::from_secs(1), task).await.expect("abort must be prompt");
+    let r = tokio::time::timeout(Duration::from_secs(1), task)
+        .await
+        .expect("abort must be prompt");
     assert!(matches!(r, Err(e) if e.is_cancelled()));
 }
 
@@ -444,7 +545,9 @@ async fn lifecycle_connection_drop_is_detected_then_reconnect() {
     assert!(t.is_alive());
     // Kill this session's sshd process from the inside.
     // Kill the SSH session from the remote side (ppid chain through our sh wrap).
-    let _ = t.exec("kill -9 $PPID 2>/dev/null; kill -9 $(ps -o ppid= -p $$) 2>/dev/null; true").await;
+    let _ = t
+        .exec("kill -9 $PPID 2>/dev/null; kill -9 $(ps -o ppid= -p $$) 2>/dev/null; true")
+        .await;
     let t0 = Instant::now();
     while t.is_alive() && t0.elapsed() < Duration::from_secs(5) {
         let _ = t.exec("true").await; // poke so is_closed flips
@@ -455,7 +558,11 @@ async fn lifecycle_connection_drop_is_detected_then_reconnect() {
         let _ = t.disconnect().await;
     }
     assert!(!t.is_alive(), "drop not noticed");
-    let e = t.exec("echo hi").await.err().expect("exec on dead session must fail");
+    let e = t
+        .exec("echo hi")
+        .await
+        .err()
+        .expect("exec on dead session must fail");
     assert_eq!(code(&e), errors::CONNECTION_LOST, "{e}");
     let e = t.read_file("/etc/hostname").await.err().unwrap();
     assert_eq!(code(&e), errors::CONNECTION_LOST, "{e}");
@@ -469,7 +576,9 @@ async fn lifecycle_disconnect_then_use_fails_cleanly() {
     let t = c.conn(2222).await;
     t.disconnect().await.unwrap();
     tokio::time::sleep(Duration::from_millis(200)).await;
-    let r = tokio::time::timeout(Duration::from_secs(5), t.exec("true")).await.expect("must not hang");
+    let r = tokio::time::timeout(Duration::from_secs(5), t.exec("true"))
+        .await
+        .expect("must not hang");
     assert_eq!(code(&r.err().unwrap()), errors::CONNECTION_LOST);
 }
 
@@ -488,7 +597,14 @@ async fn lifecycle_many_concurrent_execs_one_session() {
     let t = c.conn(2222).await;
     let futs = (0..24).map(|i| {
         let t = &t;
-        async move { t.exec(&format!("echo {i}")).await.unwrap().stdout.trim().to_string() }
+        async move {
+            t.exec(&format!("echo {i}"))
+                .await
+                .unwrap()
+                .stdout
+                .trim()
+                .to_string()
+        }
     });
     let outs = futures_join_all(futs).await;
     for (i, o) in outs.iter().enumerate() {
@@ -544,7 +660,9 @@ async fn exec_long_running_and_large_output_and_stdin_eof() {
     let r = t.exec_raw("head -c 8000000 /dev/zero", None).await.unwrap();
     assert_eq!(r.stdout.len(), 8_000_000);
     // stdin is closed, so `cat` must not hang
-    let r = tokio::time::timeout(Duration::from_secs(5), t.exec("cat")).await.expect("cat hung");
+    let r = tokio::time::timeout(Duration::from_secs(5), t.exec("cat"))
+        .await
+        .expect("cat hung");
     assert_eq!(r.unwrap().exit_code, 0);
     let r = t.exec_raw("wc -c", Some(&[7u8; 300_000])).await.unwrap();
     assert_eq!(String::from_utf8_lossy(&r.stdout).trim(), "300000");
@@ -556,7 +674,12 @@ async fn exec_fish_login_shell_still_runs_posix() {
     let t = c.dest("lab-fish").await.unwrap();
     assert_eq!(sh(&t, "whoami").await.trim(), "sxfish");
     // POSIX-only syntax that fish would reject
-    assert_eq!(sh(&t, "X=1; if [ \"$X\" = 1 ]; then echo posix; fi").await.trim(), "posix");
+    assert_eq!(
+        sh(&t, "X=1; if [ \"$X\" = 1 ]; then echo posix; fi")
+            .await
+            .trim(),
+        "posix"
+    );
     let home = t.home().await.unwrap();
     assert!(home.ends_with("sxfish"), "{home}");
     let p = format!("{home}/f i'sh $x.txt");
@@ -572,8 +695,13 @@ async fn read_until(pty: &mut sidex_remote::RemotePty, needle: &str) -> String {
     let mut buf = [0u8; 4096];
     let t0 = Instant::now();
     while !acc.contains(needle) {
-        assert!(t0.elapsed() < Duration::from_secs(8), "timeout waiting for {needle:?}; got {acc:?}");
-        if let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(500), pty.read(&mut buf)).await {
+        assert!(
+            t0.elapsed() < Duration::from_secs(8),
+            "timeout waiting for {needle:?}; got {acc:?}"
+        );
+        if let Ok(Ok(n)) =
+            tokio::time::timeout(Duration::from_millis(500), pty.read(&mut buf)).await
+        {
             if n == 0 {
                 break;
             }
@@ -607,12 +735,21 @@ async fn forward_local_port_zero_returns_bound_port() {
     let t = c.conn(2222).await;
     let port = t.forward_port(0, "127.0.0.1", 2223).await.unwrap();
     assert_ne!(port, 0);
-    let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+    let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port))
+        .await
+        .unwrap();
     let mut banner = [0u8; 8];
-    tokio::time::timeout(Duration::from_secs(5), s.read_exact(&mut banner)).await.unwrap().unwrap();
+    tokio::time::timeout(Duration::from_secs(5), s.read_exact(&mut banner))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(&banner, b"SSH-2.0-");
     s.shutdown().await.unwrap();
-    let e = t.reverse_forward_port(9000, "127.0.0.1", 9000).await.err().unwrap();
+    let e = t
+        .reverse_forward_port(9000, "127.0.0.1", 9000)
+        .await
+        .err()
+        .unwrap();
     assert_eq!(code(&e), errors::UNSUPPORTED);
 }
 
@@ -625,7 +762,10 @@ struct Fs {
 
 async fn fs(c: &Ctx) -> Fs {
     let t = c.conn(2222).await;
-    let root = sh(&t, "mktemp -d /tmp/sidex-fs-XXXXXX").await.trim().to_string();
+    let root = sh(&t, "mktemp -d /tmp/sidex-fs-XXXXXX")
+        .await
+        .trim()
+        .to_string();
     Fs { t, root }
 }
 
@@ -634,7 +774,13 @@ impl Fs {
         format!("{}/{rel}", self.root)
     }
     async fn done(self) {
-        let _ = self.t.exec(&format!("chmod -R u+rwx '{}'; rm -rf '{}'", self.root, self.root)).await;
+        let _ = self
+            .t
+            .exec(&format!(
+                "chmod -R u+rwx '{}'; rm -rf '{}'",
+                self.root, self.root
+            ))
+            .await;
     }
 }
 
@@ -676,20 +822,41 @@ async fn fs_unicode_spaces_quotes_newlines_in_names() {
     let t = &f.t;
     let dir = f.p("dir with space 中文 'q' $HOME `x`");
     t.mkdir(&dir).await.unwrap();
-    let names = ["文件.txt", "it's here.md", "$(whoami).sh", "back\\slash", "line\nbreak", ".hidden", "-dash"];
+    let names = [
+        "文件.txt",
+        "it's here.md",
+        "$(whoami).sh",
+        "back\\slash",
+        "line\nbreak",
+        ".hidden",
+        "-dash",
+    ];
     for n in names {
         let p = format!("{dir}/{n}");
-        t.write_file(&p, n.as_bytes()).await.unwrap_or_else(|e| panic!("{n:?}: {e}"));
+        t.write_file(&p, n.as_bytes())
+            .await
+            .unwrap_or_else(|e| panic!("{n:?}: {e}"));
         assert_eq!(t.read_file(&p).await.unwrap(), n.as_bytes(), "{n:?}");
         assert!(!t.stat(&p).await.unwrap().is_dir);
     }
-    let mut got: Vec<String> = t.read_dir(&dir).await.unwrap().into_iter().map(|e| e.name).collect();
+    let mut got: Vec<String> = t
+        .read_dir(&dir)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|e| e.name)
+        .collect();
     got.sort();
     let mut want: Vec<String> = names.iter().map(|s| s.to_string()).collect();
     want.sort();
     assert_eq!(got, want);
     // nothing was executed by a `$(...)` name
-    assert!(t.read_dir(&f.root).await.unwrap().iter().all(|e| !e.name.contains(&user())));
+    assert!(t
+        .read_dir(&f.root)
+        .await
+        .unwrap()
+        .iter()
+        .all(|e| !e.name.contains(&user())));
     f.done().await;
 }
 
@@ -700,7 +867,14 @@ async fn fs_stat_types_symlinks_missing() {
     let t = &f.t;
     t.write_file(&f.p("file"), b"12345").await.unwrap();
     t.mkdir(&f.p("dir")).await.unwrap();
-    sh(t, &format!("cd '{}' && ln -s file lf && ln -s dir ld && ln -s nowhere dangling", f.root)).await;
+    sh(
+        t,
+        &format!(
+            "cd '{}' && ln -s file lf && ln -s dir ld && ln -s nowhere dangling",
+            f.root
+        ),
+    )
+    .await;
     let s = t.stat(&f.p("file")).await.unwrap();
     assert!(!s.is_dir && !s.is_symlink && s.size == 5 && s.modified.is_some());
     assert!(t.stat(&f.p("dir")).await.unwrap().is_dir);
@@ -731,13 +905,36 @@ async fn fs_read_dir_errors() {
     let t = &f.t;
     assert!(t.read_dir(&f.root).await.unwrap().is_empty());
     t.write_file(&f.p("file"), b"").await.unwrap();
-    assert_eq!(code(&t.read_dir(&f.p("file")).await.err().unwrap()), errors::ENOTDIR);
-    assert_eq!(code(&t.read_dir(&f.p("nope")).await.err().unwrap()), errors::ENOENT);
-    assert_eq!(code(&t.read_file(&f.p("nope")).await.err().unwrap()), errors::ENOENT);
-    assert_eq!(code(&t.read_file(&f.root).await.err().unwrap()), errors::EISDIR);
+    assert_eq!(
+        code(&t.read_dir(&f.p("file")).await.err().unwrap()),
+        errors::ENOTDIR
+    );
+    assert_eq!(
+        code(&t.read_dir(&f.p("nope")).await.err().unwrap()),
+        errors::ENOENT
+    );
+    assert_eq!(
+        code(&t.read_file(&f.p("nope")).await.err().unwrap()),
+        errors::ENOENT
+    );
+    assert_eq!(
+        code(&t.read_file(&f.root).await.err().unwrap()),
+        errors::EISDIR
+    );
     t.mkdir(&f.p("d")).await.unwrap();
-    assert_eq!(code(&t.write_file(&f.p("d"), b"x").await.err().unwrap()), errors::EISDIR);
-    assert_eq!(code(&t.write_file(&f.p("no/such/parent"), b"x").await.err().unwrap()), errors::ENOENT);
+    assert_eq!(
+        code(&t.write_file(&f.p("d"), b"x").await.err().unwrap()),
+        errors::EISDIR
+    );
+    assert_eq!(
+        code(
+            &t.write_file(&f.p("no/such/parent"), b"x")
+                .await
+                .err()
+                .unwrap()
+        ),
+        errors::ENOENT
+    );
     f.done().await;
 }
 
@@ -747,28 +944,53 @@ async fn fs_mkdir_delete_rename_semantics() {
     let f = fs(&c).await;
     let t = &f.t;
     t.mkdir(&f.p("d")).await.unwrap();
-    assert_eq!(code(&t.mkdir(&f.p("d")).await.err().unwrap()), errors::EEXIST);
-    assert_eq!(code(&t.mkdir(&f.p("x/y")).await.err().unwrap()), errors::ENOENT);
+    assert_eq!(
+        code(&t.mkdir(&f.p("d")).await.err().unwrap()),
+        errors::EEXIST
+    );
+    assert_eq!(
+        code(&t.mkdir(&f.p("x/y")).await.err().unwrap()),
+        errors::ENOENT
+    );
     t.write_file(&f.p("d/inner"), b"1").await.unwrap();
-    assert!(t.remove(&f.p("d"), false).await.is_err(), "non-recursive delete of non-empty dir must fail");
+    assert!(
+        t.remove(&f.p("d"), false).await.is_err(),
+        "non-recursive delete of non-empty dir must fail"
+    );
     t.remove(&f.p("d"), true).await.unwrap();
-    assert_eq!(code(&t.stat(&f.p("d")).await.err().unwrap()), errors::ENOENT);
-    assert_eq!(code(&t.remove(&f.p("d"), true).await.err().unwrap()), errors::ENOENT);
+    assert_eq!(
+        code(&t.stat(&f.p("d")).await.err().unwrap()),
+        errors::ENOENT
+    );
+    assert_eq!(
+        code(&t.remove(&f.p("d"), true).await.err().unwrap()),
+        errors::ENOENT
+    );
 
     t.write_file(&f.p("a"), b"A").await.unwrap();
     t.write_file(&f.p("b"), b"B").await.unwrap();
-    assert_eq!(code(&t.rename(&f.p("a"), &f.p("b"), false).await.err().unwrap()), errors::EEXIST);
+    assert_eq!(
+        code(&t.rename(&f.p("a"), &f.p("b"), false).await.err().unwrap()),
+        errors::EEXIST
+    );
     assert_eq!(t.read_file(&f.p("b")).await.unwrap(), b"B");
     t.rename(&f.p("a"), &f.p("b"), true).await.unwrap();
     assert_eq!(t.read_file(&f.p("b")).await.unwrap(), b"A");
-    assert_eq!(code(&t.rename(&f.p("a"), &f.p("c"), false).await.err().unwrap()), errors::ENOENT);
+    assert_eq!(
+        code(&t.rename(&f.p("a"), &f.p("c"), false).await.err().unwrap()),
+        errors::ENOENT
+    );
     t.mkdir(&f.p("src")).await.unwrap();
     t.write_file(&f.p("src/x"), b"x").await.unwrap();
-    t.rename(&f.p("src"), &f.p("dst 文件夹"), false).await.unwrap();
+    t.rename(&f.p("src"), &f.p("dst 文件夹"), false)
+        .await
+        .unwrap();
     assert_eq!(t.read_file(&f.p("dst 文件夹/x")).await.unwrap(), b"x");
     // overwrite a directory with a directory (VS Code move with overwrite)
     t.mkdir(&f.p("other")).await.unwrap();
-    t.rename(&f.p("other"), &f.p("dst 文件夹"), true).await.unwrap();
+    t.rename(&f.p("other"), &f.p("dst 文件夹"), true)
+        .await
+        .unwrap();
     assert!(t.read_dir(&f.p("dst 文件夹")).await.unwrap().is_empty());
     f.done().await;
 }
@@ -783,18 +1005,52 @@ async fn fs_permission_denied_everywhere() {
     t.write_file(&f.p("ro"), b"ro").await.unwrap();
     t.write_file(&f.p("secret"), b"s").await.unwrap();
     t.mkdir(&f.p("rodir")).await.unwrap();
-    sh(t, &format!("cd '{}' && chmod 000 locked secret && chmod 444 ro && chmod 555 rodir", f.root)).await;
-    assert_eq!(code(&t.read_dir(&f.p("locked")).await.err().unwrap()), errors::EACCES);
-    assert_eq!(code(&t.stat(&f.p("locked/inside")).await.err().unwrap()), errors::EACCES);
-    assert_eq!(code(&t.read_file(&f.p("locked/inside")).await.err().unwrap()), errors::EACCES);
-    assert_eq!(code(&t.read_file(&f.p("secret")).await.err().unwrap()), errors::EACCES);
-    assert_eq!(code(&t.write_file(&f.p("ro"), b"x").await.err().unwrap()), errors::EACCES);
+    sh(
+        t,
+        &format!(
+            "cd '{}' && chmod 000 locked secret && chmod 444 ro && chmod 555 rodir",
+            f.root
+        ),
+    )
+    .await;
+    assert_eq!(
+        code(&t.read_dir(&f.p("locked")).await.err().unwrap()),
+        errors::EACCES
+    );
+    assert_eq!(
+        code(&t.stat(&f.p("locked/inside")).await.err().unwrap()),
+        errors::EACCES
+    );
+    assert_eq!(
+        code(&t.read_file(&f.p("locked/inside")).await.err().unwrap()),
+        errors::EACCES
+    );
+    assert_eq!(
+        code(&t.read_file(&f.p("secret")).await.err().unwrap()),
+        errors::EACCES
+    );
+    assert_eq!(
+        code(&t.write_file(&f.p("ro"), b"x").await.err().unwrap()),
+        errors::EACCES
+    );
     assert_eq!(t.read_file(&f.p("ro")).await.unwrap(), b"ro");
-    assert_eq!(code(&t.write_file(&f.p("rodir/new"), b"x").await.err().unwrap()), errors::EACCES);
-    assert_eq!(code(&t.mkdir(&f.p("rodir/sub")).await.err().unwrap()), errors::EACCES);
+    assert_eq!(
+        code(&t.write_file(&f.p("rodir/new"), b"x").await.err().unwrap()),
+        errors::EACCES
+    );
+    assert_eq!(
+        code(&t.mkdir(&f.p("rodir/sub")).await.err().unwrap()),
+        errors::EACCES
+    );
     // system paths
-    assert_eq!(code(&t.read_file("/etc/shadow").await.err().unwrap()), errors::EACCES);
-    assert_eq!(code(&t.write_file("/etc/sidex-nope", b"x").await.err().unwrap()), errors::EACCES);
+    assert_eq!(
+        code(&t.read_file("/etc/shadow").await.err().unwrap()),
+        errors::EACCES
+    );
+    assert_eq!(
+        code(&t.write_file("/etc/sidex-nope", b"x").await.err().unwrap()),
+        errors::EACCES
+    );
     f.done().await;
 }
 
@@ -823,5 +1079,8 @@ async fn platform_detect_linux_and_override() {
     assert!(["x64", "arm64"].contains(&p.arch.as_str()), "{}", p.arch);
     let f = c.dest("lab-fish").await.unwrap();
     assert_eq!(detect_platform(&f, None).await.unwrap().platform, "linux");
-    assert_eq!(detect_platform(&t, Some("macos")).await.unwrap().platform, "darwin");
+    assert_eq!(
+        detect_platform(&t, Some("macos")).await.unwrap().platform,
+        "darwin"
+    );
 }

@@ -358,9 +358,7 @@ impl MarketplaceClient {
                 // SideX worker down — retry once against public Open VSX so
                 // Markdown-related and other extensions remain installable.
                 let fallback_url = url.replacen(DEFAULT_BASE_URL, OPEN_VSX_FALLBACK_URL, 1);
-                log::warn!(
-                    "marketplace search failed; falling back to Open VSX: {err}"
-                );
+                log::warn!("marketplace search failed; falling back to Open VSX: {err}");
                 self.http
                     .get(&fallback_url)
                     .send()

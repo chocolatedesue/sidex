@@ -442,7 +442,6 @@ fn fix_macos_path() {
     }
 }
 
-
 fn startup_trace_mark(label: &str) {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -460,10 +459,7 @@ fn startup_trace_mark(label: &str) {
         eprintln!("[sidex-startup] {label} +0ms");
         return;
     }
-    eprintln!(
-        "[sidex-startup] {label} +{}ms",
-        now.saturating_sub(start)
-    );
+    eprintln!("[sidex-startup] {label} +{}ms", now.saturating_sub(start));
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1177,7 +1173,6 @@ pub fn run() {
             }
         });
 }
-
 
 /// True when a storage-DB open failure means the file itself is unusable, as
 /// opposed to being locked or unreadable right now. Only the former justifies

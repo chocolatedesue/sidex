@@ -78,9 +78,7 @@ pub const MARK_ENOTDIR: &str = "__SIDEX_ENOTDIR__";
 /// Script prefix that checks `p` exists (or is a dangling symlink) and is
 /// readable, emitting a marker on failure.
 pub fn check_exists_script(quoted: &str) -> String {
-    format!(
-        "if [ ! -e {quoted} ] && [ ! -L {quoted} ]; then echo {MARK_ENOENT} >&2; exit 2; fi; "
-    )
+    format!("if [ ! -e {quoted} ] && [ ! -L {quoted} ]; then echo {MARK_ENOENT} >&2; exit 2; fi; ")
 }
 
 #[cfg(test)]

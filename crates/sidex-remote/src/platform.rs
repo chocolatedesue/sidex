@@ -85,7 +85,9 @@ where
             if out_t.eq_ignore_ascii_case("windows32") {
                 return Ok(windows("powershell"));
             }
-            if out_t.starts_with("MINGW") || out_t.starts_with("MSYS") || out_t.starts_with("CYGWIN")
+            if out_t.starts_with("MINGW")
+                || out_t.starts_with("MSYS")
+                || out_t.starts_with("CYGWIN")
             {
                 return Ok(windows("bash"));
             }
@@ -126,7 +128,10 @@ mod tests {
     fn fake(
         responses: &[(&'static str, &str, &str)],
     ) -> (
-        impl FnMut(&'static str) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Probe>> + Send>>,
+        impl FnMut(
+            &'static str,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Probe>> + Send>>,
         Arc<Mutex<Vec<String>>>,
     ) {
         let map: HashMap<&'static str, (String, String)> = responses
@@ -138,9 +143,8 @@ mod tests {
         let f = move |cmd: &'static str| {
             calls2.lock().unwrap().push(cmd.to_string());
             let r = map.get(cmd).cloned();
-            Box::pin(async move {
-                r.ok_or_else(|| anyhow::anyhow!("unexpected command: {cmd}"))
-            }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<Probe>> + Send>>
+            Box::pin(async move { r.ok_or_else(|| anyhow::anyhow!("unexpected command: {cmd}")) })
+                as std::pin::Pin<Box<dyn std::future::Future<Output = Result<Probe>> + Send>>
         };
         (f, calls)
     }
@@ -249,7 +253,10 @@ mod tests {
             "uname : The term 'uname' is not recognized...\n + FullyQualifiedErrorId : CommandNotFoundException",
         )]);
         let r = block(detect_platform(f, None)).unwrap();
-        assert_eq!((r.platform.as_str(), r.shell.as_str()), ("windows", "powershell"));
+        assert_eq!(
+            (r.platform.as_str(), r.shell.as_str()),
+            ("windows", "powershell")
+        );
         assert_eq!(calls.lock().unwrap().len(), 1, "arch not probed on windows");
 
         let (f, _) = fake(&[(
@@ -267,7 +274,10 @@ mod tests {
         assert_eq!((r.platform.as_str(), r.shell.as_str()), ("windows", "bash"));
 
         let (f, calls) = fake(&[("uname -s", "MINGW64_NT-10.0\n", "")]);
-        assert_eq!(block(detect_platform(f, Some("windows"))).unwrap().shell, "bash");
+        assert_eq!(
+            block(detect_platform(f, Some("windows"))).unwrap().shell,
+            "bash"
+        );
         assert_eq!(calls.lock().unwrap()[0], "uname -s");
     }
 
@@ -278,6 +288,9 @@ mod tests {
         assert_eq!((r.platform.as_str(), r.arch.as_str()), ("linux", "arm64"));
         assert!(!calls.lock().unwrap().iter().any(|c| c == "uname -s"));
         let (f, _) = fake(&[("uname -m", "arm64\n", "")]);
-        assert_eq!(block(detect_platform(f, Some("macos"))).unwrap().platform, "darwin");
+        assert_eq!(
+            block(detect_platform(f, Some("macos"))).unwrap().platform,
+            "darwin"
+        );
     }
 }

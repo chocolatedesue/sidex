@@ -416,9 +416,7 @@ pub fn install_cli_to_path() -> Result<std::path::PathBuf, String> {
     std::fs::create_dir_all(&bin_dir).map_err(|e| format!("mkdir {}: {e}", bin_dir.display()))?;
 
     let exe = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
-    let exe = exe
-        .canonicalize()
-        .unwrap_or(exe);
+    let exe = exe.canonicalize().unwrap_or(exe);
 
     // Prefer linking as `sidex` (lowercase, VS Code `code` feel) and also `SideX`.
     let sidex_link = bin_dir.join("sidex");

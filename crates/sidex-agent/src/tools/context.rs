@@ -235,7 +235,10 @@ pub fn search(args: &Args, ctx: &ToolContext) -> Result<String> {
         });
 
         if let Ok(resp) = client
-            .post(format!("{}/v1/index/search", cloud_api.trim_end_matches('/')))
+            .post(format!(
+                "{}/v1/index/search",
+                cloud_api.trim_end_matches('/')
+            ))
             .bearer_auth(&ctx.token)
             .json(&payload)
             .send()

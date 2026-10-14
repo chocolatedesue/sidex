@@ -1870,7 +1870,10 @@ mod tests {
             .filter(|&id| id != "anthropic")
         {
             assert_eq!(
-                header_style(id, &dummy_resolved(id, AUTH_API_KEY, "https://example.com/v1")),
+                header_style(
+                    id,
+                    &dummy_resolved(id, AUTH_API_KEY, "https://example.com/v1")
+                ),
                 HeaderStyle::Bearer,
                 "{id} must use the default Bearer header style, not Anthropic's"
             );
@@ -1880,7 +1883,11 @@ mod tests {
     #[test]
     fn openai_oauth_retargets_stock_api_host_to_codex() {
         assert_eq!(
-            openai_oauth_base_url("openai", AUTH_OAUTH, "https://api.openai.com/v1".to_string()),
+            openai_oauth_base_url(
+                "openai",
+                AUTH_OAUTH,
+                "https://api.openai.com/v1".to_string()
+            ),
             OPENAI_CODEX_BASE_URL
         );
         assert_eq!(
@@ -1904,7 +1911,8 @@ mod tests {
     #[test]
     fn parse_codex_models_cache_version_reads_client_version() {
         assert_eq!(
-            parse_codex_models_cache_version(r#"{"client_version":"0.146.0","models":[]}"#).as_deref(),
+            parse_codex_models_cache_version(r#"{"client_version":"0.146.0","models":[]}"#)
+                .as_deref(),
             Some("0.146.0")
         );
         assert_eq!(parse_codex_models_cache_version("{}"), None);

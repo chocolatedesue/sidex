@@ -7,8 +7,8 @@
 
 pub mod codespaces;
 pub mod container;
-pub mod manager;
 pub mod errors;
+pub mod manager;
 pub mod platform;
 pub mod port_forwarding;
 pub mod server;
@@ -19,7 +19,7 @@ pub mod transport;
 pub mod tunnel;
 pub mod wsl;
 
+pub use errors::code_of;
 pub use manager::{ConnectionId, ConnectionInfo, ConnectionKind, RemoteManager};
 pub use port_forwarding::{ForwardedPort, PortForwardingService, PortPrivacy, PortProtocol};
 pub use transport::{DirEntry, ExecOutput, FileStat, RemotePty, RemoteTransport};
-pub use errors::code_of;
