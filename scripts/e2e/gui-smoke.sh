@@ -55,7 +55,7 @@ require() {
   done
 }
 
-require Xvfb openbox xdotool scrot wmctrl identify
+require Xvfb openbox xdotool scrot wmctrl identify compare
 
 if [ ! -x "$BIN" ]; then
   echo "SideX binary not found or not executable: $BIN" >&2
@@ -173,17 +173,11 @@ if [ "$PAINTED" != 1 ]; then
   exit 1
 fi
 
-# --- 3. command palette -----------------------------------------------------
-xdotool key --clearmodifiers ctrl+shift+p
-sleep 1.5
-xdotool type --delay 40 "markdown"
-sleep 1
-shot "02-command-palette.png"
-step "ui.commandPalette" ok "ctrl+shift+p sent; see 02-command-palette.png"
-xdotool key --clearmodifiers Escape
-sleep 0.8
-
-# --- 4. quick open the note -------------------------------------------------
+# --- 3. quick open the note -------------------------------------------------
+# Do this before the palette check: with a real file loaded the editor content
+# is static, so a before/after pixel diff later can only be the palette. While
+# the welcome editor is showing, its rotating hint text ("Show All Commands" /
+# "Find in Files" / ...) changes on its own and makes any diff meaningless.
 xdotool key --clearmodifiers ctrl+p
 sleep 1.5
 xdotool type --delay 60 "note.md"
@@ -199,6 +193,32 @@ TITLE="$(xdotool getwindowname "$WIN" 2>/dev/null)"
 # save check below: the marker must land in note.md while its original line
 # survives — that can only happen if quick open loaded this file into the editor.
 step "editor.opened" ok "window title: $TITLE (informational; save check below is authoritative)"
+
+# --- 4. command palette -----------------------------------------------------
+# Focus the editor, then check that Ctrl+Shift+P changes what is on screen. The
+# editor content is static here, so a large diff means the palette rendered.
+eval "$(xdotool getwindowgeometry --shell "$WIN")"
+xdotool mousemove $((WIDTH / 2)) $((HEIGHT / 2))
+xdotool click 1
+sleep 1
+shot "04a-before-palette.png"
+
+xdotool key --clearmodifiers ctrl+shift+p
+sleep 2
+xdotool type --delay 40 "markdown"
+sleep 1
+shot "04b-command-palette.png"
+PIXDIFF="$(compare -metric AE "$OUT/04a-before-palette.png" "$OUT/04b-command-palette.png" null: 2>&1 | tr -d '\n' || true)"
+# ImageMagick prints this in scientific notation once it gets large, so let awk
+# do the numeric comparison.
+PALETTE_CHANGED="$(awk -v d="${PIXDIFF:-0}" 'BEGIN { print (d + 0 > 2000) ? "yes" : "no" }')"
+if [ "$PALETTE_CHANGED" = "yes" ]; then
+  step "ui.commandPalette" ok "screen changed by ${PIXDIFF} px after ctrl+shift+p"
+else
+  step "ui.commandPalette" fail "screen barely changed (${PIXDIFF:-0} px); palette did not open"
+fi
+xdotool key --clearmodifiers Escape
+sleep 0.8
 
 # --- 5. edit + save (the hard assertion) ------------------------------------
 # Click into the middle of the editor so keystrokes land there.
@@ -242,9 +262,10 @@ cat > "$OUT/evidence.json" <<JSON
   "failed": $FAIL,
   "screenshots": [
     "01-startup.png",
-    "02-command-palette.png",
     "03-quick-open.png",
     "04-opened.png",
+    "04a-before-palette.png",
+    "04b-command-palette.png",
     "05-typed.png",
     "06-saved.png"
   ]
