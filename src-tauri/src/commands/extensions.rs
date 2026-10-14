@@ -305,3 +305,17 @@ pub async fn extension_get_contributions(
     let points = parse_contributions(&value);
     Ok(points.iter().map(summarize_point).collect())
 }
+
+/// Return the raw `package.json` of an installed extension.
+///
+/// The webview has no `file://` file-system provider in the Tauri build, so the
+/// workbench cannot read an extension manifest on its own. This hands the raw
+/// JSON over the bridge so contributions the workbench has to register itself
+/// (icon themes, product icon themes, color themes) can be resolved.
+#[tauri::command]
+pub async fn extension_read_manifest_json(
+    extension_dir: String,
+) -> Result<serde_json::Value, String> {
+    let pkg_path = Path::new(&extension_dir).join("package.json");
+    crate::commands::encoding::read_json_file(&pkg_path)
+}

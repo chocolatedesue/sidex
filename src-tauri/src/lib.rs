@@ -1011,6 +1011,7 @@ pub fn run() {
             // Marketplace & contributions (sidex-extensions)
             commands::extension_search_marketplace,
             commands::extension_get_contributions,
+            commands::extension_read_manifest_json,
             // WASM extensions
             commands::wasm_load_extension,
             commands::wasm_unload_extension,

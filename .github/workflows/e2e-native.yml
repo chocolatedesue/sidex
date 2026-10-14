@@ -1,0 +1,97 @@
+name: Native GUI e2e
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/e2e-native.yml"
+      - "scripts/e2e/**"
+      - "src/**"
+      - "src-tauri/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/e2e-native.yml"
+      - "scripts/e2e/**"
+      - "src/**"
+      - "src-tauri/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+jobs:
+  gui-e2e:
+    name: Xvfb + xdotool GUI smoke
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            xvfb \
+            openbox \
+            xdotool \
+            scrot \
+            wmctrl \
+            x11-utils
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend (dist/)
+        run: npm run build
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          key: e2e-native
+
+      - name: Build SideX binary
+        # Must go through the Tauri CLI: a plain `cargo build --release` does not
+        # flip Tauri into production mode, so the binary keeps pointing at the dev
+        # URL (http://localhost:1420) instead of the embedded dist/ assets.
+        run: npx tauri build --no-bundle
+
+      - name: Run native GUI e2e
+        env:
+          SIDEX_BIN: ${{ github.workspace }}/target/release/SideX
+          E2E_OUT: ${{ github.workspace }}/smoke-artifacts/e2e-native
+        run: bash scripts/e2e/gui-smoke.sh
+
+      - name: Upload evidence (screenshots + logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-e2e-evidence
+          path: smoke-artifacts/e2e-native/
+          if-no-files-found: warn
