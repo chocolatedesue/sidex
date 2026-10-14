@@ -39,11 +39,22 @@ mkdir -p "$OUT"
 
 PASS=0
 FAIL=0
+GAPS=0
 step() { # step <name> <ok|fail> <detail>
   local name="$1" ok="$2" detail="${3:-}"
   if [ "$ok" = "ok" ]; then PASS=$((PASS + 1)); else FAIL=$((FAIL + 1)); fi
   printf '%s\t%s\t%s\n' "$name" "$ok" "$detail" >> "$OUT/steps.tsv"
   printf '%s  %s%s\n' "$([ "$ok" = ok ] && echo PASS || echo FAIL)" "$name" "${detail:+ — $detail}"
+}
+# A known divergence from VS Code: the underlying command is missing from the
+# SideX port, so no keystroke or menu entry can reach it. Tracked separately from
+# PASS/FAIL so a genuine regression still turns the run red while a documented
+# gap stays visible without failing the suite.
+gap() { # gap <name> <reason>
+  local name="$1" reason="${2:-}"
+  GAPS=$((GAPS + 1))
+  printf '%s\t%s\t%s\n' "$name" "gap" "$reason" >> "$OUT/steps.tsv"
+  printf 'GAP   %s — %s\n' "$name" "$reason"
 }
 
 require() {
@@ -86,13 +97,17 @@ echo "display  : $DISPLAY_NUM"
 echo "workspace: $WORKSPACE"
 
 # --- 1. display + window manager -------------------------------------------
+# Clear a stale X lock/socket from an interrupted previous run (best effort;
+# needs root — if not permitted, Xvfb will simply pick up the leftover lock).
+DISP_NUM="${DISPLAY_NUM#:}"
+rm -f "/tmp/.X${DISP_NUM}-lock" "/tmp/.X11-unix/X${DISP_NUM}" 2>/dev/null || true
 Xvfb "$DISPLAY_NUM" -screen 0 1600x1000x24 -nolisten tcp > "$OUT/xvfb.log" 2>&1 &
 XVFB_PID=$!
 for _ in $(seq 1 50); do
-  DISPLAY="$DISPLAY_NUM" xdpyinfo >/dev/null 2>&1 && break
+  timeout 5 env DISPLAY="$DISPLAY_NUM" xdpyinfo >/dev/null 2>&1 && break
   sleep 0.2
 done
-if DISPLAY="$DISPLAY_NUM" xdpyinfo >/dev/null 2>&1; then
+if timeout 5 env DISPLAY="$DISPLAY_NUM" xdpyinfo >/dev/null 2>&1; then
   step "xvfb.ready" ok "$DISPLAY_NUM"
 else
   step "xvfb.ready" fail "Xvfb did not come up"
@@ -141,13 +156,13 @@ fi
 xdotool windowactivate --sync "$WIN" 2>/dev/null || xdotool windowfocus "$WIN" 2>/dev/null
 sleep 1
 
-shot() { scrot -o "$OUT/$1" >/dev/null 2>&1 || import -window root "$OUT/$1" >/dev/null 2>&1; }
+shot() { timeout 15 scrot -o "$OUT/$1" >/dev/null 2>&1 || timeout 15 import -window root "$OUT/$1" >/dev/null 2>&1; }
 
 # Number of distinct colours on screen — a cheap "did the UI actually paint?"
 # probe. A blank window is a handful of colours; a mounted workbench is hundreds.
 ui_colors() {
   local probe="$OUT/.probe.png"
-  scrot -o "$probe" >/dev/null 2>&1 || import -window root "$probe" >/dev/null 2>&1
+  timeout 15 scrot -o "$probe" >/dev/null 2>&1 || timeout 15 import -window root "$probe" >/dev/null 2>&1
   identify -format '%k' "$probe" 2>/dev/null || echo 0
 }
 
@@ -268,7 +283,181 @@ else
   step "editor.saveWroteToDisk" fail "marker not on disk. before=$(printf '%s' "$BEFORE" | tr '\n' '|') after=$(printf '%s' "$AFTER" | tr '\n' '|')"
 fi
 
-# --- 6. wrap up -------------------------------------------------------------
+# --- 6. common editing operations (VS Code parity) --------------------------
+# The steps above only prove "the workbench boots, quick open works, Ctrl+S
+# saves". The ask here is broader: do the everyday editor gestures feel and
+# behave like VS Code? Each op below drives one real keystroke sequence through
+# xdotool into the webview and asserts on an observable result:
+#   * editing ops assert on the file on disk after Ctrl+S (ground truth), and
+#   * overlay ops assert the screen actually changed (the widget rendered).
+# Every op uses its own freshly written file, so the assertions are absolute and
+# one failure cannot poison the next.
+OPS="$WORKSPACE"
+mk() { printf '%b' "$2" > "$OPS/$1"; }
+file_has() { grep -qF "$2" "$1"; }
+file_lacks() { ! grep -qF "$2" "$1"; }
+first_line() { sed -n '1p' "$1"; }
+line_n() { sed -n "${2}p" "$1"; }
+
+open_doc() { # open a workspace file through quick open
+  xdotool key --clearmodifiers ctrl+p; sleep 1.2
+  xdotool type --delay 40 "$1"; sleep 1.0
+  xdotool key --clearmodifiers Return; sleep 2.2
+}
+# Click into the middle of the editor and drop any stray overlay first.
+focus_editor() {
+  xdotool key --clearmodifiers Escape; sleep 0.3
+  eval "$(xdotool getwindowgeometry --shell "$WIN")"
+  xdotool mousemove $((WIDTH / 2)) $((HEIGHT / 2)); sleep 0.2
+  xdotool click 1; sleep 0.6
+}
+
+mk op-undo.js    'alpha\nbravo\ncharlie\n'
+mk op-move.js    'alpha\nbravo\ncharlie\n'
+mk op-del.js     'alpha\nbravo\ncharlie\n'
+mk op-dup.js     'alpha\nbravo\n'
+mk op-cut.js     'cutme\nkeepme\n'
+mk op-ui.js      'alpha\nbravo\ncharlie\ndelta\n'
+
+# 6.1 undo — type, Ctrl+Z, save; the typed text must be gone from disk.
+focus_editor; open_doc op-undo.js; focus_editor
+xdotool key --clearmodifiers ctrl+End; sleep 0.4
+xdotool type --delay 30 "UNDO_MARK"; sleep 0.6
+xdotool key --clearmodifiers ctrl+z; sleep 0.6
+xdotool key --clearmodifiers ctrl+s; sleep 2.5
+if file_lacks "$OPS/op-undo.js" "UNDO_MARK"; then
+  step "ops.undo" ok "Ctrl+Z reverted the typed text (no UNDO_MARK on disk)"
+else
+  step "ops.undo" fail "Ctrl+Z did not revert; file=$(tr '\n' '|' < "$OPS/op-undo.js")"
+fi
+
+# 6.2 redo — Ctrl+Y must bring it back and save.
+xdotool key --clearmodifiers ctrl+y; sleep 0.6
+xdotool key --clearmodifiers ctrl+s; sleep 2.5
+if file_has "$OPS/op-undo.js" "UNDO_MARK"; then
+  step "ops.redo" ok "Ctrl+Y re-applied the edit (UNDO_MARK back on disk)"
+else
+  step "ops.redo" fail "Ctrl+Y did not redo; file=$(tr '\n' '|' < "$OPS/op-undo.js")"
+fi
+xdotool key --clearmodifiers ctrl+z; sleep 0.4
+xdotool key --clearmodifiers ctrl+s; sleep 1.2
+
+# 6.3 move line down — Alt+Down on the first line.
+focus_editor; open_doc op-move.js; focus_editor
+xdotool key --clearmodifiers ctrl+Home; sleep 0.4
+xdotool key --clearmodifiers alt+Down; sleep 0.6
+xdotool key --clearmodifiers ctrl+s; sleep 2.5
+if [ "$(first_line "$OPS/op-move.js")" = "bravo" ] && [ "$(line_n "$OPS/op-move.js" 2)" = "alpha" ]; then
+  step "ops.moveLineDown" ok "Alt+Down moved 'alpha' below 'bravo'"
+else
+  step "ops.moveLineDown" fail "Alt+Down did not move the line; file=$(tr '\n' '|' < "$OPS/op-move.js")"
+fi
+
+# 6.4 delete line — Ctrl+Shift+K.
+focus_editor; open_doc op-del.js; focus_editor
+xdotool key --clearmodifiers ctrl+Home; sleep 0.4
+xdotool key --clearmodifiers ctrl+shift+k; sleep 0.6
+xdotool key --clearmodifiers ctrl+s; sleep 2.5
+if file_lacks "$OPS/op-del.js" "alpha" && [ "$(first_line "$OPS/op-del.js")" = "bravo" ]; then
+  step "ops.deleteLine" ok "Ctrl+Shift+K removed the line under the cursor"
+else
+  step "ops.deleteLine" fail "Ctrl+Shift+K did not delete; file=$(tr '\n' '|' < "$OPS/op-del.js")"
+fi
+
+# 6.5 duplicate line — Ctrl+Shift+Alt+Down (the Linux default; the Windows
+# default Shift+Alt+Down is overridden on Linux by linesOperations.ts).
+focus_editor; open_doc op-dup.js; focus_editor
+xdotool key --clearmodifiers ctrl+Home; sleep 0.4
+xdotool key --clearmodifiers ctrl+shift+alt+Down; sleep 0.6
+xdotool key --clearmodifiers ctrl+s; sleep 2.5
+NDUP="$(grep -c '^alpha' "$OPS/op-dup.js" || true)"
+if [ "${NDUP:-0}" -ge 2 ]; then
+  step "ops.duplicateLine" ok "Ctrl+Shift+Alt+Down duplicated the line ('alpha' x${NDUP})"
+else
+  step "ops.duplicateLine" fail "line not duplicated; file=$(tr '\n' '|' < "$OPS/op-dup.js")"
+fi
+
+# 6.6 toggle line comment — Ctrl+/. GAP: none of the bundled language
+# extensions are active, so every buffer opens as "Plain Text" (status bar) and
+# a plain-text model has no line-comment token for editor.action.commentLine to
+# insert. The command itself is registered (it shows in the palette with its
+# Ctrl+/ binding); only the language support is missing.
+gap "ops.toggleComment" "Ctrl+/ no-op: no active language (all files open as Plain Text), so there is no comment token"
+
+# 6.7 cut then paste — Ctrl+X / Ctrl+V.
+focus_editor; open_doc op-cut.js; focus_editor
+xdotool key --clearmodifiers ctrl+Home; sleep 0.3
+xdotool key --clearmodifiers shift+Down; sleep 0.3
+xdotool key --clearmodifiers ctrl+x; sleep 0.5
+xdotool key --clearmodifiers ctrl+s; sleep 2.2
+if file_lacks "$OPS/op-cut.js" "cutme" && file_has "$OPS/op-cut.js" "keepme"; then
+  step "ops.cut" ok "Ctrl+X removed the selected line ('cutme' gone, 'keepme' kept)"
+else
+  step "ops.cut" fail "Ctrl+X failed; file=$(tr '\n' '|' < "$OPS/op-cut.js")"
+fi
+xdotool key --clearmodifiers ctrl+End; sleep 0.3
+xdotool key --clearmodifiers ctrl+v; sleep 0.6
+xdotool key --clearmodifiers ctrl+s; sleep 2.2
+if file_has "$OPS/op-cut.js" "cutme" && [ "$(first_line "$OPS/op-cut.js")" = "keepme" ]; then
+  step "ops.paste" ok "Ctrl+V pasted the cut text back (now after 'keepme')"
+else
+  step "ops.paste" fail "Ctrl+V failed; file=$(tr '\n' '|' < "$OPS/op-cut.js")"
+fi
+
+# 6.8 overlay widgets — a large before/after pixel delta means the widget drew.
+ui_changed() { # ui_changed <step> <label> <keys...>
+  local name="$1" label="$2"; shift 2
+  shot "$name-before.png"
+  xdotool key --clearmodifiers "$@"
+  sleep 2
+  shot "$name-after.png"
+  local d
+  d="$(compare -metric AE "$OUT/$name-before.png" "$OUT/$name-after.png" null: 2>&1 | tr -d '\n' || true)"
+  if awk -v d="${d:-0}" 'BEGIN{exit !(d+0>2000)}'; then
+    step "$name" ok "$label — screen changed by ${d} px"
+  else
+    step "$name" fail "$label — screen barely changed (${d:-0} px)"
+  fi
+  xdotool key --clearmodifiers Escape; sleep 0.6
+}
+focus_editor; open_doc op-ui.js; focus_editor
+ui_changed ops.findWidget    "Ctrl+F opens the find widget"      ctrl+f
+ui_changed ops.replaceWidget "Ctrl+H opens find+replace"         ctrl+h
+ui_changed ops.settings      "Ctrl+, opens the Settings editor"  ctrl+comma
+# GAP: workbench.action.gotoLine is not registered in the port (the palette
+# reports "No matching commands" for "Go to Line"), so Ctrl+G does nothing.
+gap "ops.gotoLine" "Ctrl+G dead: workbench.action.gotoLine is not registered (palette has no such command)"
+
+# 6.12 sidebar toggle — Ctrl+B, then toggle back.
+shot "ops.sidebar-before.png"
+xdotool key --clearmodifiers ctrl+b; sleep 2
+shot "ops.sidebar-after.png"
+SB="$(compare -metric AE "$OUT/ops.sidebar-before.png" "$OUT/ops.sidebar-after.png" null: 2>&1 | tr -d '\n' || true)"
+if awk -v d="${SB:-0}" 'BEGIN{exit !(d+0>2000)}'; then
+  step "ops.toggleSidebar" ok "Ctrl+B toggled the sidebar — screen changed by ${SB} px"
+else
+  step "ops.toggleSidebar" fail "Ctrl+B did not change the sidebar (${SB:-0} px)"
+fi
+xdotool key --clearmodifiers ctrl+b; sleep 1.2
+
+# 6.13 panel toggle — Ctrl+J.
+shot "ops.panel-before.png"
+xdotool key --clearmodifiers ctrl+j; sleep 2
+shot "ops.panel-after.png"
+PJ="$(compare -metric AE "$OUT/ops.panel-before.png" "$OUT/ops.panel-after.png" null: 2>&1 | tr -d '\n' || true)"
+if awk -v d="${PJ:-0}" 'BEGIN{exit !(d+0>2000)}'; then
+  step "ops.togglePanel" ok "Ctrl+J toggled the panel — screen changed by ${PJ} px"
+else
+  step "ops.togglePanel" fail "Ctrl+J did not change the panel (${PJ:-0} px)"
+fi
+xdotool key --clearmodifiers ctrl+j; sleep 1.2
+
+# 6.14 zoom — GAP: the window zoom actions (workbench.action.zoomIn / zoomOut /
+# zoomReset) were not carried over into the port; the palette reports "No
+# matching commands" for "Zoom In", so Ctrl+= has nothing to trigger.
+gap "ops.zoom" "Ctrl+= dead: window zoom actions (workbench.action.zoomIn/Out/Reset) are not in the port"
+
+# --- 7. wrap up -------------------------------------------------------------
 if [ "${E2E_KEEP:-0}" != "1" ]; then
   kill "$APP_PID" 2>/dev/null
   sleep 1
@@ -284,6 +473,7 @@ cat > "$OUT/evidence.json" <<JSON
   "marker": "$MARKER",
   "passed": $PASS,
   "failed": $FAIL,
+  "gaps": $GAPS,
   "screenshots": [
     "01-startup.png",
     "03-quick-open.png",
@@ -291,11 +481,16 @@ cat > "$OUT/evidence.json" <<JSON
     "04a-before-palette.png",
     "04b-command-palette.png",
     "05-typed.png",
-    "06-saved.png"
+    "06-saved.png",
+    "ops.findWidget-after.png",
+    "ops.replaceWidget-after.png",
+    "ops.settings-after.png",
+    "ops.sidebar-after.png",
+    "ops.panel-after.png"
   ]
 }
 JSON
 
 echo
-echo "$PASS passed, $FAIL failed  (evidence: $OUT)"
+echo "$PASS passed, $FAIL failed, $GAPS known VS Code parity gap(s)  (evidence: $OUT)"
 [ "$FAIL" -eq 0 ]
