@@ -4207,6 +4207,7 @@ function createVscodeShim() {
       let _visible = true;
       const column = typeof showOptions === 'number' ? showOptions : showOptions?.viewColumn || 1;
       host.emit('event', { type: 'createWebviewPanel', panelId, viewType, title, column, options });
+      vlog(`webviewPanel created ${viewType} ${panelId}`);
       const panel = {
         viewType,
         get title() { return _title; },
@@ -4231,10 +4232,11 @@ function createVscodeShim() {
           get options() { return options || {}; },
           set options(v) { options = { ...options, ...v }; },
           get html() { return _html; },
-          set html(v) { _html = v; host.emit('event', { type: 'webviewHtmlUpdate', panelId, html: inlineWebviewResources(v) }); },
+          set html(v) { _html = v; vlog(`webviewHtml ${panelId} len=${String(v || '').length}`); host.emit('event', { type: 'webviewHtmlUpdate', panelId, html: inlineWebviewResources(v) }); },
           onDidReceiveMessage: messageEmitter.event,
           postMessage(msg) {
             host.emit('event', { type: 'webviewPostMessage', panelId, message: msg });
+            vlog(`webviewPostMessage ${panelId}`);
             return Promise.resolve(true);
           },
           asWebviewUri(localUri) {

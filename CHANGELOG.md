@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.13 — 2026-10-14
+
+### Fixed
+- **A user-installed extension only ever got its themes registered.**
+  `_applyExtensionPointContributions()` (previously `_applyThemeExtensionPoints`)
+  filtered the extension points down to `themes` / `iconThemes` /
+  `productIconThemes`, so a marketplace extension's `commands`, `menus`,
+  `keybindings`, `grammars`, `configuration`, … never reached the workbench.
+  The extension activated and its language server ran, but none of its commands
+  were in the command palette and its editor-title actions were missing — it
+  looked installed yet could not actually be driven. Every extension point is
+  now fed from the disk extensions as well, each wrapped so that one point
+  rejecting the users cannot skip the rest.
+
+### Tests
+- `npm run e2e:typst` now exercises the extension's real flows end to end:
+  language resolution, LSP activation, live edits, `Export … as PDF` (asserts
+  the PDF lands next to the file), `Typst Preview` (asserts the webview panel is
+  created and receives the rendered document) and diagnostics.
+
 ## 0.1.12 — 2026-10-14
 
 ### Fixed

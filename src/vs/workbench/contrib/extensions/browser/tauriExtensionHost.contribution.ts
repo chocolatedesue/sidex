@@ -177,7 +177,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 
 	private _bootstrapExtensions: IExtensionManifestSummary[] = [];
 	private _diskExtensionDescriptions = new Map<string, IExtensionDescription>();
-	private _themeExtensionPointsApplied = false;
+	private _extensionPointsApplied = false;
 	private _statusBarItems = new Map<string, IStatusbarEntryAccessor>();
 	private _webviewPanels = new Map<string, WebviewInput>();
 	private _treeViews = new Map<string, TreeView>();
@@ -313,7 +313,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 			`[ExtHost] Registered theme contributions for ${this._diskExtensionDescriptions.size} disk extension(s)` +
 			(userExtensionsDir ? ` under ${userExtensionsDir}` : '')
 		);
-		this._applyThemeExtensionPoints();
+		this._applyExtensionPointContributions();
 	}
 
 	private async _registerDiskExtensionWithWorkbench(extensionPath: string, extensionId: string): Promise<void> {
@@ -322,7 +322,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 			this.logService.warn(`[ExtHost] No manifest found for ${extensionId} at ${extensionPath}`);
 			return;
 		}
-		this._applyThemeExtensionPoints();
+		this._applyExtensionPointContributions();
 	}
 
 	private async _readDiskExtensionManifest(extensionPath: string): Promise<IExtensionDescription | undefined> {
@@ -390,10 +390,10 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 	 * apply would otherwise drop the service's themes and a later scan would
 	 * drop ours.
 	 */
-	private _applyThemeExtensionPoints(): void {
-		if (!this._themeExtensionPointsApplied) {
-			this._themeExtensionPointsApplied = true;
-			this._register(this.extensionService.onDidChangeExtensions(() => this._applyThemeExtensionPoints()));
+	private _applyExtensionPointContributions(): void {
+		if (!this._extensionPointsApplied) {
+			this._extensionPointsApplied = true;
+			this._register(this.extensionService.onDidChangeExtensions(() => this._applyExtensionPointContributions()));
 		}
 
 		const available: IExtensionDescription[] = [...this.extensionService.extensions];
@@ -407,8 +407,15 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		}
 
 		for (const point of ExtensionsRegistry.getExtensionPoints()) {
-			if (point.name === 'themes' || point.name === 'iconThemes' || point.name === 'productIconThemes') {
+			// Every contribution point, not just the themes: a user-installed
+			// extension that only got its themes applied has no commands in the
+			// palette, no menus, no keybindings, no grammars and no settings —
+			// i.e. the extension looks installed but cannot actually be used.
+			// One point rejecting the users must not skip the others.
+			try {
 				this._acceptExtensionPointUsers(point, available);
+			} catch (err) {
+				this.logService.warn(`[ExtHost] extension point '${point.name}' rejected disk extensions: ${(err as Error)?.message ?? err}`);
 			}
 		}
 	}
@@ -435,7 +442,7 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 			await invoke('uninstall_extension', { extensionId: extId });
 			this.logService.info(`[ExtHost] Removed extension ${extId} from disk`);
 			this._diskExtensionDescriptions.delete(extId.toLowerCase());
-			this._applyThemeExtensionPoints();
+			this._applyExtensionPointContributions();
 		} catch (err: any) {
 			this.logService.warn(`[ExtHost] Failed to remove ${extId} from disk: ${err?.message ?? err}`);
 		}
