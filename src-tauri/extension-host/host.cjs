@@ -1930,7 +1930,7 @@ class ExtensionHost extends EventEmitter {
       name: raw.displayName || name,
       version: raw.version || '0.0.0',
       main: raw.main || raw.browser,
-      activationEvents: raw.activationEvents || [],
+      activationEvents: deriveActivationEvents(raw.contributes, raw.activationEvents),
       contributes: raw.contributes || {},
       extensionDependencies: raw.extensionDependencies || [],
       packageJSON: raw,
@@ -2100,6 +2100,27 @@ class ExtensionHost extends EventEmitter {
 
 function log(msg) {
   process.stderr.write(`[ext-host] ${msg}\n`);
+}
+
+// VS Code lets extensions omit many activation events: they are derived from
+// `contributes`. Without this, any extension that ships contributions but no
+// explicit `activationEvents` (most modern ones, e.g. tinymist) never activates.
+function deriveActivationEvents(contributes, explicit) {
+  const events = new Set(Array.isArray(explicit) ? explicit : []);
+  const one = v => (Array.isArray(v) ? v : v ? [v] : []);
+  const c = contributes || {};
+  for (const l of one(c.languages)) if (l && l.id) events.add(`onLanguage:${l.id}`);
+  for (const cmd of one(c.commands)) if (cmd && cmd.command) events.add(`onCommand:${cmd.command}`);
+  for (const e of one(c.customEditors)) if (e && e.viewType) events.add(`onCustomEditor:${e.viewType}`);
+  for (const n of one(c.notebooks)) if (n && n.type) events.add(`onNotebook:${n.type}`);
+  for (const a of one(c.authentication)) if (a && a.id) events.add(`onAuthenticationRequest:${a.id}`);
+  for (const t of one(c.taskDefinitions)) if (t && t.type) events.add(`onTaskType:${t.type}`);
+  for (const d of one(c.debuggers)) if (d && d.type) { events.add('onDebug'); events.add(`onDebugResolve:${d.type}`); }
+  for (const p of one(c.terminal && c.terminal.profiles)) if (p && p.id) events.add(`onTerminalProfile:${p.id}`);
+  for (const w of one(c.walkthroughs)) if (w && w.id) events.add(`onWalkthrough:${w.id}`);
+  const views = c.views || {};
+  for (const key of Object.keys(views)) for (const v of one(views[key])) if (v && v.id) events.add(`onView:${v.id}`);
+  return Array.from(events);
 }
 
 const noopDisposable = { dispose() {} };

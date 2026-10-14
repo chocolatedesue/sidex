@@ -3,6 +3,7 @@ import { registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/
 import type { IWorkbenchContribution } from '../../../common/contributions.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { ILanguageFeaturesService } from '../../../../editor/common/services/languageFeatures.js';
+import { ModesRegistry } from '../../../../editor/common/languages/modesRegistry.js';
 import { IModelService } from '../../../../editor/common/services/model.js';
 import { IMarkerService, MarkerSeverity } from '../../../../platform/markers/common/markers.js';
 import type { IMarkerData } from '../../../../platform/markers/common/markers.js';
@@ -331,6 +332,11 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 			if (!manifest?.name || !manifest?.publisher) {
 				return undefined;
 			}
+			// A user-installed extension's `contributes.languages` has to reach the
+			// workbench's language registry or a file it owns (.typ for tinymist)
+			// opens as Plain Text: the extension host would then never see the
+			// matching `onLanguage:<id>` activation event and its LSP would not start.
+			this._registerDiskLanguages(manifest);
 			const description = toExtensionDescription({
 				type: ExtensionType.User,
 				isBuiltin: false,
@@ -347,6 +353,33 @@ class TauriExtensionHostContribution extends Disposable implements IWorkbenchCon
 		} catch (err: any) {
 			this.logService.warn(`[ExtHost] Could not read manifest at ${extensionPath}: ${err?.message ?? err}`);
 			return undefined;
+		}
+	}
+
+	private readonly _registeredDiskLanguages = new Set<string>();
+
+	private _registerDiskLanguages(manifest: IExtensionManifest): void {
+		const languages = (manifest.contributes as { languages?: unknown })?.languages;
+		const defs = Array.isArray(languages) ? languages : languages ? [languages] : [];
+		for (const def of defs as Array<Record<string, unknown>>) {
+			const id = def?.['id'];
+			if (typeof id !== 'string' || !id || this._registeredDiskLanguages.has(id)) {
+				continue;
+			}
+			this._registeredDiskLanguages.add(id);
+			try {
+				ModesRegistry.registerLanguage({
+					id,
+					extensions: def['extensions'] as string[] | undefined,
+					filenames: def['filenames'] as string[] | undefined,
+					aliases: def['aliases'] as string[] | undefined,
+					mimetypes: def['mimetypes'] as string[] | undefined,
+					firstLine: def['firstLine'] as string | undefined,
+				});
+				this.logService.info(`[ExtHost] registered language '${id}' from a disk extension`);
+			} catch (err: any) {
+				this.logService.warn(`[ExtHost] could not register language '${id}': ${err?.message ?? err}`);
+			}
 		}
 	}
 
