@@ -13,9 +13,10 @@
 | Prettier | **178 个文件不达标** | `npx prettier --check 'src/**/*.{ts,tsx,js,json}'` |
 | 静态 smoke | `smoke:ux` 17/17 | `npm run smoke:ux` |
 | 扩展宿主 | 是 **Node 边车** `src-tauri/extension-host/host.cjs`（5441 行，CommonJS），工作台侧是 `src/vs/workbench/contrib/extensions/browser/tauriExtensionHost.contribution.ts`（3334 行）；两者用自定义 `{type, params}` 协议通信 | 读代码 + `smoke-preview-and-md-diff.mjs` |
-| 自定义编辑器 | `resolveCustomTextEditor` / `resolveCustomEditor` / `openCustomDocument` 已实现；**自定义文档生命周期（dirty / save / saveAs / revert / backup）完全缺失**（全仓 grep 无 `onDidChangeCustomDocument`、`saveCustomDocument` 等） | grep + 单测 |
-| 工作台侧 customEditor | `contrib/customEditor/{common/customEditor.ts, browser/customEditorInput.ts, customTextEditorModel.ts, customEditorInputFactory.ts}` 全是 `/* SideX: Stub */` | 读文件 |
-| 原生 GUI e2e | 已有 `scripts/e2e/gui-smoke.sh`（Xvfb + openbox + xdotool + scrot），在 cc 上跑通 9/9 | `npm run e2e:native` |
+| 自定义编辑器 | `resolveCustomTextEditor` / `resolveCustomEditor` / `openCustomDocument` 已实现；自定义文档生命周期（dirty / save / saveAs / revert / backup）本次补齐 | 单测 `scripts/test-ext-host.mjs` |
+| 工作台侧 customEditor | 本次从历史版本恢复整个 `contrib/customEditor` 模块（10 个文件，之前只剩 4 个 stub）并接线到 `workbench.common.main.ts` | `tsc --noEmit` 0 条 customEditor 错误 + `vite build` |
+| 扩展主题贡献 | 本次修掉 `_syncDiskThemeExtensions` / `_registerDiskExtensionWithWorkbench` 未定义（调用即抛，被 catch 吞掉） | `tsc --noEmit` 从 10 条降到 7 条（消掉的正是这 3 条） |
+| 原生 GUI e2e | `scripts/e2e/gui-smoke.sh`（Xvfb + openbox + xdotool + scrot），在 cc 上 9/9 | `npm run e2e:native` |
 | Rust / Go 工具链 | tyy-237（本 agent 的常驻运行环境）没有 cargo / rustc / go；**cc（qzlab，8 核 31 GB）有** rustc 1.99.0 / go / docker / gh，构建与测试都在那跑 | `ssh cc` |
 
 ## 1. 测试策略（先定口径，各批次复用）
@@ -46,23 +47,38 @@
 
 **没做**：工作台侧消费这些协议（见批次 B）。宿主侧接口先落地并被单测锁住。
 
-### 批次 B —— 工作台侧自定义编辑器（dirty 指示 + 保存闭环）
+### 批次 B —— 工作台侧自定义编辑器（本次已实现）
 
-**范围**：`tauriExtensionHost.contribution.ts`（消费 `customDocumentDirty`、发 save/revert）+ 把 `contrib/customEditor` 的 stub 换成真实现（`CustomEditorInput extends EditorInput`，接 working copy / backup，注册 `customEditorInputFactory`）。
+**范围**：`contrib/customEditor/` + `workbench.common.main.ts`。
 
-**验收标准**：装一个 marketplace 预览插件（如 SVG/HTML 预览），打开文件 → 编辑 → 标签出现未保存标记 → `Ctrl+S` 真写盘、标记消失 → `Reopen With` 能切回文本编辑器。
+移植时整个模块被删成 4 个 stub 文件，插件声明的 `customEditors` 在工作台侧没有落点。本次从 `18424e49`（打桩前的最后一版）恢复 10 个文件并接线：
 
-**测试方式**：第 2 层（web 下 customEditors 走 worker 宿主，能覆盖打开/渲染）+ 第 3 层（原生下覆盖保存闭环）。
+- `customEditorInput.ts` / `customEditorInputFactory.ts`：`CustomEditorInput extends LazilyResolvedWebviewEditorInput`、`CustomEditorInputSerializer`、`ComplexCustomWorkingCopyEditorHandler`。
+- `customEditors.ts`：`CustomEditorService`（能力注册、`openWith`、`getContributedCustomEditors`）。
+- `customEditorModelManager.ts` / `customTextEditorModel.ts`：dirty / backup 模型。
+- `contributedCustomEditors.ts` / `extensionPoint.ts`：`contributes.customEditors` 扩展点。
+- `customEditor.contribution.ts` 注册进 `workbench.common.main.ts`（放在 Webview 段之前）。
 
-**依赖**：能构建原生（本环境不行，需 CNB 开发容器 docker 或具备 webkit2gtk 的机器）。
+这样 `CustomEditorInput` 又是真的 webview 编辑器输入，`mainThreadCustomEditors` 和编辑器标签协议拿到的是具体类型而不是 `any` stub。
 
-### 批次 C —— 扩展宿主 activate 完整性
+**验收标准**：`tsc --noEmit` 无 customEditor 报错；`vite build` 通过。装一个 marketplace 预览插件后打开文件 → 编辑 → 标签出现未保存标记 → `Ctrl+S` 真写盘、标记消失（原生下验收）。
 
-**范围**：补齐宿主 API 面：`workspace.fs`、文件/文件夹 watcher 的语义、`TreeDataProvider` 的完整事件、`StatusBarItem`、`Decoration`、`secrets`、`tasks`、`Terminal` 事件、`workspace.applyEdit`。逐项对照 VS Code 1.141 的 `vscode.d.ts`，缺的补上并加单测。
+**测试方式**：第 2 层 + 第 3 层。
 
-**验收标准**：一套 fixture 扩展（覆盖上述 API）能激活、命令可执行、事件顺序正确；宿主单测覆盖每个新 API。
+### 批次 C —— 扩展宿主 activate 完整性（本次修掉一个具体缺口）
 
-**测试方式**：第 1 层为主。
+**范围**：补齐宿主 API 面（`workspace.fs`、watcher 语义、`TreeDataProvider` 事件、`StatusBarItem`、`Decoration`、`secrets`、`tasks`、`Terminal` 事件、`workspace.applyEdit`），对照 VS Code 1.141 的 `vscode.d.ts` 逐项补。
+
+本次先修掉一个具体缺口：`_syncDiskThemeExtensions` / `_registerDiskExtensionWithWorkbench` 被调用但从未定义，每次调用都抛异常并被外层 catch 吞掉，所以「让 marketplace 插件的图标 / 产品图标 / 配色主题可被 `workbench.iconTheme` 选中」这件事从来没生效。
+
+- 新增 Tauri 命令 `extension_read_manifest_json`（原样返回 `package.json`）——Tauri 构建没有 `file://` 文件系统 provider，工作台自己读不到盘上的 manifest。
+- 把盘上扩展读成 `IExtensionDescription`，和扩展服务自己的描述取并集，喂给 `themes` / `iconThemes` / `productIconThemes` 三个扩展点；在 `onDidChangeExtensions` 上重放，卸载时移除并重放。
+
+**验收标准**：`tsc --noEmit` 消掉这 3 条错误；`cargo check` 通过；`npm run test:ext-host` 12/12。
+
+**测试方式**：第 1 层 + 第 4 层（Rust 编译）。
+
+**还没做**：上面列的其余宿主 API 补全（`workspace.fs`、watcher 语义等）仍待逐项对照补。
 
 ### 批次 D —— 调试器（DAP）
 
@@ -70,13 +86,15 @@
 
 **验收标准**：对一段 Node 脚本下断点、单步、看变量；`onDebug` 激活事件生效。
 
-**测试方式**：第 1 层（DAP 编解码）+ 第 3 层（原生里真跑一次）。
+**测试方式**：第 1 层（DAP 编解码）+ 第 3 层（原生里真跑一次）。**未开始。**
 
 ### 批次 E —— 原生 GUI e2e 套件（本次已实现）
 
 **范围**：`scripts/e2e/gui-smoke.sh`。Xvfb + openbox（让 webview 拿到焦点）+ xdotool 驱动 + scrot 逐步截图；断言落在可观察结果：窗口出现、workbench 真的画出内容（屏幕上的不同颜色数，空白窗口只有十几个）、命令面板可开、快速打开 `note.md`、输入后 `Ctrl+S` 真写盘（marker 进文件、原有行还在）。
 
 **验收标准**：`npm run e2e:native` 在 cc 上 9/9 通过，截图存档在 `smoke-artifacts/e2e-native/`。CI 里加了 `Native GUI e2e` workflow（`e2e-native.yml`）。
+
+**修过的假阳性**：命令面板那条断言原先在欢迎页取 before/after 截图，而欢迎页的空编辑器提示文字会自己轮换（"Show All Commands" / "Find in Files" / …），屏幕本来就变，所以不开面板也会 PASS（截图里根本没有面板）。改成先快速打开 `note.md`，等编辑器内容静止后再取前后两张，此时大差异只可能来自面板。
 
 **踩到的两个坑**（都写进脚本注释/CI 注释）：
 
@@ -100,9 +118,9 @@
 
 ## 3. 顺序与依赖
 
-已完成：A（扩展宿主自定义文档生命周期）、E（原生 GUI e2e）。
+已完成：A（扩展宿主自定义文档生命周期）、B（工作台侧自定义编辑器恢复 + 接线）、C（主题贡献接线，宿主 API 其余项仍待补）、E（原生 GUI e2e）。
 
-接着做：B（工作台侧自定义编辑器）→ C（宿主 API 补全）→ D（调试器）→ F/G（CI 与打包、贡献接线）。B / D 现在可以在 cc 上真机验收；C 是纯宿主、无外部依赖，可以和 B 并行。
+接着做：C 剩余项（`workspace.fs`、watcher 语义等宿主 API）→ D（调试器）→ F/G（CI 与打包、贡献接线）。D 现在可以在 cc 上真机验收；C 剩余项是纯宿主、无外部依赖。
 
 ## 4. 需要用户定的一件事
 
