@@ -15,8 +15,8 @@
 | 扩展宿主 | 是 **Node 边车** `src-tauri/extension-host/host.cjs`（5441 行，CommonJS），工作台侧是 `src/vs/workbench/contrib/extensions/browser/tauriExtensionHost.contribution.ts`（3334 行）；两者用自定义 `{type, params}` 协议通信 | 读代码 + `smoke-preview-and-md-diff.mjs` |
 | 自定义编辑器 | `resolveCustomTextEditor` / `resolveCustomEditor` / `openCustomDocument` 已实现；**自定义文档生命周期（dirty / save / saveAs / revert / backup）完全缺失**（全仓 grep 无 `onDidChangeCustomDocument`、`saveCustomDocument` 等） | grep + 单测 |
 | 工作台侧 customEditor | `contrib/customEditor/{common/customEditor.ts, browser/customEditorInput.ts, customTextEditorModel.ts, customEditorInputFactory.ts}` 全是 `/* SideX: Stub */` | 读文件 |
-| 原生 GUI e2e | 无独立套件；`smoke-startup.mjs` 有 Xvfb 下跑原生二进制的可选分支 | 读 `scripts/` |
-| Rust / Go 工具链 | 本运行环境（tyy-237 容器，4 核 / 5 GB）**没有 cargo / rustc / go**，原生与 Rust 测试要放别处跑 | `command -v` |
+| 原生 GUI e2e | 已有 `scripts/e2e/gui-smoke.sh`（Xvfb + openbox + xdotool + scrot），在 cc 上跑通 9/9 | `npm run e2e:native` |
+| Rust / Go 工具链 | tyy-237（本 agent 的常驻运行环境）没有 cargo / rustc / go；**cc（qzlab，8 核 31 GB）有** rustc 1.99.0 / go / docker / gh，构建与测试都在那跑 | `ssh cc` |
 
 ## 1. 测试策略（先定口径，各批次复用）
 
@@ -72,13 +72,16 @@
 
 **测试方式**：第 1 层（DAP 编解码）+ 第 3 层（原生里真跑一次）。
 
-### 批次 E —— 原生 GUI e2e 套件
+### 批次 E —— 原生 GUI e2e 套件（本次已实现）
 
-**范围**：`scripts/e2e/` 新增原生套件（Xvfb + xdotool + 截图），断言落在可观察结果：启动出现 workbench、命令面板可开、打开文件、`Ctrl+S` 真写盘、自定义编辑器打开。CI 里加一步。
+**范围**：`scripts/e2e/gui-smoke.sh`。Xvfb + openbox（让 webview 拿到焦点）+ xdotool 驱动 + scrot 逐步截图；断言落在可观察结果：窗口出现、workbench 真的画出内容（屏幕上的不同颜色数，空白窗口只有十几个）、命令面板可开、快速打开 `note.md`、输入后 `Ctrl+S` 真写盘（marker 进文件、原有行还在）。
 
-**验收标准**：套件在无 GPU（Mesa 软件 GL）下通过；截图作为证据存档。
+**验收标准**：`npm run e2e:native` 在 cc 上 9/9 通过，截图存档在 `smoke-artifacts/e2e-native/`。CI 里加了 `Native GUI e2e` workflow（`e2e-native.yml`）。
 
-**测试方式**：第 3 层。
+**踩到的两个坑**（都写进脚本注释/CI 注释）：
+
+1. **构建方式**：`cargo build --release` 出来的二进制不会切到生产模式，启动时仍然去连 `http://localhost:1420`（dev URL），页面加载被取消、workbench 一片空白。必须走 `npm run build && npx tauri build --no-bundle`，二进制从 55.9 MB 变成 62.9 MB（dist 资产真的嵌进去了）。
+2. **渲染**：Xvfb 下 WebKitGTK 默认合成路径画不出东西（窗口在、内容是空白矩形）。要 `WEBKIT_DISABLE_COMPOSITING_MODE=1` + `LIBGL_ALWAYS_SOFTWARE=1` + `WEBKIT_DISABLE_DMABUF_RENDERER=1`（脚本里已设）。
 
 ### 批次 F —— CI 与打包
 
@@ -97,9 +100,12 @@
 
 ## 3. 顺序与依赖
 
-A（本次）→ B → C → E → D → F/G。B 卡在「能构建原生」，E 同样；C 纯宿主、无外部依赖，可与 B 并行；D 最重，放后面。
+已完成：A（扩展宿主自定义文档生命周期）、E（原生 GUI e2e）。
 
-## 4. 需要用户定的两件事
+接着做：B（工作台侧自定义编辑器）→ C（宿主 API 补全）→ D（调试器）→ F/G（CI 与打包、贡献接线）。B / D 现在可以在 cc 上真机验收；C 是纯宿主、无外部依赖，可以和 B 并行。
 
-1. **Prettier 口径**：全量格式化 `src/vs/**`（diff 巨大，伤上游合并）还是收敛检查范围（推荐）。
-2. **算力**：B / D / E 需要能构建 Tauri 的机器。本运行环境（tyy-237，4 核 5 GB，无 cargo）跑不了，需要指定落点（CNB 开发容器 docker / 其他）。
+## 4. 需要用户定的一件事
+
+**Prettier 口径**：178 个文件的差异，是全量格式化 `src/vs/**`（diff 巨大，以后合上游很痛），还是把检查范围收到 SideX 自写的部分？我倾向后者。
+
+算力已定：cc（qzlab）。

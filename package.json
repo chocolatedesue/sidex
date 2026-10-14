@@ -25,6 +25,7 @@
     "cli:install": "bash scripts/install-cli.sh",
     "smoke:cli-icons": "node scripts/smoke-cli-and-icons.mjs",
     "smoke:ux": "node scripts/smoke-ux-polish.mjs",
+    "e2e:native": "bash scripts/e2e/gui-smoke.sh",
     "test:ext-host": "node --test scripts/test-ext-host.mjs",
     "test": "npm run test:ext-host"
   },
