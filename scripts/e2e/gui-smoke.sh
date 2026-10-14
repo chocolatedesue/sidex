@@ -179,11 +179,18 @@ fi
 # the welcome editor is showing, its rotating hint text ("Show All Commands" /
 # "Find in Files" / ...) changes on its own and makes any diff meaningless.
 #
-# Click first: right after startup the webview has not taken keyboard focus, so
-# Ctrl+P would go nowhere and no file would open.
+# Warm-up first. Right after startup the very first keystroke is swallowed —
+# the window is mapped but the webview has not taken keyboard focus yet. In the
+# old script that cost us the palette check (the rotating hint text faked the
+# diff); with quick open first it silently dropped the Ctrl+P instead. Click,
+# open and close the palette once, and only then drive the real steps.
 eval "$(xdotool getwindowgeometry --shell "$WIN")"
 xdotool mousemove $((WIDTH / 2)) $((HEIGHT / 2))
 xdotool click 1
+sleep 1
+xdotool key --clearmodifiers ctrl+shift+p
+sleep 1.5
+xdotool key --clearmodifiers Escape
 sleep 1
 
 xdotool key --clearmodifiers ctrl+p
@@ -191,6 +198,15 @@ sleep 1.5
 xdotool type --delay 60 "note.md"
 sleep 1.2
 shot "03-quick-open.png"
+# The quick-open widget must be on screen: the welcome editor is static, so any
+# real change against the startup shot is the widget (or its result list).
+QO_DIFF="$(compare -metric AE "$OUT/01-startup.png" "$OUT/03-quick-open.png" null: 2>&1 | tr -d '\n' || true)"
+QO_CHANGED="$(awk -v d="${QO_DIFF:-0}" 'BEGIN { print (d + 0 > 2000) ? "yes" : "no" }')"
+if [ "$QO_CHANGED" = "yes" ]; then
+  step "ui.quickOpen" ok "screen changed by ${QO_DIFF} px after ctrl+p + 'note.md'"
+else
+  step "ui.quickOpen" fail "screen barely changed (${QO_DIFF:-0} px); quick open did not show"
+fi
 xdotool key --clearmodifiers Return
 sleep 2.5
 shot "04-opened.png"
