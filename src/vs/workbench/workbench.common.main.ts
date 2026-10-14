@@ -251,6 +251,9 @@ import './contrib/commands/common/commands.contribution.js';
 // URL Support
 import './contrib/url/browser/url.contribution.js';
 
+// Custom Editors
+import './contrib/customEditor/browser/customEditor.contribution.js';
+
 // Webview
 import './contrib/webview/browser/webview.contribution.js';
 import './contrib/webviewPanel/browser/webviewPanel.contribution.js';
