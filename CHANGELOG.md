@@ -131,6 +131,71 @@
 - Known debt, unchanged: `prettier --check` (178 files), `cargo fmt` (141 files),
   and 7 pre-existing `tsc` errors in unrelated files.
 
+
+## 0.1.15 — 2026-10-13
+
+### Fixed
+- **Cross-platform terminal:** Windows `profiles`/`env`, drop hardcoded defaultProfile so `$SHELL`/pwsh detection wins; path basename works on `\\` paths.
+- **Fish:** Rust no longer forces `-l` when args are unset (VS Code profile align + SI inject).
+- **CLI `--install-cli`:** Windows uses `%LOCALAPPDATA%\\SideX\\bin` and `;` PATH checks.
+- **Keybinding sensing:** chord timeout **5s** (was 3); `cmdorctrl`/`option` aliases; META labels Cmd/Win; Win/Linux **Ctrl+Y** redo.
+
+### Verification
+- `smoke:compat` 18/18, `smoke:terminal` 13/13, `smoke:ux` 30/30
+- `sidex-keymap` 88 tests; terminal 4; cli 9
+
+
+## 0.1.13 — 2026-10-13
+
+### Added
+- **UX / VS Code 1.141:** editor tab styles (`connected` / `pill`) via `workbench.experimental.modernUIEditorTabStyle` + Command Palette actions.
+- **UX:** View → Appearance → **Layout Density** toggle (`sidex.ux.toggleLayoutDensity`).
+- **UX:** compact editor tab height class when `window.density.layout` or `window.density.editorTabHeight` is compact.
+
+### Fixed
+- **Empty editor watermark:** shortcut labels use theme tokens (were near-invisible `#303030` on SideX dark).
+- **Version sync:** `tauri.conf.json` caught up with package / Cargo / lock (**0.1.13**).
+
+### Notes
+- Perf work stays secondary; no speculative cold-path changes this tag.
+- CI workflows unchanged (cloud-build + release only).
+
+
+## 0.1.12 — 2026-10-13
+
+### Fixed
+- **CI / cloud-build:** sync workspace `Cargo.lock` after the 0.1.11 package version bump so Linux/Windows `cargo build --locked` succeeds again.
+- **CI / attach to release:** `gh release` commands now pass `-R $GITHUB_REPOSITORY` because the attach job has no git checkout (was: `fatal: not a git repository`).
+
+## 0.1.11
+
+### Fixed
+- **PDF Preview:** EmbedPDF pages actually paint (was empty dark canvas). Root cause: `page-width` zoom against a zero-sized host. Now uses `fit-page`, ArrayBuffer `documentManager` open, wasm probe, and layout resize nudge.
+- **File icons:** Packaged builds must ship `extensions/theme-seti` + non-empty `builtin-extensions.js` (postbuild guard). E2E validates explorer icon pixels, not smoke-only.
+
+
+## 0.1.10 — 2026-10-13
+
+### Fixed
+- **E2E:** cargo-built Linux/Windows SideX opened a blank window unless Vite was on `:1420`. Added `scripts/ensure-frontend-server.sh`, wired it into `scripts/sidex`, and wrap cloud-build Linux `SideX` so packaged `dist/` is served automatically. Documented in `docs/CLOUD-BUILD.md` + `docs/DEV_NOTES_E2E_STARTUP.md`.
+
+### Verification
+- Native Xvfb E2E: startup trace, explorer, terminal, palette, markdown open; PDF toolbar/assets load (canvas paint under software GL still partial).
+- `smoke:startup` 9/9, `smoke:pdf` 8/8, `smoke:remote-ssh` 39/39, interactive web 5/5.
+
+## 0.1.9 — 2026-10-13
+
+### Fixed
+- **PDF / EmbedPDF:** seed `public/pdfium.wasm` via `scripts/ensure-pdfium-wasm.sh` (setup + cloud-build) so `/pdfium.wasm` is same-origin; stop relying on EmbedPDF’s jsDelivr default. Safe Uint8Array→Blob copy for WebKit/Tauri.
+- **Cloud build `--locked`:** regenerate workspace `Cargo.lock` (syn / aws-lc bumps) so Linux/Windows `cargo build --locked` succeeds.
+- **CLI:** `sidex --version` / `--help` never open a GUI (shell fast-path); `--install-cli` prefers a binary with early-CLI.
+- **Smoke:** startup `windowMark` recorded when setup+window arrive in one chunk.
+
+### Perf
+- PDF open path prefers cached `/pdfium.wasm` (no CDN RTT / no HEAD probe). Native startup markers documented in `docs/DEV_NOTES_ISSUES_PERF.md`.
+
+
+
 ## 0.1.6 — 2026-10-13
 
 ### Added

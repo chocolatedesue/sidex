@@ -37,6 +37,23 @@ if (fs.existsSync('extensions-meta.json')) {
 }
 console.log('Post-build: copied extensions\n');
 
+// File icons require theme-seti under dist/extensions (E2E + packaged builds).
+const setiWoff = path.join(DIST_DIR, 'extensions', 'theme-seti', 'icons', 'seti.woff');
+const setiJson = path.join(DIST_DIR, 'extensions', 'theme-seti', 'icons', 'vs-seti-icon-theme.json');
+if (!fs.existsSync(setiWoff) || !fs.existsSync(setiJson)) {
+	console.error('Post-build: theme-seti missing under dist/extensions — run npm run setup');
+	process.exit(1);
+}
+const builtinJs = path.join(DIST_DIR, 'builtin-extensions.js');
+if (fs.existsSync(builtinJs)) {
+	const builtin = fs.readFileSync(builtinJs, 'utf8');
+	if (!builtin.includes('theme-seti')) {
+		console.error('Post-build: dist/builtin-extensions.js does not list theme-seti');
+		process.exit(1);
+	}
+}
+
+
 // EmbedPDF (LAB-707) needs PDFium WASM next to the app. public/ copies on Vite
 // build, but keep an explicit fallback from node_modules for cloud/CI caches.
 const PDFIUM_CANDIDATES = [

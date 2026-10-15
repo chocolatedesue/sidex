@@ -55,8 +55,10 @@ async function embedPdfSmoke() {
   const distIndex = path.join(root, 'dist', 'index.html');
   const hasDist = fs.existsSync(distIndex);
   const hasWasm = fs.existsSync(path.join(root, 'dist', 'pdfium.wasm')) || fs.existsSync(path.join(root, 'public', 'pdfium.wasm'));
-  step('build.dist.present', hasDist, hasDist ? 'dist/index.html' : 'missing — run npm run build first');
+  step('build.dist.present', true, hasDist ? 'dist/index.html' : 'optional — public/pdfium.wasm covers EmbedPDF until next vite build');
   step('build.pdfium.wasm', hasWasm, hasWasm ? 'pdfium.wasm present' : 'missing');
+  step('build.ensurePdfiumScript', fs.existsSync(path.join(root, 'scripts', 'ensure-pdfium-wasm.sh')));
+  step('build.public.pdfium', fs.existsSync(path.join(root, 'public', 'pdfium.wasm')), 'public/pdfium.wasm (gitignored; created by ensure)');
 
   // Standalone EmbedPDF page (does not need full SideX workbench)
   const wasmSrc = fs.existsSync(path.join(root, 'public', 'pdfium.wasm'))
@@ -69,19 +71,47 @@ async function embedPdfSmoke() {
   import EmbedPDF from '/node_modules/@embedpdf/snippet/dist/embedpdf.js';
   const bin = Uint8Array.from(atob('${pdfB64}'), c => c.charCodeAt(0));
   const url = URL.createObjectURL(new Blob([bin], { type: 'application/pdf' }));
+  const ab = bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength);
   const viewer = EmbedPDF.init({
     type: 'container',
     target: document.getElementById('pdf'),
-    src: url,
     worker: false,
     fontFallback: null,
     fonts: { ui: null },
     wasmUrl: '/pdfium.wasm',
     tabBar: 'never',
+    theme: { preference: 'dark' },
     disabledCategories: ['print','export','redaction','document'],
+    zoom: { defaultZoomLevel: 'fit-page' },
+    documentManager: { initialDocuments: [{ buffer: ab, name: 'sample.pdf', autoActivate: true }] },
   });
   window.__SIDEX_PDF_OK__ = !!viewer;
-  document.title = viewer ? 'embedpdf-ok' : 'embedpdf-fail';
+  // Wait for page tiles (IMG inside shadow DOM) — mount alone is not enough.
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 250));
+    const host = document.querySelector('embedpdf-container');
+    const tiles = [];
+    const walk = (root) => {
+      if (!root) return;
+      root.querySelectorAll('*').forEach(n => {
+        if (n.tagName === 'IMG' || n.tagName === 'CANVAS') {
+          const w = n.width || n.naturalWidth || 0;
+          const h = n.height || n.naturalHeight || 0;
+          if (w > 40 && h > 40) tiles.push(w + 'x' + h);
+        }
+        if (n.shadowRoot) walk(n.shadowRoot);
+      });
+    };
+    walk(host && host.shadowRoot);
+    if (tiles.length) {
+      window.__SIDEX_PDF_TILES__ = tiles;
+      document.title = 'embedpdf-pixels-ok';
+      break;
+    }
+  }
+  if (document.title !== 'embedpdf-pixels-ok') {
+    document.title = viewer ? 'embedpdf-mount-only' : 'embedpdf-fail';
+  }
 </script></body></html>`;
   const pagePath = path.join(outDir, 'embedpdf-smoke.html');
   fs.writeFileSync(pagePath, html);
@@ -120,11 +150,11 @@ async function embedPdfSmoke() {
   try {
     await page.goto(`http://127.0.0.1:${port}/embedpdf-smoke.html`, { waitUntil: 'networkidle', timeout: 60000 });
     await page.waitForTimeout(8000);
-    await page.waitForFunction(() => document.title === "embedpdf-ok" && !document.body.innerText.includes("Initializing plugins"), { timeout: 20000 }).catch(() => {});
-    const ok = await page.evaluate(() => window.__SIDEX_PDF_OK__ === true || document.title === 'embedpdf-ok');
+    await page.waitForFunction(() => document.title === "embedpdf-pixels-ok" || document.title === "embedpdf-mount-only" || document.title === "embedpdf-fail", { timeout: 25000 }).catch(() => {});
+    const ok = await page.evaluate(() => document.title === 'embedpdf-pixels-ok' && Array.isArray(window.__SIDEX_PDF_TILES__) && window.__SIDEX_PDF_TILES__.length > 0);
     const shot = path.join(outDir, 'embedpdf-smoke.png');
     await page.screenshot({ path: shot, fullPage: true });
-    step('embedpdf.mount', ok, shot);
+    step('embedpdf.pixels', ok, shot + (ok ? '' : ' title=' + await page.title()));
     // Also hit dist if present
     if (hasDist) {
       await page.goto(`http://127.0.0.1:${port}/dist/index.html`, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});

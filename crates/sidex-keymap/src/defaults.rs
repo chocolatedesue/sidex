@@ -77,15 +77,15 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
     let tf = "terminalFocus";
     let idm = "inDebugMode";
 
-    vec![
+    let mut bindings = vec![
         // ── Clipboard ────────────────────────────────────────────────────
         bind(p, Key::C, "editor.action.clipboardCopyAction"),
         bind(p, Key::X, "editor.action.clipboardCutAction"),
         bind(p, Key::V, "editor.action.clipboardPasteAction"),
-        // ── Undo / Redo ─────────────────────────────────────────────────
+        // ── Undo / Redo (VS Code: Ctrl/Cmd+Z; Win/Linux Ctrl+Y + Ctrl+Shift+Z; Mac Cmd+Shift+Z) ──
         bind(p, Key::Z, "undo"),
-        bind(ps, Key::Z, "redo"),
         bind_when(p, Key::Z, "undo", etf_ro),
+        bind(ps, Key::Z, "redo"),
         bind_when(ps, Key::Z, "redo", etf_ro),
         // ── File operations ─────────────────────────────────────────────
         bind(p, Key::N, "workbench.action.files.newUntitledFile"),
@@ -871,7 +871,14 @@ pub fn default_keybindings() -> Vec<KeyBinding> {
             Key::K,
             "workbench.action.openDefaultKeybindingsFile",
         ),
-    ]
+
+    ];
+    // Win/Linux: Ctrl+Y is primary redo (VS Code editorExtensions). Mac keeps Cmd+Shift+Z only.
+    if !is_macos() {
+        bindings.push(bind(p, Key::Y, "redo"));
+        bindings.push(bind_when(p, Key::Y, "redo", etf_ro));
+    }
+    bindings
 }
 
 #[cfg(test)]

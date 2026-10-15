@@ -199,12 +199,27 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 			const dataBuffer: string[] = [];
 			let attached = false;
 
+			// rAF-coalesce IPC chunks so xterm.write sees fewer, larger bursts (cross-checked vs emit coalesce).
+			let rafPending: string[] = [];
+			let rafHandle = 0;
+			const flushRaf = () => {
+				rafHandle = 0;
+				if (rafPending.length === 0) {
+					return;
+				}
+				const merged = rafPending.join('');
+				rafPending = [];
+				this._onProcessData.fire(merged);
+			};
 			this._unlisten = await _listen('terminal-data', event => {
 				const payload = event.payload as { terminal_id: number; data: string };
 				if (this._backendId !== undefined && payload.terminal_id === this._backendId) {
 					this._consumeOsc7(payload.data);
 					if (attached) {
-						this._onProcessData.fire(payload.data);
+						rafPending.push(payload.data);
+						if (!rafHandle) {
+							rafHandle = (globalThis.requestAnimationFrame || ((cb: FrameRequestCallback) => setTimeout(cb, 16) as unknown as number))(flushRaf);
+						}
 					} else {
 						dataBuffer.push(payload.data);
 					}
@@ -213,6 +228,7 @@ class TauriPty extends Disposable implements ITerminalChildProcess {
 					ackTerminalData(payload.terminal_id, payload.data);
 				}
 			});
+			this._register({ dispose: () => { if (rafHandle) { (globalThis.cancelAnimationFrame || clearTimeout)(rafHandle); rafHandle = 0; } if (rafPending.length) flushRaf(); } });
 
 			this._unlistenExit = await _listen('terminal-exit', event => {
 				const payload = event.payload as { terminal_id: number; exit_code: number };
@@ -435,7 +451,10 @@ class TauriTerminalBackend extends Disposable implements ITerminalBackend {
 				}
 			} catch {}
 		}
-		return '/bin/zsh';
+		if (isWindows) {
+			return 'powershell.exe';
+		}
+		return isMacintosh ? '/bin/zsh' : '/bin/bash';
 	}
 
 	async getProfiles(
@@ -454,7 +473,9 @@ class TauriTerminalBackend extends Disposable implements ITerminalBackend {
 			fish: Codicon.terminal,
 			sh: Codicon.terminalLinux,
 			pwsh: Codicon.terminalPowershell,
-			powershell: Codicon.terminalPowershell
+			powershell: Codicon.terminalPowershell,
+			cmd: Codicon.terminalCmd,
+			wsl: Codicon.terminalUbuntu
 		};
 
 		interface ShellInfoResult {
@@ -508,14 +529,21 @@ class TauriTerminalBackend extends Disposable implements ITerminalBackend {
 		}
 
 		// Fallback: check each shell path individually via Rust
-		const knownShells: { path: string; profileName: string }[] = [
-			{ path: '/bin/zsh', profileName: 'zsh' },
-			{ path: '/bin/bash', profileName: 'bash' },
-			{ path: '/usr/bin/fish', profileName: 'fish' },
-			{ path: '/usr/local/bin/fish', profileName: 'fish' },
-			{ path: '/opt/homebrew/bin/fish', profileName: 'fish' },
-			{ path: '/bin/sh', profileName: 'sh' }
-		];
+		const knownShells: { path: string; profileName: string }[] = isWindows
+			? [
+					{ path: 'pwsh.exe', profileName: 'PowerShell Core' },
+					{ path: 'powershell.exe', profileName: 'PowerShell' },
+					{ path: 'cmd.exe', profileName: 'Command Prompt' },
+					{ path: 'wsl.exe', profileName: 'WSL' }
+				]
+			: [
+					{ path: '/bin/zsh', profileName: 'zsh' },
+					{ path: '/bin/bash', profileName: 'bash' },
+					{ path: '/usr/bin/fish', profileName: 'fish' },
+					{ path: '/usr/local/bin/fish', profileName: 'fish' },
+					{ path: '/opt/homebrew/bin/fish', profileName: 'fish' },
+					{ path: '/bin/sh', profileName: 'sh' }
+				];
 
 		const profiles: ITerminalProfile[] = [];
 		const seen = new Set<string>();
@@ -633,8 +661,19 @@ export class TauriTerminalBackendContribution implements IWorkbenchContribution 
 		const configKey = `terminal.integrated.defaultProfile.${platformKey}`;
 		const current = configurationService.getValue<string>(configKey);
 		if (!current) {
+			// Prefer detected profile display name (e.g. "PowerShell") over path basename.
+			try {
+				const profiles = await backend.getProfiles(undefined, undefined, true);
+				const def = profiles.find(p => p.isDefault) || profiles[0];
+				if (def?.profileName) {
+					configurationService.updateValue(configKey, def.profileName);
+					return;
+				}
+			} catch {
+				// fall through
+			}
 			const shell = await backend.getDefaultSystemShell();
-			const name = shell.split('/').pop() || 'zsh';
+			const name = getShellBasename(shell) || (isWindows ? 'PowerShell' : isMacintosh ? 'zsh' : 'bash');
 			configurationService.updateValue(configKey, name);
 		}
 	}

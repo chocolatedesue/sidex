@@ -284,21 +284,26 @@ async function boot() {
 			'editor.inlineSuggest.enabled': true,
 			'editor.stickyScroll.enabled': true,
 			'editor.minimap.enabled': false,
-			'terminal.integrated.defaultProfile.osx': 'zsh',
-			'terminal.integrated.defaultProfile.linux': 'bash',
+			// defaultProfile.* left unset so Tauri backend can pick $SHELL / pwsh (VS Code null default).
 			'terminal.integrated.profiles.osx': {
 				zsh: { path: 'zsh', args: ['-l'] },
 				bash: { path: 'bash', args: ['-l'], icon: 'terminal-bash' },
-				fish: { path: 'fish', args: ['-l'] },
+				fish: { path: 'fish' },
 				tmux: { path: 'tmux', icon: 'terminal-tmux' },
 				pwsh: { path: 'pwsh', icon: 'terminal-powershell' }
 			},
 			'terminal.integrated.profiles.linux': {
 				bash: { path: 'bash', args: ['-l'], icon: 'terminal-bash' },
 				zsh: { path: 'zsh', args: ['-l'] },
-				fish: { path: 'fish', args: ['-l'] },
+				fish: { path: 'fish' },
 				tmux: { path: 'tmux', icon: 'terminal-tmux' },
 				pwsh: { path: 'pwsh', icon: 'terminal-powershell' }
+			},
+			'terminal.integrated.profiles.windows': {
+				PowerShell: { path: 'powershell.exe', icon: 'terminal-powershell' },
+				'PowerShell Core': { path: 'pwsh.exe', icon: 'terminal-powershell' },
+				'Command Prompt': { path: 'cmd.exe', icon: 'terminal-cmd' },
+				'Git Bash': { source: 'Git Bash', icon: 'terminal-bash' }
 			},
 			'terminal.integrated.enablePersistentSessions': false,
 			// VS Code–aligned operator defaults for the integrated terminal.
@@ -315,10 +320,14 @@ async function boot() {
 			'terminal.integrated.defaultLocation': 'view',
 			'terminal.integrated.shellIntegration.enabled': true,
 			'terminal.integrated.shellIntegration.decorationsEnabled': 'both',
+			// VS Code default: basic terminal IntelliSense (needs shell integration).
+			'terminal.integrated.suggest.enabled': true,
+			'terminal.integrated.suggest.quickSuggestions': { commands: 'on', arguments: 'on', unknown: 'off' },
+			'terminal.integrated.suggest.suggestOnTriggerCharacters': true,
 			// VS Code 1.140+: sharper terminal text on macOS high-DPI (experimental).
 			'terminal.integrated.fontRendering': 'inherit',
 			'terminal.integrated.gpuAcceleration': 'auto',
-			'terminal.integrated.smoothScrolling': true,
+			'terminal.integrated.smoothScrolling': false, // VS Code default; animation costs frames
 			'terminal.integrated.enableImages': false,
 			// VS Code 1.140 chat terminal output reflow (kept for parity; AI surfaces stay off).
 			'chat.tools.terminal.outputReflow': true,
@@ -326,6 +335,7 @@ async function boot() {
 			'terminal.integrated.cwd': '',
 			'terminal.integrated.env.linux': {},
 			'terminal.integrated.env.osx': {},
+			'terminal.integrated.env.windows': {},
 			'editor.formatOnPaste': false,
 			'editor.renderWhitespace': 'selection',
 			'editor.smoothScrolling': false,
@@ -355,10 +365,10 @@ async function boot() {
 			'window.density.editorTabHeight': 'default',
 			'workbench.modernUIFrostedGlass': true,
 			'workbench.modernUIFrostedGlassOpacity': 0.72,
+			'workbench.experimental.modernUIEditorTabStyle': 'default',
 			'editor.multiCursorPaste': 'spread',
 			'editor.selectedTextMatchMode': 'findOptions',
-			'workbench.list.smoothScrolling': true,
-			'editor.smoothScrolling': false,
+			'workbench.list.smoothScrolling': false, // VS Code default; snappier tree/list
 			'workbench.tree.indent': 8,
 			'workbench.editor.wrapTabs': false,
 			'window.autoDetectHighContrast': true

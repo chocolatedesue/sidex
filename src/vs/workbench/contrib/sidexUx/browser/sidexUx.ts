@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  SideX UX polish — VS Code 1.141 density + frosted-glass class wiring.
+ *  SideX UX polish — VS Code 1.141 density, frosted glass, tab styles, editor chrome.
  *--------------------------------------------------------------------------------------------*/
 
 import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -9,12 +9,14 @@ import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { mainWindow } from '../../../../base/browser/window.js';
 
 const DENSITY_LAYOUT = 'window.density.layout';
+const EDITOR_TAB_HEIGHT = 'window.density.editorTabHeight';
 const FROSTED_GLASS = 'workbench.modernUIFrostedGlass';
 const FROSTED_OPACITY = 'workbench.modernUIFrostedGlassOpacity';
+const TAB_STYLE = 'workbench.experimental.modernUIEditorTabStyle';
 
 /**
- * Applies VS Code 1.141-aligned layout density and frosted-glass classes on the
- * workbench root. CSS in `src/styles.css` consumes these classes.
+ * Applies VS Code 1.141-aligned layout density, frosted-glass, and editor tab
+ * style classes on the workbench root. CSS in `src/styles.css` consumes these.
  */
 export class SidexUxPolishController extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.sidexUxPolish';
@@ -22,12 +24,12 @@ export class SidexUxPolishController extends Disposable implements IWorkbenchCon
 	constructor(@IConfigurationService private readonly configurationService: IConfigurationService) {
 		super();
 
-		const onChange = Event.filter(
-			configurationService.onDidChangeConfiguration,
-			e =>
-				e.affectsConfiguration(DENSITY_LAYOUT) ||
-				e.affectsConfiguration(FROSTED_GLASS) ||
-				e.affectsConfiguration(FROSTED_OPACITY)
+		const onChange = Event.filter(configurationService.onDidChangeConfiguration, e =>
+			e.affectsConfiguration(DENSITY_LAYOUT) ||
+			e.affectsConfiguration(EDITOR_TAB_HEIGHT) ||
+			e.affectsConfiguration(FROSTED_GLASS) ||
+			e.affectsConfiguration(FROSTED_OPACITY) ||
+			e.affectsConfiguration(TAB_STYLE)
 		);
 		this._register(onChange(() => this.apply()));
 		this.apply();
@@ -40,7 +42,6 @@ export class SidexUxPolishController extends Disposable implements IWorkbenchCon
 	private apply(): void {
 		const root = this.workbenchRoot();
 		if (!root) {
-			// Workbench may not be in the DOM yet; retry once after paint.
 			mainWindow.requestAnimationFrame(() => {
 				const retry = this.workbenchRoot();
 				if (retry) {
@@ -57,14 +58,29 @@ export class SidexUxPolishController extends Disposable implements IWorkbenchCon
 		root.classList.toggle('density-compact', density === 'compact');
 		root.classList.toggle('density-default', density !== 'compact');
 
+		const tabHeight = this.configurationService.getValue<string>(EDITOR_TAB_HEIGHT) ?? 'default';
+		const compactTabs = density === 'compact' || tabHeight === 'compact';
+		root.classList.toggle('editor-tabs-compact', compactTabs);
+
 		const frosted = this.configurationService.getValue<boolean>(FROSTED_GLASS);
 		const enabled = frosted !== false;
 		root.classList.toggle('frosted-glass', enabled);
 		root.classList.toggle('no-frosted-glass', !enabled);
 
 		const opacity = this.configurationService.getValue<number>(FROSTED_OPACITY);
-		const clamped =
-			typeof opacity === 'number' && Number.isFinite(opacity) ? Math.min(1, Math.max(0.4, opacity)) : 0.72;
+		const clamped = typeof opacity === 'number' && Number.isFinite(opacity)
+			? Math.min(1, Math.max(0.4, opacity))
+			: 0.72;
 		root.style.setProperty('--sidex-frosted-opacity', String(clamped));
+
+		const tabStyle = this.configurationService.getValue<string>(TAB_STYLE) ?? 'default';
+		root.classList.remove('tabs-style-default', 'tabs-style-connected', 'tabs-style-pill');
+		if (tabStyle === 'connected') {
+			root.classList.add('tabs-style-connected');
+		} else if (tabStyle === 'pill') {
+			root.classList.add('tabs-style-pill');
+		} else {
+			root.classList.add('tabs-style-default');
+		}
 	}
 }

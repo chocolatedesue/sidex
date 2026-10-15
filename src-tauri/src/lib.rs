@@ -867,6 +867,7 @@ pub fn run() {
             commands::terminal_resize,
             commands::terminal_kill,
             commands::terminal_get_pid,
+            commands::terminal_ack_data,
             commands::exec,
             commands::get_default_shell,
             commands::check_shell_exists,

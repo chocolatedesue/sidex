@@ -63,6 +63,7 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           bash scripts/ensure-file-icon-theme.sh
+          bash scripts/ensure-pdfium-wasm.sh
           npm run build
 
       - uses: swatinem/rust-cache@v2
@@ -93,7 +94,12 @@ jobs:
           cp "$BIN" "dist-pkg/${NAME}/SideX"
           # CLI: `sidex` on PATH after `./bin/sidex --install-cli` or copying bin/
           cp scripts/sidex "dist-pkg/${NAME}/bin/sidex"
-          chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/SideX"
+          cp scripts/ensure-frontend-server.sh "dist-pkg/${NAME}/bin/ensure-frontend-server.sh"
+          chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/bin/ensure-frontend-server.sh"
+          # Wrapper: cargo-built SideX still hits Vite :1420 — serve packaged dist/ first.
+          mv "dist-pkg/${NAME}/SideX" "dist-pkg/${NAME}/SideX.bin"
+          cp scripts/SideX-wrapper.sh "dist-pkg/${NAME}/SideX"
+          chmod +x "dist-pkg/${NAME}/SideX" "dist-pkg/${NAME}/SideX.bin"
           ln -sfn ../SideX "dist-pkg/${NAME}/bin/SideX"
           cp scripts/install-cli.sh "dist-pkg/${NAME}/install-cli.sh"
           chmod +x "dist-pkg/${NAME}/install-cli.sh"
@@ -125,6 +131,7 @@ jobs:
       - name: Frontend
         run: |
           npm ci --no-audit --no-fund
+          bash scripts/ensure-pdfium-wasm.sh
           npm run build
 
       - uses: swatinem/rust-cache@v2
@@ -202,7 +209,9 @@ jobs:
           sudo ln -sf "$(which create-dmg)" /usr/local/bin/create-dmg
 
       - name: Ensure built-in file icons
-        run: bash scripts/ensure-file-icon-theme.sh
+        run: |
+          bash scripts/ensure-file-icon-theme.sh
+          bash scripts/ensure-pdfium-wasm.sh
 
       - name: Build the macOS DMG
         # Default mac artifact is .dmg (VS Code / typical desktop feel).
@@ -272,10 +281,20 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      # No checkout on this job — pass -R so `gh` does not look for a .git dir.
       - name: Attach to the tag's release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "Cloud build ${GITHUB_REF_NAME}"
-          gh release upload "${GITHUB_REF_NAME}" artifacts/* --clobber
+          REPO="${GITHUB_REPOSITORY}"
+          gh release view "${GITHUB_REF_NAME}" -R "$REPO" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" -R "$REPO" \
+              --title "${GITHUB_REF_NAME}" --notes "Cloud build ${GITHUB_REF_NAME}"
+          # Upload only files (skip empty dirs from merge-multiple)
+          shopt -s nullglob
+          files=(artifacts/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no artifacts to upload" >&2
+            exit 1
+          fi
+          gh release upload "${GITHUB_REF_NAME}" -R "$REPO" "${files[@]}" --clobber

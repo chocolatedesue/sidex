@@ -2,7 +2,9 @@ use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 pub struct PtyHandle {
@@ -14,6 +16,8 @@ pub struct PtyHandle {
 pub struct TerminalStore {
     terminals: Mutex<HashMap<u32, PtyHandle>>,
     next_id: Mutex<u32>,
+    /// Unacked UTF-8 bytes per terminal (flow control vs frontend).
+    unacked_bytes: Mutex<HashMap<u32, Arc<AtomicUsize>>>,
 }
 
 impl TerminalStore {
@@ -21,8 +25,50 @@ impl TerminalStore {
         Self {
             terminals: Mutex::new(HashMap::new()),
             next_id: Mutex::new(1),
+            unacked_bytes: Mutex::new(HashMap::new()),
         }
     }
+
+    fn flow_counter(&self, id: u32) -> Arc<AtomicUsize> {
+        let mut map = self.unacked_bytes.lock().expect("unacked map");
+        map.entry(id)
+            .or_insert_with(|| Arc::new(AtomicUsize::new(0)))
+            .clone()
+    }
+
+    fn drop_flow_counter(&self, id: u32) {
+        if let Ok(mut map) = self.unacked_bytes.lock() {
+            map.remove(&id);
+        }
+    }
+}
+
+/// Coalesce window for PTY→IPC emits (ms). Matches VS Code TerminalDataBufferer ~5ms + IPC cost.
+const EMIT_COALESCE_MS: u64 = 8;
+/// Max bytes in one coalesced emit.
+const EMIT_COALESCE_MAX_BYTES: usize = 64 * 1024;
+/// Pause emitting when frontend is this far behind (bytes).
+const FLOW_HIGH_WATER: usize = 256 * 1024;
+/// Resume once acked down to this (bytes).
+const FLOW_LOW_WATER: usize = 64 * 1024;
+
+/// Join successive PTY chunks until deadline or size cap (unit-tested).
+pub(crate) fn coalesce_chunks(chunks: &[String], max_bytes: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    for chunk in chunks {
+        if !cur.is_empty() && cur.len() + chunk.len() > max_bytes {
+            out.push(std::mem::take(&mut cur));
+        }
+        cur.push_str(chunk);
+        if cur.len() >= max_bytes {
+            out.push(std::mem::take(&mut cur));
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -177,8 +223,9 @@ pub fn terminal_spawn(
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("");
+        // Fish: VS Code default profile has no -l; login fish breaks some configs + SI inject.
         match shell_basename {
-            "zsh" | "bash" | "sh" | "fish" => {
+            "zsh" | "bash" | "sh" | "zsh.exe" | "bash.exe" | "sh.exe" => {
                 cmd.arg("-l");
             }
             _ => {}
@@ -240,6 +287,38 @@ pub fn terminal_spawn(
         }
     }
 
+    // Fish: inject VS Code shellIntegration.fish via --init-command when args are default.
+    // Aligns with VS Code (bash/zsh/fish/pwsh SI) so suggest + cwd tracking work.
+    {
+        let shell_basename_owned = std::path::Path::new(&shell_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let shell_basename = shell_basename_owned
+            .strip_suffix(".exe")
+            .unwrap_or(shell_basename_owned.as_str());
+        if shell_basename == "fish" {
+            let can_inject = match &args {
+                None => true,
+                Some(a) if a.is_empty() || a.iter().all(|x| x == "-l" || x == "--login") => true,
+                _ => false,
+            };
+            if can_inject {
+                if let Ok(resource_dir) = app.path().resource_dir() {
+                    let fish_si = resource_dir
+                        .join("shell-integration")
+                        .join("shellIntegration.fish");
+                    if fish_si.is_file() {
+                        let raw = fish_si.to_string_lossy();
+                        let si_path = raw.replace('\\', "\\\\").replace('\'', "'\\''");
+                        cmd.arg(format!("--init-command=source '{si_path}'"));
+                    }
+                }
+            }
+        }
+    }
+
     let child = pair
         .slave
         .spawn_command(cmd)
@@ -276,47 +355,83 @@ pub fn terminal_spawn(
 
     let terminal_id = id;
     let state_clone = state.inner().clone();
+    let unacked = state.inner().flow_counter(id);
+    // Reader thread → channel; emitter thread coalesces bursts into fewer IPC emits.
+    let (chunk_tx, chunk_rx) = std::sync::mpsc::sync_channel::<Option<String>>(64);
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
         loop {
             match reader.read(&mut buf) {
                 Ok(n) if n > 0 => {
                     let text = String::from_utf8_lossy(&buf[..n]).to_string();
-                    let _ = app.emit(
-                        "terminal-data",
-                        TerminalDataEvent {
-                            terminal_id,
-                            data: text,
-                        },
-                    );
+                    if chunk_tx.send(Some(text)).is_err() {
+                        break;
+                    }
                 }
-                Ok(_) | Err(_) => break,
+                Ok(_) | Err(_) => {
+                    let _ = chunk_tx.send(None);
+                    break;
+                }
             }
         }
+    });
 
-        let exit_code = {
-            let Ok(mut terminals) = state_clone.terminals.lock() else {
-                let _ = app.emit(
-                    "terminal-exit",
-                    TerminalExitEvent {
-                        terminal_id,
-                        exit_code: -1,
-                    },
-                );
-                return;
+    std::thread::spawn(move || {
+        let coalesce = Duration::from_millis(EMIT_COALESCE_MS);
+        loop {
+            let first = match chunk_rx.recv() {
+                Ok(Some(t)) => t,
+                Ok(None) | Err(_) => break,
             };
-            let code = if let Some(handle) = terminals.get_mut(&terminal_id) {
-                match handle.child.try_wait() {
-                    Ok(Some(status)) => i32::from(!status.success()),
-                    _ => 0,
+            let mut batch = first;
+            let deadline = Instant::now() + coalesce;
+            while batch.len() < EMIT_COALESCE_MAX_BYTES {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
                 }
-            } else {
-                0
-            };
-            terminals.remove(&terminal_id);
-            code
-        };
+                match chunk_rx.recv_timeout(remaining) {
+                    Ok(Some(more)) => {
+                        batch.push_str(&more);
+                        if batch.len() >= EMIT_COALESCE_MAX_BYTES {
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        // EOF after partial batch — emit then exit outer after.
+                        let _ = emit_with_flow(&app, &unacked, terminal_id, batch);
+                        // drain done
+                        let exit_code = finish_terminal(&state_clone, &app, terminal_id);
+                        let _ = app.emit(
+                            "terminal-exit",
+                            TerminalExitEvent {
+                                terminal_id,
+                                exit_code,
+                            },
+                        );
+                        state_clone.drop_flow_counter(terminal_id);
+                        return;
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => break,
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                        let _ = emit_with_flow(&app, &unacked, terminal_id, batch);
+                        let exit_code = finish_terminal(&state_clone, &app, terminal_id);
+                        let _ = app.emit(
+                            "terminal-exit",
+                            TerminalExitEvent {
+                                terminal_id,
+                                exit_code,
+                            },
+                        );
+                        state_clone.drop_flow_counter(terminal_id);
+                        return;
+                    }
+                }
+            }
+            let _ = emit_with_flow(&app, &unacked, terminal_id, batch);
+        }
 
+        let exit_code = finish_terminal(&state_clone, &app, terminal_id);
         let _ = app.emit(
             "terminal-exit",
             TerminalExitEvent {
@@ -324,9 +439,57 @@ pub fn terminal_spawn(
                 exit_code,
             },
         );
+        state_clone.drop_flow_counter(terminal_id);
     });
 
     Ok(id)
+}
+
+fn emit_with_flow(
+    app: &AppHandle,
+    unacked: &AtomicUsize,
+    terminal_id: u32,
+    data: String,
+) -> Result<(), ()> {
+    // Backpressure: wait until frontend has acked enough bytes.
+    let mut spins = 0u32;
+    while unacked.load(Ordering::Relaxed) > FLOW_HIGH_WATER {
+        std::thread::sleep(Duration::from_millis(1));
+        spins += 1;
+        if spins > 5_000 {
+            // ~5s stuck — emit anyway to avoid deadlock if ack path is missing.
+            break;
+        }
+        if unacked.load(Ordering::Relaxed) <= FLOW_LOW_WATER {
+            break;
+        }
+    }
+    let n = data.len();
+    unacked.fetch_add(n, Ordering::Relaxed);
+    app.emit(
+        "terminal-data",
+        TerminalDataEvent {
+            terminal_id,
+            data,
+        },
+    )
+    .map_err(|_| ())
+}
+
+fn finish_terminal(state: &TerminalStore, _app: &AppHandle, terminal_id: u32) -> i32 {
+    let Ok(mut terminals) = state.terminals.lock() else {
+        return -1;
+    };
+    let code = if let Some(handle) = terminals.get_mut(&terminal_id) {
+        match handle.child.try_wait() {
+            Ok(Some(status)) => i32::from(!status.success()),
+            _ => 0,
+        }
+    } else {
+        0
+    };
+    terminals.remove(&terminal_id);
+    code
 }
 
 #[tauri::command]
@@ -387,6 +550,8 @@ pub fn terminal_kill(state: State<'_, Arc<TerminalStore>>, terminal_id: u32) -> 
     let mut handle = terminals
         .remove(&terminal_id)
         .ok_or_else(|| format!("Terminal {terminal_id} not found"))?;
+    drop(terminals);
+    state.drop_flow_counter(terminal_id);
 
     handle
         .child
@@ -414,6 +579,34 @@ pub fn terminal_get_pid(
 
     Ok(pid)
 }
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn terminal_ack_data(
+    state: State<'_, Arc<TerminalStore>>,
+    handle: u32,
+    bytes: usize,
+) -> Result<(), String> {
+    let counter = {
+        let map = state.unacked_bytes.lock().map_err(|e| e.to_string())?;
+        map.get(&handle).cloned()
+    };
+    if let Some(c) = counter {
+        // Saturating sub without going negative.
+        loop {
+            let cur = c.load(Ordering::Relaxed);
+            let next = cur.saturating_sub(bytes);
+            if c
+                .compare_exchange(cur, next, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
 
 fn home_dir_string() -> Option<String> {
     if cfg!(target_os = "windows") {
@@ -554,18 +747,46 @@ pub fn get_available_shells() -> Vec<ShellInfo> {
             }
         }
 
-        // Fallback if /etc/shells wasn't readable
+        // Always merge PATH/`which` candidates (Homebrew fish often missing from /etc/shells).
+        let path_candidates: &[(&str, &str)] = &[
+            ("zsh", "zsh"),
+            ("bash", "bash"),
+            ("fish", "fish"),
+            ("pwsh", "pwsh"),
+            ("sh", "sh"),
+        ];
+        let fixed_candidates: &[(&str, &str)] = &[
+            ("zsh", "/bin/zsh"),
+            ("bash", "/bin/bash"),
+            ("fish", "/usr/bin/fish"),
+            ("fish", "/usr/local/bin/fish"),
+            ("fish", "/opt/homebrew/bin/fish"),
+            ("sh", "/bin/sh"),
+        ];
+        let mut seen_names: std::collections::HashSet<String> =
+            shells.iter().map(|s| s.name.clone()).collect();
+        for (name, bin) in path_candidates {
+            if seen_names.contains(*name) {
+                continue;
+            }
+            if let Ok(resolved) = which::which(bin) {
+                let resolved_path = resolved.to_string_lossy().to_string();
+                if std::path::Path::new(&resolved_path).exists()
+                    && seen_paths.insert(resolved_path.clone())
+                {
+                    seen_names.insert(name.to_string());
+                    shells.push(ShellInfo {
+                        name: name.to_string(),
+                        path: resolved_path.clone(),
+                        is_default: resolved_path == default_shell
+                            || resolved.file_name()
+                                == std::path::Path::new(&default_shell).file_name(),
+                    });
+                }
+            }
+        }
         if shells.is_empty() {
-            let candidates: &[(&str, &str)] = &[
-                ("zsh", "/bin/zsh"),
-                ("bash", "/bin/bash"),
-                ("fish", "/usr/bin/fish"),
-                ("fish", "/usr/local/bin/fish"),
-                ("fish", "/opt/homebrew/bin/fish"),
-                ("sh", "/bin/sh"),
-            ];
-            let mut seen_names = std::collections::HashSet::new();
-            for (name, shell_path) in candidates {
+            for (name, shell_path) in fixed_candidates {
                 if std::path::Path::new(shell_path).exists() && seen_names.insert(name.to_string())
                 {
                     shells.push(ShellInfo {
@@ -575,6 +796,41 @@ pub fn get_available_shells() -> Vec<ShellInfo> {
                     });
                 }
             }
+        }
+
+        // Deduplicate by basename (prefer exact $SHELL path), then exactly one default.
+        {
+            let mut by_name: std::collections::HashMap<String, ShellInfo> =
+                std::collections::HashMap::new();
+            for s in shells.drain(..) {
+                match by_name.get(&s.name) {
+                    None => {
+                        by_name.insert(s.name.clone(), s);
+                    }
+                    Some(existing) => {
+                        let prefer_new = s.path == default_shell
+                            || (existing.path != default_shell
+                                && s.is_default
+                                && !existing.is_default);
+                        if prefer_new {
+                            by_name.insert(s.name.clone(), s);
+                        }
+                    }
+                }
+            }
+            shells = by_name.into_values().collect();
+            shells.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+        for s in &mut shells {
+            s.is_default = false;
+        }
+        if let Some(s) = shells.iter_mut().find(|s| s.path == default_shell) {
+            s.is_default = true;
+        } else if let Some(s) = shells.iter_mut().find(|s| {
+            std::path::Path::new(&s.path).file_name()
+                == std::path::Path::new(&default_shell).file_name()
+        }) {
+            s.is_default = true;
         }
 
         shells
@@ -672,4 +928,63 @@ fi
         .map_err(|e| format!("Failed to write .zlogin: {e}"))?;
 
     Ok(zdotdir.to_string_lossy().to_string())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::coalesce_chunks;
+
+    #[test]
+    fn coalesce_respects_max_bytes() {
+        // Does not split mid-chunk; flushes before appending when over cap.
+        let chunks = vec!["aa".into(), "bb".into(), "cc".into(), "dd".into()];
+        let out = coalesce_chunks(&chunks, 5);
+        assert_eq!(out, vec!["aabb".to_string(), "ccdd".to_string()]);
+    }
+
+    #[test]
+    fn coalesce_single_chunk_passthrough() {
+        let chunks = vec!["hello".into()];
+        let out = coalesce_chunks(&chunks, 64);
+        assert_eq!(out, vec!["hello".to_string()]);
+    }
+
+    #[test]
+    fn coalesce_reduces_emit_count() {
+        let chunks: Vec<String> = (0..100).map(|i| format!("x{i}")).collect();
+        let naive = chunks.len();
+        let batched = coalesce_chunks(&chunks, 64);
+        assert!(batched.len() < naive);
+        assert_eq!(batched.concat(), chunks.concat());
+        // Cross-check: 100 tiny chunks @ 64-byte cap should be well under 100 emits.
+        assert!(batched.len() <= 20, "expected strong coalesce, got {}", batched.len());
+    }
+
+    #[test]
+    fn detects_shells_on_this_platform() {
+        let shells = super::get_available_shells();
+        let names: Vec<_> = shells.iter().map(|s| s.name.as_str()).collect();
+        // Windows surfaces its native shells; POSIX reads /etc/shells (Git Bash on Windows).
+        #[cfg(target_os = "windows")]
+        assert!(
+            names.iter().any(|n| *n == "PowerShell" || *n == "Git Bash"),
+            "expected PowerShell or Git Bash, got {names:?}"
+        );
+        #[cfg(not(target_os = "windows"))]
+        assert!(
+            names.iter().any(|n| *n == "bash" || *n == "sh"),
+            "expected bash/sh, got {names:?}"
+        );
+        if std::path::Path::new("/usr/bin/fish").exists() || which::which("fish").is_ok() {
+            assert!(
+                shells.iter().any(|s| s.name == "fish"),
+                "fish binary present but not detected: {shells:?}"
+            );
+        }
+        assert!(
+            shells.iter().filter(|s| s.is_default).count() <= 1,
+            "more than one default shell: {shells:?}"
+        );
+    }
 }
