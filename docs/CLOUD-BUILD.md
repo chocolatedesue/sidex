@@ -20,19 +20,20 @@ to R2 (`siden-assets`), so on a mirror without those secrets it will fail.
    to a GitHub Release.
 
 Artifacts land under the run’s **Artifacts** section: `sidex-linux-x86_64`
-(`.tar.gz`), `sidex-windows-x86_64` (`.zip` plus `*-setup.exe`), and
-`sidex-macos-arm64` (`.dmg`).
+(`.tar.gz`), `sidex-windows-x86_64` (`*-setup.exe`), and `sidex-macos-arm64`
+(`.dmg`). One download per platform — a Windows portable `.zip` would mostly
+duplicate the installer at roughly twice the size.
 
 Only the common architectures are built (x86_64 for Linux/Windows, Apple
 Silicon for macOS). Intel macOS is a one-line addition to the `macos` matrix in
 `.github/workflows/cloud-build.yml` if it is ever needed.
 
-These artifacts are built with a **relaxed release profile** — parallel codegen
-and no LTO, set through `CARGO_PROFILE_RELEASE_*` environment variables — because
-the repo’s shipping profile (`lto = "thin"`, `codegen-units = 1`) serialises
-codegen and dominates the build time. Same optimisation level, faster build,
-marginally slower binary: fine for testing, not what you would publish. Drop
-those two env vars to get the shipping profile, or use upstream’s `release.yml`.
+These artifacts are what people download and run, so they are built with the
+repo’s **shipping Cargo profile** (`lto = "thin"`, `codegen-units = 1`,
+`strip = true`, `panic = "abort"`) — smaller binary and better runtime than a
+throwaway build. LTO serialises codegen, so the download is paid for in build
+time; set `CARGO_PROFILE_RELEASE_LTO=false` / `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16`
+in the workflow `env` if a fast local test build matters more than size.
 
 The macOS **`.dmg`** is **unsigned** (no Apple certificate in this mirror), so
 Gatekeeper will refuse it on first open. Download, open the DMG, drag SideX to
@@ -50,9 +51,12 @@ the binary and the packaged app starts on its own — no local dev server, no
 - `SideX` — the native binary (frontend assets embedded)
 - `bin/sidex`, `extension-host/`, `shell-integration/`, and a copy of this file
 
-Windows ships the same layout as a `.zip` (portable) plus an NSIS installer
-(`sidex-<version>-windows-x86_64-setup.exe`) that unpacks to Program Files and
-installs the WebView2 bootstrapper when it is missing.
+Windows ships a single NSIS installer,
+`sidex-<version>-windows-x86_64-setup.exe`, which unpacks to Program Files and
+installs the WebView2 bootstrapper when it is missing. It is the only Windows
+download on purpose: an NSIS installer of this build is around 32 MB, while a
+portable `.zip` of the same build was around 75 MB because the ~70 MB
+`SideX.exe` had to be stored twice (once at the root, once in `bin\` as the CLI).
 
 A `cargo build --release` binary must **not** be shipped: a bare cargo build
 never flips Tauri to production, so the binary keeps loading Vite's `devUrl`

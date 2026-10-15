@@ -10,16 +10,19 @@ name: Cloud build (no signing secrets)
 # artifacts, nothing else.
 #
 # Linux and Windows both go through `tauri build`, so the workbench is baked
-# into the binary and starts without a local dev server — Linux ships the raw
-# release binary plus resources, Windows ships the raw binary plus an NSIS
-# installer. A bare `cargo build --release` must not be used here: it leaves the
-# binary on `devUrl` (`http://localhost:1420`) and the packaged app opens blank
-# or fails with "localhost fail connect".
+# into the binary and starts without a local dev server. Linux ships the raw
+# release binary plus its resources; Windows ships the NSIS installer. A bare
+# `cargo build --release` must not be used here: it leaves the binary on `devUrl`
+# (`http://localhost:1420`) and the packaged app opens blank or fails with
+# "localhost fail connect".
+#
+# Downloads stay small: the build uses the repo's shipping Cargo profile (LTO +
+# `strip`), and each platform ships exactly one artifact — no duplicate copies of
+# the executable, no portable zip next to an installer that compresses better.
 #
 # macOS (Apple Silicon) is also `tauri build`, producing a real SideX.app
 # (unsigned — see docs/CLOUD-BUILD.md for how to open it past Gatekeeper). Only
-# the common architectures are built; the repo's release profile is
-# deliberately relaxed here to keep the build short.
+# the common architectures are built.
 #
 # Trigger it from the Actions tab ("Run workflow") or by pushing a tag; tags
 # additionally attach the files to a GitHub Release.
@@ -36,13 +39,14 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # The repo's release profile is tuned for shipping (lto thin, codegen-units 1),
-  # which serialises codegen and is the bulk of the build time. These artifacts
-  # are for testing, so trade a little throughput for a much shorter build: same
-  # optimisation level, parallel codegen, no LTO. Unset these two to build
-  # byte-identical-to-release output.
-  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16
-  CARGO_PROFILE_RELEASE_LTO: 'false'
+  # These artifacts are what people download and run, so build them with the
+  # repo's shipping profile (`lto = "thin"`, `codegen-units = 1`, `strip`,
+  # `panic = "abort"` — see the root Cargo.toml). Those settings make the binary
+  # both smaller and faster, and they used to be overridden here to
+  # `codegen-units = 16` / `lto = false` to shorten the build; that trade is not
+  # worth it for a release. Build time goes up noticeably (LTO serialises
+  # codegen) — put the two `CARGO_PROFILE_RELEASE_*` overrides back if a quick
+  # throwaway test build matters more than size.
 
 jobs:
   linux-x86_64:
@@ -156,43 +160,26 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
+          # The NSIS installer is the only Windows download. It already carries
+          # the app, its resources and the WebView2 bootstrapper, and it compresses
+          # far better than a zip holding the same binary: the old portable zip was
+          # ~75 MB because `SideX.exe` was stored twice (root + bin\), while the
+          # installer of the identical build is ~32 MB. Add a `--no-bundle` step
+          # and a zip back if a portable build is ever needed.
           $version = node -p "require('./package.json').version"
-          $name = "sidex-$version-windows-x86_64"
-          # A workspace member's binary lands in the workspace target dir.
-          $bin = @("target/release/SideX.exe", "src-tauri/target/release/SideX.exe") |
-            Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $bin) { throw "release binary not found (target/release or src-tauri/target/release)" }
-          New-Item -ItemType Directory -Force -Path "dist-pkg/$name" | Out-Null
-          Copy-Item $bin "dist-pkg/$name/SideX.exe"
-          New-Item -ItemType Directory -Force -Path "dist-pkg/$name/bin" | Out-Null
-          Copy-Item $bin "dist-pkg/$name/bin/sidex.exe"
-          Copy-Item $bin "dist-pkg/$name/bin/SideX.exe"
-          foreach ($dir in @("extension-host", "shell-integration")) {
-            if (Test-Path "src-tauri/$dir") { Copy-Item -Recurse "src-tauri/$dir" "dist-pkg/$name/" }
-          }
-          Copy-Item "docs/CLOUD-BUILD.md" "dist-pkg/$name/README.md"
-          Compress-Archive -Path "dist-pkg/$name" -DestinationPath "$name.zip"
-          Get-ChildItem "$name.zip" | Select-Object Name, Length
-
-      - name: Collect the NSIS installer
-        shell: pwsh
-        run: |
           $setup = @(
             "target/release/bundle/nsis/*-setup.exe",
             "src-tauri/target/release/bundle/nsis/*-setup.exe"
           ) | ForEach-Object { Get-ChildItem $_ -ErrorAction SilentlyContinue } |
             Select-Object -First 1
           if (-not $setup) { throw "NSIS installer not found under target/release/bundle/nsis" }
-          $version = node -p "require('./package.json').version"
           Copy-Item $setup.FullName "sidex-$version-windows-x86_64-setup.exe"
           Get-ChildItem "sidex-*-setup.exe" | Select-Object Name, Length
 
       - uses: actions/upload-artifact@v7
         with:
           name: sidex-windows-x86_64
-          path: |
-            sidex-*.zip
-            sidex-*-setup.exe
+          path: sidex-*-setup.exe
 
   macos:
     name: macos-${{ matrix.arch }}
@@ -312,9 +299,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           REPO="${GITHUB_REPOSITORY}"
+          {
+            echo "Unsigned cloud build of \`${GITHUB_REF_NAME}\`. All three platforms are built"
+            echo 'with `tauri build`, so the workbench is embedded in the binary and the app'
+            echo "starts on its own — no local server, no \`localhost:1420\`."
+            echo
+            echo "- **Windows**: \`*-setup.exe\` — NSIS installer. Installs the WebView2 bootstrapper if it is missing."
+            echo "- **Linux**: \`*.tar.gz\` — unpack and run \`./SideX\`; \`./install-cli.sh\` puts \`sidex\` on your PATH."
+            echo "- **macOS (Apple Silicon)**: \`*.dmg\` — unsigned, so clear the quarantine flag first:"
+            echo '  `xattr -dr com.apple.quarantine /Applications/SideX.app`'
+            echo
+            echo 'The AI panel stays off until `sidex.chat.enabled` is turned on.'
+          } > release-notes.md
           gh release view "${GITHUB_REF_NAME}" -R "$REPO" >/dev/null 2>&1 || \
             gh release create "${GITHUB_REF_NAME}" -R "$REPO" \
-              --title "${GITHUB_REF_NAME}" --notes "Cloud build ${GITHUB_REF_NAME}"
+              --title "${GITHUB_REF_NAME}" --notes-file release-notes.md
           # Upload only files (skip empty dirs from merge-multiple)
           shopt -s nullglob
           files=(artifacts/*)
