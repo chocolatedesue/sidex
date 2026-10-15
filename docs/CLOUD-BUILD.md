@@ -6,7 +6,7 @@ Two clouds can build this tree. Neither needs a local toolchain.
 |---|---|---|
 | GitHub Actions — `build.yml` (upstream) | `cargo check` on Linux / macOS / Windows | push to `main`, PR (paths-filtered) |
 | GitHub Actions — `release.yml` (upstream) | the real release: `tauri build` × 6 targets, signing, Cloudflare R2 + updater manifest | tag `v*` or manual dispatch |
-| GitHub Actions — `cloud-build.yml` (added here) | unsigned Linux x86_64 + Windows x86_64 release binaries and an unsigned macOS **`.dmg`** (Apple Silicon), as **workflow artifacts** | manual dispatch, or tag `v*` |
+| GitHub Actions — `cloud-build.yml` (added here) | unsigned Linux x86_64 + Windows x86_64 (`.zip` and an NSIS `-setup.exe`) and an unsigned macOS **`.dmg`** (Apple Silicon), as **workflow artifacts** | manual dispatch, or tag `v*` |
 | CNB — `.cnb.yml` (added here) | `check` on push/PR; `linux-x86_64` release tarball published to the `dist/linux-x86_64` branch | push to `main`, PR |
 
 ## Getting a binary without any secrets
@@ -20,7 +20,8 @@ to R2 (`siden-assets`), so on a mirror without those secrets it will fail.
    to a GitHub Release.
 
 Artifacts land under the run’s **Artifacts** section: `sidex-linux-x86_64`
-(`.tar.gz`), `sidex-windows-x86_64` (`.zip`), and `sidex-macos-arm64` (`.dmg`).
+(`.tar.gz`), `sidex-windows-x86_64` (`.zip` plus `*-setup.exe`), and
+`sidex-macos-arm64` (`.dmg`).
 
 Only the common architectures are built (x86_64 for Linux/Windows, Apple
 Silicon for macOS). Intel macOS is a one-line addition to the `macos` matrix in
@@ -42,29 +43,32 @@ xattr -dr com.apple.quarantine /Applications/SideX.app
 open /Applications/SideX.app
 ```
 
-The Linux/Windows cloud tarball uses a fast `cargo build --release` (not a full
-`tauri build`), so the workbench is **not** baked into the binary the way a
-macOS `.app` is. The package therefore ships:
+All three platforms go through `tauri build`, so the workbench is baked into
+the binary and the packaged app starts on its own — no local dev server, no
+`localhost:1420`. The Linux tarball ships:
 
-- `SideX` — wrapper that serves packaged `dist/` on `http://127.0.0.1:1420` then
-  execs `SideX.bin` (cargo-built binaries still load Vite's `devUrl`)
-- `SideX.bin` — the native binary
-- `dist/` — built workbench assets (required)
-- `bin/sidex`, `bin/ensure-frontend-server.sh`, `extension-host/`,
-  `shell-integration/`, and a copy of this file
+- `SideX` — the native binary (frontend assets embedded)
+- `bin/sidex`, `extension-host/`, `shell-integration/`, and a copy of this file
 
-Upstream `release.yml` (`tauri build`) embeds the frontend; use that when you
-need a single self-contained executable.
+Windows ships the same layout as a `.zip` (portable) plus an NSIS installer
+(`sidex-<version>-windows-x86_64-setup.exe`) that unpacks to Program Files and
+installs the WebView2 bootstrapper when it is missing.
 
-Running the Linux build needs GTK 3, WebKit 2, and Python 3 (for the dist server):
+A `cargo build --release` binary must **not** be shipped: a bare cargo build
+never flips Tauri to production, so the binary keeps loading Vite's `devUrl`
+(`http://localhost:1420`) and opens a blank window — or on Windows just reports
+`localhost fail connect`. `scripts/SideX-wrapper.sh` + `ensure-frontend-server.sh`
+exist for that local case (serve `dist/` on `:1420` then exec the cargo binary);
+the cloud tarball does not need them.
+
+Running the Linux build needs GTK 3 and WebKit 2:
 
 ```bash
-sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0 python3
+sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0
 ./SideX /path/to/a/folder      # or: ./SideX file.md
-# Skip auto-serve only if you already run Vite: SIDEX_SKIP_FRONTEND_SERVER=1
 
 # Optional: put `sidex` on your PATH (like VS Code's `code`)
-./install-cli.sh               # or: ./SideX.bin --install-cli
+./install-cli.sh               # or: ./SideX --install-cli
 sidex .
 sidex --version
 ```
@@ -115,9 +119,9 @@ Node 20+ comes from NodeSource; the CNB job points cargo at the aliyun mirror
 - macOS is not built in `.cnb.yml` — CNB has no cloud macOS nodes — so it goes
   through GitHub Actions (`cloud-build.yml`, unsigned). Upstream's `release.yml`
   builds the signed DMGs when the Apple secrets are present.
-- `cargo build --release` produces the raw binary rather than a `.deb`/AppImage;
-  `tauri build` (the CLI is already a dev dependency) would emit installers —
-  that is what upstream’s `release.yml` does, given the secrets.
+- Linux ships the raw binary rather than a `.deb`/AppImage (`tauri build
+  --no-bundle`); `--bundles deb,appimage` would emit those too. Windows already
+  emits the NSIS installer.
 - The workflows install system packages with `apt-get` on every run. A build
   environment with them baked in (`docker.build` + Dockerfile on CNB) would cut
   several minutes per build.
@@ -129,5 +133,6 @@ sudo apt-get install -y pkg-config build-essential \
   libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
   librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
 npm install && npm run build
-cargo build --release --manifest-path src-tauri/Cargo.toml
+npx tauri build --no-bundle            # production binary, frontend embedded
+# npx tauri build --bundles deb,appimage  # or a real Linux installer
 ```

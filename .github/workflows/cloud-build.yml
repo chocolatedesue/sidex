@@ -9,11 +9,17 @@ name: Cloud build (no signing secrets)
 # binary" path: it builds release binaries and attaches them as workflow
 # artifacts, nothing else.
 #
-# Linux and Windows come out as the raw release binary plus its resources;
-# macOS (Apple Silicon) goes through `tauri build` so it produces a real
-# SideX.app (unsigned — see docs/CLOUD-BUILD.md for how to open it past
-# Gatekeeper). Only the common architectures are built; the repo's release
-# profile is deliberately relaxed here to keep the build short.
+# Linux and Windows both go through `tauri build`, so the workbench is baked
+# into the binary and starts without a local dev server — Linux ships the raw
+# release binary plus resources, Windows ships the raw binary plus an NSIS
+# installer. A bare `cargo build --release` must not be used here: it leaves the
+# binary on `devUrl` (`http://localhost:1420`) and the packaged app opens blank
+# or fails with "localhost fail connect".
+#
+# macOS (Apple Silicon) is also `tauri build`, producing a real SideX.app
+# (unsigned — see docs/CLOUD-BUILD.md for how to open it past Gatekeeper). Only
+# the common architectures are built; the repo's release profile is
+# deliberately relaxed here to keep the build short.
 #
 # Trigger it from the Actions tab ("Run workflow") or by pushing a tag; tags
 # additionally attach the files to a GitHub Release.
@@ -72,15 +78,20 @@ jobs:
           key: fast-release
 
       - name: Build
-        run: cargo build --locked --release --manifest-path src-tauri/Cargo.toml
+        # `tauri build` (not a bare `cargo build --release`): only the CLI sets
+        # the production cfg and bakes `frontendDist` into the binary. A
+        # cargo-built binary keeps pointing at Vite's `devUrl`
+        # (`http://localhost:1420`) and opens an empty window — or, on Windows,
+        # just "localhost fail connect" — unless something serves `dist/` there.
+        run: npx tauri build --no-bundle
 
       - name: Package
         run: |
           set -e
           VERSION=$(node -p "require('./package.json').version")
           NAME="sidex-${VERSION}-linux-x86_64"
-          # `src-tauri` is a workspace member, so cargo writes the binary into
-          # the workspace target dir rather than src-tauri/target.
+          # `src-tauri` is a workspace member, so the binary lands in the
+          # workspace target dir rather than src-tauri/target.
           BIN=""
           for candidate in target/release/SideX src-tauri/target/release/SideX; do
             if [ -f "$candidate" ]; then BIN="$candidate"; break; fi
@@ -94,18 +105,13 @@ jobs:
           cp "$BIN" "dist-pkg/${NAME}/SideX"
           # CLI: `sidex` on PATH after `./bin/sidex --install-cli` or copying bin/
           cp scripts/sidex "dist-pkg/${NAME}/bin/sidex"
-          cp scripts/ensure-frontend-server.sh "dist-pkg/${NAME}/bin/ensure-frontend-server.sh"
-          chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/bin/ensure-frontend-server.sh"
-          # Wrapper: cargo-built SideX still hits Vite :1420 — serve packaged dist/ first.
-          mv "dist-pkg/${NAME}/SideX" "dist-pkg/${NAME}/SideX.bin"
-          cp scripts/SideX-wrapper.sh "dist-pkg/${NAME}/SideX"
-          chmod +x "dist-pkg/${NAME}/SideX" "dist-pkg/${NAME}/SideX.bin"
+          chmod +x "dist-pkg/${NAME}/bin/sidex" "dist-pkg/${NAME}/SideX"
           ln -sfn ../SideX "dist-pkg/${NAME}/bin/SideX"
           cp scripts/install-cli.sh "dist-pkg/${NAME}/install-cli.sh"
           chmod +x "dist-pkg/${NAME}/install-cli.sh"
+          # Resources are resolved next to the executable when not bundled.
           cp -a src-tauri/extension-host "dist-pkg/${NAME}/" 2>/dev/null || true
           cp -a src-tauri/shell-integration "dist-pkg/${NAME}/" 2>/dev/null || true
-          cp -a dist "dist-pkg/${NAME}/dist"
           cp docs/CLOUD-BUILD.md "dist-pkg/${NAME}/README.md"
           ( cd dist-pkg && tar czf "../${NAME}.tar.gz" "${NAME}" )
           ls -lh "${NAME}.tar.gz"
@@ -140,7 +146,12 @@ jobs:
           key: fast-release
 
       - name: Build
-        run: cargo build --locked --release --manifest-path src-tauri/Cargo.toml
+        # `tauri build`, not `cargo build --release`: only the CLI bakes
+        # `frontendDist` into the binary and flips it to production. A
+        # cargo-built SideX.exe keeps loading Vite's `devUrl`
+        # (`http://localhost:1420`) and dies with "localhost fail connect"
+        # because nothing serves that port on a user's machine.
+        run: npx tauri build --bundles nsis
 
       - name: Package
         shell: pwsh
@@ -159,15 +170,29 @@ jobs:
           foreach ($dir in @("extension-host", "shell-integration")) {
             if (Test-Path "src-tauri/$dir") { Copy-Item -Recurse "src-tauri/$dir" "dist-pkg/$name/" }
           }
-          Copy-Item -Recurse "dist" "dist-pkg/$name/dist"
           Copy-Item "docs/CLOUD-BUILD.md" "dist-pkg/$name/README.md"
           Compress-Archive -Path "dist-pkg/$name" -DestinationPath "$name.zip"
           Get-ChildItem "$name.zip" | Select-Object Name, Length
 
+      - name: Collect the NSIS installer
+        shell: pwsh
+        run: |
+          $setup = @(
+            "target/release/bundle/nsis/*-setup.exe",
+            "src-tauri/target/release/bundle/nsis/*-setup.exe"
+          ) | ForEach-Object { Get-ChildItem $_ -ErrorAction SilentlyContinue } |
+            Select-Object -First 1
+          if (-not $setup) { throw "NSIS installer not found under target/release/bundle/nsis" }
+          $version = node -p "require('./package.json').version"
+          Copy-Item $setup.FullName "sidex-$version-windows-x86_64-setup.exe"
+          Get-ChildItem "sidex-*-setup.exe" | Select-Object Name, Length
+
       - uses: actions/upload-artifact@v7
         with:
           name: sidex-windows-x86_64
-          path: sidex-*.zip
+          path: |
+            sidex-*.zip
+            sidex-*-setup.exe
 
   macos:
     name: macos-${{ matrix.arch }}
